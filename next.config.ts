@@ -21,6 +21,14 @@ const nextConfig: NextConfig = {
     ],
   },
   devIndicators: false,
+  async rewrites() {
+    return [
+      {
+        source: '/backend/:path*',
+        destination: 'http://165.232.176.24:8000/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

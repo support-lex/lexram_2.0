@@ -10,6 +10,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import AuthBottomSheet from '@/components/auth/AuthBottomSheet';
 import { DashboardAuthContext, type DashboardAuthContextValue } from '@/lib/dashboard-auth-context';
+import { supabase } from '@/lib/supabase/client';
 
 // Pages that can be accessed without authentication
 const PUBLIC_DASHBOARD_PATHS = ['/dashboard/research-3'];
@@ -32,22 +33,37 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Client-side auth check — public pages are allowed without auth
+  // Client-side auth check via Supabase. Middleware enforces this server-side
+  // already; this just toggles the in-page UI (sidebar / bottom sheet).
   useEffect(() => {
-    const hasAuth = document.cookie.split(';').some(c => c.trim().startsWith('lexram_auth='));
+    const sb = supabase();
     const isPublicPage = PUBLIC_DASHBOARD_PATHS.some(p => pathname.startsWith(p));
 
-    if (!hasAuth && !isPublicPage) {
-      router.replace(`/sign-in?redirect=${encodeURIComponent(pathname)}`);
-      return;
-    }
+    sb.auth.getUser().then(async ({ data }) => {
+      const signedIn = !!data.user;
+      if (!signedIn && !isPublicPage) {
+        router.replace(`/sign-in?redirect=${encodeURIComponent(pathname)}`);
+        return;
+      }
+      // Hard verification gate: phone OTP is the ONLY signal that counts.
+      // If the session exists but the phone is not confirmed, kick the user
+      // back to /sign-in so they can finish OTP verification there.
+      if (signedIn && !data.user!.phone_confirmed_at && !isPublicPage) {
+        await sb.auth.signOut();
+        router.replace('/sign-in?reason=unverified');
+        return;
+      }
+      if (signedIn) {
+        document.cookie = 'sidebar_state=false; path=/; max-age=604800';
+        setIsAuthenticated(true);
+      }
+      setAuthChecked(true);
+    });
 
-    if (hasAuth) {
-      document.cookie = 'sidebar_state=true; path=/; max-age=604800';
-      setIsAuthenticated(true);
-    }
-
-    setAuthChecked(true);
+    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
+      setIsAuthenticated(!!session?.user);
+    });
+    return () => sub.subscription.unsubscribe();
   }, [pathname, router]);
 
   useKeyboardShortcuts({
@@ -66,7 +82,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
   const handleAuthenticated = () => {
     setIsAuthenticated(true);
-    document.cookie = 'sidebar_state=true; path=/; max-age=604800';
+    document.cookie = 'sidebar_state=false; path=/; max-age=604800';
   };
 
   if (!authChecked) return null;
@@ -80,12 +96,15 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <DashboardAuthContext.Provider value={authContextValue}>
       <SidebarProvider
-        defaultOpen={true}
+        defaultOpen={false}
         style={{ "--sidebar-width": "11rem", "--sidebar-width-icon": "3.25rem" } as React.CSSProperties}
       >
         {isAuthenticated && <AppSidebar />}
 
-        <SidebarInset style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "var(--bg-primary)", minHeight: "100svh" }}>
+        <SidebarInset
+          className="dashboard-main-inset"
+          style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "var(--bg-primary)", minHeight: "100svh" }}
+        >
           {children}
         </SidebarInset>
 

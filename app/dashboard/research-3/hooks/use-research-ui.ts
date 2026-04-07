@@ -36,6 +36,12 @@ export function useResearchUI({
           Boolean(response.draftReady?.trim()))
     );
 
+  // Show chat history by default on desktop, keep it closed on mobile.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setShowHistory(window.innerWidth >= 1024);
+  }, []);
+
   // Auto-open artifacts when a new response with artifacts comes in
   useEffect(() => {
     if (!lastAi?.id) return;

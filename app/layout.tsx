@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Libre_Baskerville, Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/sonner";
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="font-sans antialiased h-full bg-[var(--bg-primary)] text-[var(--text-primary)] selection:bg-[var(--accent)]/30 transition-colors duration-300" suppressHydrationWarning>
         {children}
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   );

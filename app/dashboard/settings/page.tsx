@@ -5,6 +5,10 @@ import {
   User, Building2, Bell, Shield, CreditCard,
   Settings2, Save, LogOut, Check
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useCurrentUser, getInitials } from '@/hooks/use-current-user';
+import { logoutUsecase } from '@/modules/auth/usecase/auth.usecase';
+import { supabase } from '@/lib/supabase/client';
 
 const themes = [
   { id: 'light', name: 'Classic', desc: 'Warm white with gold accents', sidebar: '#0F172A', bg: '#FAFAF9', accent: '#B8860B', surface: '#FFFFFF' },
@@ -16,6 +20,45 @@ const themes = [
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [currentTheme, setCurrentTheme] = useState('light');
+
+  // ── Profile state, hydrated from the signed-in user ────────────────────────
+  const currentUser = useCurrentUser();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState('');
+
+  useEffect(() => {
+    if (currentUser) {
+      setFirstName(currentUser.first_name ?? '');
+      setLastName(currentUser.last_name ?? '');
+      setEmail(currentUser.email ?? '');
+      setPhone(currentUser.phone ?? '');
+      setCountry(currentUser.country ?? '');
+    }
+  }, [currentUser]);
+
+  const handleSaveProfile = async () => {
+    const { error } = await supabase().auth.updateUser({
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+        country,
+      },
+    });
+    if (error) {
+      toast.error('Could not update profile', { description: error.message });
+      return;
+    }
+    toast.success('Profile updated');
+  };
+
+  const handleSignOut = async () => {
+    await logoutUsecase();
+    window.location.href = '/';
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem('lexram_theme');
@@ -84,7 +127,7 @@ export default function SettingsPage() {
           </nav>
 
           <div className="mt-8 pt-4 border-t border-[var(--border-default)]">
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold text-red-500 hover:bg-red-500/10 transition-colors">
+            <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold text-red-500 hover:bg-red-500/10 transition-colors">
               <LogOut className="w-4 h-4" /> Sign Out
             </button>
           </div>
@@ -98,7 +141,7 @@ export default function SettingsPage() {
 
               <div className="flex items-center gap-6">
                 <div className="w-20 h-20 bg-[var(--bg-sidebar)] rounded-full flex items-center justify-center text-[var(--accent)] text-2xl font-bold shadow-sm border-2 border-[var(--bg-sidebar-hover)]">
-                  AS
+                  {getInitials(currentUser)}
                 </div>
                 <div>
                   <button className="bg-[var(--bg-surface)] ring-1 ring-[var(--border-default)] text-[var(--text-primary)] px-4 py-2 rounded-lg text-sm font-bold hover:bg-[var(--surface-hover)] transition-colors shadow-[var(--shadow-card)]">
@@ -111,29 +154,34 @@ export default function SettingsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-[var(--text-primary)]">First Name</label>
-                  <input type="text" defaultValue="Advocate" className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] shadow-sm" />
+                  <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] shadow-sm" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-[var(--text-primary)]">Last Name</label>
-                  <input type="text" defaultValue="Sharma" className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] shadow-sm" />
+                  <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] shadow-sm" />
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-[var(--text-primary)]">Email Address</label>
-                <input type="email" defaultValue="adv.sharma@example.com" className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] shadow-sm" />
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] shadow-sm" />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold text-[var(--text-primary)]">Bar Council Enrollment Number</label>
-                <input type="text" defaultValue="D/1234/2010" className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] shadow-sm" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-[var(--text-primary)]">Phone</label>
+                  <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] shadow-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-[var(--text-primary)]">Country</label>
+                  <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] shadow-sm" />
+                </div>
               </div>
 
               <div className="pt-4 flex justify-end gap-3">
-                <button className="bg-[var(--bg-sidebar)] text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center gap-2 shadow-[var(--shadow-card)]" onClick={() => alert('Changes saved!')}>
+                <button onClick={handleSaveProfile} className="bg-[var(--bg-sidebar)] text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center gap-2 shadow-[var(--shadow-card)]">
                   <Save className="w-4 h-4" /> Save Changes
                 </button>
-                <span className="text-xs text-emerald-600 font-bold py-2.5 hidden">Saved!</span>
               </div>
             </div>
           )}

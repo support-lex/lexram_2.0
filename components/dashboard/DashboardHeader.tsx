@@ -1,12 +1,23 @@
 'use client';
 
 import { Search } from 'lucide-react';
+import { useCurrentUser, getDisplayName } from '@/hooks/use-current-user';
 
 interface DashboardHeaderProps {
   today: string;
 }
 
+function timeOfDayGreeting(): string {
+  if (typeof window === 'undefined') return 'Welcome';
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export default function DashboardHeader({ today }: DashboardHeaderProps) {
+  const user = useCurrentUser();
+  const displayName = getDisplayName(user);
   return (
     <div className="space-y-8">
       {/* Search Bar */}
@@ -24,7 +35,9 @@ export default function DashboardHeader({ today }: DashboardHeaderProps) {
  
       {/* Hero Section */}
       <div>
-        <h1 className="text-3xl font-serif font-bold text-[var(--text-primary)] mb-2">Good morning, Adv. Sharma</h1>
+        <h1 className="text-3xl font-serif font-bold text-[var(--text-primary)] mb-2" suppressHydrationWarning>
+          {timeOfDayGreeting()}, {displayName}
+        </h1>
         <p className="text-[var(--text-secondary)] font-medium" suppressHydrationWarning>{today}</p>
       </div>
     </div>

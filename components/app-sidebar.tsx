@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
+import { useCurrentUser, getDisplayName } from "@/hooks/use-current-user"
 import {
   Sidebar,
   SidebarContent,
@@ -14,7 +15,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
 } from "@/components/ui/sidebar"
 import {
   LayoutDashboard,
@@ -23,7 +23,6 @@ import {
   FileSignature,
   CalendarDays,
   Settings2,
-  History,
   Scale,
 } from "lucide-react"
 
@@ -57,15 +56,15 @@ const navMain = [
   },
 ]
 
-// User data
-const user = {
-  name: "Adv. Sharma",
-  email: "sharma@lexram.ai",
-  avatar: "/avatars/user.jpg",
-}
-
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
+  const currentUser = useCurrentUser()
+
+  const user = {
+    name: getDisplayName(currentUser),
+    email: currentUser?.email || currentUser?.phone || "",
+    avatar: "",
+  }
 
   // Update isActive based on current path
   const navItems = navMain.map(item => ({
@@ -94,7 +93,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               >
                 <Scale className="size-4" />
               </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
+              <div className="sidebar-brand-text grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-serif font-bold text-[var(--text-on-sidebar)]">
                   LexRam
                 </span>
@@ -127,7 +126,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavUser user={user} />
       </SidebarFooter>
       
-      <SidebarRail />
     </Sidebar>
   )
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Search, X, MessageSquare, SquarePen } from "lucide-react";
+import { Search, X, MessageSquare, SquarePen, Trash2 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import type { ResearchSession } from "../types";
 
@@ -13,6 +13,7 @@ type HistorySidebarProps = {
   currentSessionId: string | null;
   onSelectSession: (id: string) => void;
   onNewSession: () => void;
+  onDeleteSession?: (id: string) => void;
   historySearch: string;
   setHistorySearch: (v: string) => void;
   relativeDateLabel: (ts: string) => string;
@@ -22,21 +23,26 @@ function ConversationItem({
   session,
   isActive,
   onSelect,
+  onDelete,
   relativeDateLabel,
 }: {
   session: ResearchSession;
   isActive: boolean;
   onSelect: () => void;
+  onDelete?: () => void;
   relativeDateLabel: (ts: string) => string;
 }) {
   return (
-    <button
-      onClick={onSelect}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all group/item relative ${
+    <div
+      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all group/item relative cursor-pointer ${
         isActive
           ? "bg-[var(--accent)]/10 text-[var(--text-primary)]"
           : "hover:bg-[var(--surface-hover)] text-[var(--text-secondary)]"
       }`}
+      onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelect(); }}
     >
       {isActive && (
         <div className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-full bg-[var(--accent)]" />
@@ -60,7 +66,22 @@ function ConversationItem({
           {relativeDateLabel(session.updatedAt)}
         </div>
       </div>
-    </button>
+      {onDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (window.confirm("Delete this conversation? This cannot be undone.")) {
+              onDelete();
+            }
+          }}
+          title="Delete conversation"
+          className="opacity-0 group-hover/item:opacity-100 p-1 rounded hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-500 transition-all"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -70,6 +91,7 @@ function SidebarContent({
   currentSessionId,
   onSelectSession,
   onNewSession,
+  onDeleteSession,
   historySearch,
   setHistorySearch,
   relativeDateLabel,
@@ -136,6 +158,7 @@ function SidebarContent({
                   session={session}
                   isActive={currentSessionId === session.id}
                   onSelect={() => onSelectSession(session.id)}
+                  onDelete={onDeleteSession ? () => onDeleteSession(session.id) : undefined}
                   relativeDateLabel={relativeDateLabel}
                 />
               ))}

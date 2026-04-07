@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { History } from "lucide-react";
 import { useMatterContext } from "@/lib/matter-context";
 import { ResearchHistoryContext } from "@/lib/research-history-context";
 import { useDashboardAuth } from "@/lib/dashboard-auth-context";
@@ -30,6 +31,7 @@ export default function Research3Page() {
 
   // ── Hooks ──────────────────────────────────────────────────────────────
   const {
+    sessions,
     messages,
     setMessages,
     currentSessionId,
@@ -40,6 +42,7 @@ export default function Research3Page() {
     relativeDateLabel,
     handleNewSession,
     handleSelectSession,
+    handleDeleteSession,
     historyContextValue,
   } = useResearchSessions(selectedMatterId);
 
@@ -156,6 +159,8 @@ export default function Research3Page() {
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
 
   const userInitials = "U";
+  const currentSessionTitle =
+    sessions.find((s) => s.id === currentSessionId)?.title ?? "New Conversation";
 
   // ── Handlers ───────────────────────────────────────────────────────────
   const handleOpenAuthorities = (index: number) => {
@@ -235,6 +240,7 @@ export default function Research3Page() {
           currentSessionId={currentSessionId}
           onSelectSession={handleSelectSession}
           onNewSession={handleNewSession}
+          onDeleteSession={handleDeleteSession}
           historySearch={historySearch}
           setHistorySearch={setHistorySearch}
           relativeDateLabel={relativeDateLabel}
@@ -242,6 +248,20 @@ export default function Research3Page() {
 
         {/* ── Center: Chat area ───────────────────────────────────────── */}
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          <div className="flex items-center justify-between px-4 md:px-6 py-2 border-b border-[var(--border-default)] bg-[var(--bg-surface)]/80 backdrop-blur-sm">
+            <button
+              onClick={() => setShowHistory((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+              title="Toggle chat history"
+            >
+              <History className="w-3.5 h-3.5" />
+              History
+            </button>
+            <div className="max-w-[60%] truncate text-xs font-medium text-[var(--text-muted)]">
+              {currentSessionTitle}
+            </div>
+          </div>
+
           {/* Mobile pane switcher */}
           {hasThread && (
             <div className="flex lg:hidden border-b border-[var(--border-default)] bg-[var(--bg-surface)] flex-shrink-0">

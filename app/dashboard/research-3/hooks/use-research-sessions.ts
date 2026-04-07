@@ -1,29 +1,52 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getStoredData, setStoredData } from "@/lib/storage";
-import { formatDate, generateId } from "@/lib/utils";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { formatDate } from "@/lib/utils";
+import { chatSessionRepository } from "@/modules/chat/repository/chatSession.repository";
+import { generateChatTitle } from "@/modules/chat/usecase/generateTitle";
+import { supabase } from "@/lib/supabase/client";
 import type { Message, ResearchSession } from "../types";
-
-const RESEARCH3_STORAGE_KEY = "lexram_research_sessions_v3";
 
 export function useResearchSessions(selectedMatterId: string) {
   const [sessions, setSessions] = useState<ResearchSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [historySearch, setHistorySearch] = useState("");
+  const [isAuthed, setIsAuthed] = useState(false);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sessionsRef = useRef<ResearchSession[]>([]);
+  const titleGeneratedRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => {
-    setSessions(getStoredData<ResearchSession[]>(RESEARCH3_STORAGE_KEY, []));
+  // ── Load all sessions for the current user from Supabase ───────────────────
+  const refresh = useCallback(async () => {
+    const list = await chatSessionRepository.list();
+    setSessions(list);
+    sessionsRef.current = list;
   }, []);
 
   useEffect(() => {
-    sessionsRef.current = sessions;
-  }, [sessions]);
+    let mounted = true;
+    supabase().auth.getUser().then(({ data }) => {
+      if (!mounted) return;
+      const signedIn = !!data.user;
+      setIsAuthed(signedIn);
+      if (signedIn) refresh();
+    });
 
+    const { data: sub } = supabase().auth.onAuthStateChange((_e, session) => {
+      const signedIn = !!session?.user;
+      setIsAuthed(signedIn);
+      if (signedIn) refresh();
+      else setSessions([]);
+    });
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [refresh]);
+
+  // Reload messages when the user selects a different session.
   useEffect(() => {
     if (!currentSessionId) {
       setMessages([]);
@@ -33,45 +56,82 @@ export function useResearchSessions(selectedMatterId: string) {
     setMessages(session?.messages || []);
   }, [currentSessionId]);
 
+  // ── Debounced auto-save: persist messages to Supabase ──────────────────────
   useEffect(() => {
+    if (!isAuthed) return; // guests can't save
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
+
+    saveTimeoutRef.current = setTimeout(async () => {
       if (messages.length === 0) return;
 
+      // Existing session → update messages
       if (currentSessionId) {
-        setSessions((prev) => {
-          const updated = prev.map((s) =>
+        await chatSessionRepository.updateMessages(currentSessionId, messages);
+        setSessions((prev) =>
+          prev.map((s) =>
             s.id === currentSessionId
               ? { ...s, messages, updatedAt: new Date().toISOString() }
               : s
+          )
+        );
+
+        // Generate AI title once we have at least one user + one ai message
+        // and the session still has the placeholder title.
+        const session = sessionsRef.current.find((s) => s.id === currentSessionId);
+        const hasUser = messages.some((m) => m.role === "user");
+        const hasAi   = messages.some((m) => m.role === "ai");
+        if (
+          session &&
+          hasUser && hasAi &&
+          !titleGeneratedRef.current.has(currentSessionId) &&
+          (session.title === "New Conversation" || session.title.length < 8)
+        ) {
+          titleGeneratedRef.current.add(currentSessionId);
+          const firstUserMsg = messages.find((m) => m.role === "user")?.content ?? "";
+          const newTitle = await generateChatTitle(firstUserMsg);
+          await chatSessionRepository.updateTitle(currentSessionId, newTitle);
+          setSessions((prev) =>
+            prev.map((s) => (s.id === currentSessionId ? { ...s, title: newTitle } : s))
           );
-          setStoredData(RESEARCH3_STORAGE_KEY, updated);
-          return updated;
-        });
-      } else {
-        const id = generateId();
-        const session: ResearchSession = {
-          id,
-          title: messages[0]?.content.slice(0, 60) || "Research Session",
-          messages,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          matterId: selectedMatterId !== "all" ? selectedMatterId : undefined,
-        };
-        setSessions((prev) => {
-          const next = [session, ...prev];
-          setStoredData(RESEARCH3_STORAGE_KEY, next);
-          return next;
-        });
-        setCurrentSessionId(id);
+        }
+        return;
       }
-    }, 500);
+
+      // No session yet → create one with a temporary title.
+      const firstUser = messages.find((m) => m.role === "user")?.content ?? "";
+      const created = await chatSessionRepository.create({
+        title: firstUser.slice(0, 60) || "New Conversation",
+        messages,
+        matter_id: selectedMatterId !== "all" ? selectedMatterId : null,
+      });
+      if (!created) return;
+
+      setCurrentSessionId(created.id);
+      setSessions((prev) => [created, ...prev]);
+      sessionsRef.current = [created, ...sessionsRef.current];
+    }, 600);
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [messages, currentSessionId, selectedMatterId]);
+  }, [messages, currentSessionId, selectedMatterId, isAuthed]);
 
+  // ── Delete a session ───────────────────────────────────────────────────────
+  const handleDeleteSession = useCallback(
+    async (id: string) => {
+      const ok = await chatSessionRepository.remove(id);
+      if (!ok) return;
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      sessionsRef.current = sessionsRef.current.filter((s) => s.id !== id);
+      if (currentSessionId === id) {
+        setCurrentSessionId(null);
+        setMessages([]);
+      }
+    },
+    [currentSessionId]
+  );
+
+  // ── Display helpers (unchanged from previous implementation) ───────────────
   const relativeDateLabel = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -137,6 +197,7 @@ export function useResearchSessions(selectedMatterId: string) {
     relativeDateLabel,
     onSelectSession: handleSelectSession,
     onNewSession: handleNewSession,
+    onDeleteSession: handleDeleteSession,
   };
 
   return {
@@ -152,6 +213,7 @@ export function useResearchSessions(selectedMatterId: string) {
     relativeDateLabel,
     handleNewSession,
     handleSelectSession,
+    handleDeleteSession,
     historyContextValue,
   };
 }

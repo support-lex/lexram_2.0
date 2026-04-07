@@ -22,6 +22,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { ChevronsUpDownIcon, BadgeCheckIcon, BellIcon, SettingsIcon, LogOutIcon } from "lucide-react"
+import { logoutUsecase } from "@/modules/auth/usecase/auth.usecase"
 
 export function NavUser({
   user,
@@ -94,8 +95,8 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
-              onClick={() => {
-                document.cookie = 'lexram_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+              onClick={async () => {
+                await logoutUsecase();
                 window.location.href = '/';
               }}
             >

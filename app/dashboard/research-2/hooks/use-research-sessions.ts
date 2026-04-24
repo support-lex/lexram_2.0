@@ -6,6 +6,57 @@ import { chatSessionRepository } from "@/modules/chat/repository/chatSession.rep
 import { supabase } from "@/lib/supabase/client";
 import type { Message, ResearchSession } from "../types";
 
+// ── Guest (temp) session helpers ──────────────────────────────────────────────
+// A guest chat runs without a LexRam session. We synthesize a `temp_<uuid>`
+// id, keep the thread in localStorage so it survives the sign-in redirect,
+// then swap it for a real backend session id once the user authenticates.
+const TEMP_SESSION_STORAGE_KEY = "lexram_temp_session";
+
+interface StoredTempSession {
+  id: string;
+  messages: Message[];
+  updatedAt: string;
+}
+
+function loadTempSession(): StoredTempSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(TEMP_SESSION_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as StoredTempSession) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveTempSession(s: StoredTempSession) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(TEMP_SESSION_STORAGE_KEY, JSON.stringify(s));
+  } catch {
+    /* quota or disabled storage — silent */
+  }
+}
+
+function clearTempSession() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(TEMP_SESSION_STORAGE_KEY);
+  } catch {
+    /* noop */
+  }
+}
+
+function generateTempSessionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `temp_${crypto.randomUUID()}`;
+  }
+  return `temp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function isTempId(id: string | null | undefined): boolean {
+  return !!id && id.startsWith("temp_");
+}
+
 export function useResearchSessions(selectedMatterId: string) {
   const [sessions, setSessions] = useState<ResearchSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -20,6 +71,10 @@ export function useResearchSessions(selectedMatterId: string) {
   // auto-save effect must NOT race it with a second create — otherwise we end
   // up with duplicate sessions in the sidebar (the bug this guards against).
   const creatingSessionRef = useRef(false);
+  // One-shot guard so a stored guest session is only migrated to a real
+  // backend session once per page load (first time we learn the user is
+  // authed, whether from the initial getUser() probe or a later auth event).
+  const migrationDoneRef = useRef(false);
 
   // ── Load all sessions for the current user from Supabase ───────────────────
   const refresh = useCallback(async () => {
@@ -28,26 +83,58 @@ export function useResearchSessions(selectedMatterId: string) {
     sessionsRef.current = list;
   }, []);
 
+  // Swap a guest `temp_*` session in localStorage for a real LexRam + Supabase
+  // session. Called after the first auth event we see. Safe to call multiple
+  // times — the `migrationDoneRef` guard makes subsequent calls no-op.
+  const migrateTempSessionIfNeeded = useCallback(async () => {
+    if (migrationDoneRef.current) return;
+    const stored = loadTempSession();
+    if (!stored || stored.messages.length === 0) {
+      clearTempSession();
+      return;
+    }
+    migrationDoneRef.current = true;
+    const firstUser = stored.messages.find((m) => m.role === "user")?.content ?? "";
+    const created = await chatSessionRepository.create({
+      title: firstUser.slice(0, 60) || "New Conversation",
+      messages: stored.messages,
+      matter_id: null,
+    });
+    clearTempSession();
+    if (!created) return;
+    sessionsRef.current = [created, ...sessionsRef.current];
+    setSessions((prev) => [created, ...prev]);
+    setCurrentSessionId(created.id);
+    setMessages(stored.messages);
+  }, []);
+
   useEffect(() => {
     let mounted = true;
-    supabase().auth.getUser().then(({ data }) => {
+    supabase().auth.getUser().then(async ({ data }) => {
       if (!mounted) return;
       const signedIn = !!data.user;
       setIsAuthed(signedIn);
-      if (signedIn) refresh();
+      if (signedIn) {
+        await migrateTempSessionIfNeeded();
+        refresh();
+      }
     });
 
-    const { data: sub } = supabase().auth.onAuthStateChange((_e, session) => {
+    const { data: sub } = supabase().auth.onAuthStateChange(async (_e, session) => {
       const signedIn = !!session?.user;
       setIsAuthed(signedIn);
-      if (signedIn) refresh();
-      else setSessions([]);
+      if (signedIn) {
+        await migrateTempSessionIfNeeded();
+        refresh();
+      } else {
+        setSessions([]);
+      }
     });
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [refresh]);
+  }, [refresh, migrateTempSessionIfNeeded]);
 
   // NOTE: there is intentionally no useEffect on `currentSessionId` to load
   // messages from cache. Loading is driven explicitly by handleSelectSession
@@ -58,7 +145,19 @@ export function useResearchSessions(selectedMatterId: string) {
 
   // ── Debounced auto-save: persist messages to Supabase ──────────────────────
   useEffect(() => {
-    if (!isAuthed) return; // guests can't save
+    // Guest flow: mirror the active temp session to localStorage on every
+    // messages change so the thread survives the /sign-in redirect and can
+    // be migrated into a real backend session after the user authenticates.
+    if (!isAuthed) {
+      if (isTempId(currentSessionId) && messages.length > 0) {
+        saveTempSession({
+          id: currentSessionId!,
+          messages,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      return;
+    }
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
     saveTimeoutRef.current = setTimeout(async () => {
@@ -112,12 +211,20 @@ export function useResearchSessions(selectedMatterId: string) {
   }, [messages, currentSessionId, selectedMatterId, isAuthed]);
 
   // ── Ensure a session exists, creating one on demand if not ────────────────
-  // Returns the session id. If we already have a current session, returns it
-  // immediately. Otherwise creates a new session via the repository (which
-  // calls POST /sessions on LexRam, then PATCHes the title) and updates state.
+  // Returns the session id. Authed users get a real LexRam + Supabase session;
+  // guests get a client-side `temp_*` id that lets the chat proceed without
+  // hitting the backend's /sessions endpoint. The temp id is swapped for a
+  // real one after login via migrateTempSessionIfNeeded().
   const ensureSession = useCallback(
     async (titleHint: string): Promise<string | null> => {
       if (currentSessionId) return currentSessionId;
+
+      if (!isAuthed) {
+        const tempId = generateTempSessionId();
+        setCurrentSessionId(tempId);
+        return tempId;
+      }
+
       // Mark create-in-flight so the debounced auto-save effect doesn't race
       // and POST a second session for the same thread.
       creatingSessionRef.current = true;
@@ -135,7 +242,7 @@ export function useResearchSessions(selectedMatterId: string) {
       setSessions((prev) => [created, ...prev]);
       return created.id;
     },
-    [currentSessionId, selectedMatterId]
+    [currentSessionId, isAuthed, selectedMatterId]
   );
 
   // ── Delete a session ───────────────────────────────────────────────────────

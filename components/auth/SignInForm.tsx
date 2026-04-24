@@ -36,7 +36,7 @@ const RESEND_COOLDOWN = 30;
 export default function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectPath = searchParams.get('redirect') || '/dashboard';
+  const redirectPath = searchParams.get('redirect') || '/dashboard/research-2';
   const initialMode: Mode = searchParams.get('intent') === 'signup' ? 'signup' : 'signin';
 
   const [mode, setMode] = useState<Mode>(initialMode);

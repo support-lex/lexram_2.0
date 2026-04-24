@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
-const PUBLIC_DASHBOARD_PATHS = ['/dashboard/research-3', '/dashboard/research-2'];
+const RESEARCH_2_PATH = '/dashboard/research-2';
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -30,12 +30,19 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isDashboard = pathname.startsWith('/dashboard');
-  const isPublicDashboard = PUBLIC_DASHBOARD_PATHS.some((p) => pathname.startsWith(p));
+  const isResearch2 = pathname.startsWith(RESEARCH_2_PATH);
 
-  if (isDashboard && !isPublicDashboard && !user) {
+  if (isDashboard && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/sign-in';
-    url.searchParams.set('redirect', pathname);
+    url.searchParams.set('redirect', RESEARCH_2_PATH);
+    return NextResponse.redirect(url);
+  }
+
+  if (isDashboard && user && !isResearch2) {
+    const url = request.nextUrl.clone();
+    url.pathname = RESEARCH_2_PATH;
+    url.search = '';
     return NextResponse.redirect(url);
   }
 

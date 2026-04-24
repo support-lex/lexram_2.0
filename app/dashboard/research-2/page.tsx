@@ -21,13 +21,15 @@ import ShortcutsModal from "./components/ShortcutsModal";
 import DocumentDialog from "./components/DocumentDialog";
 import PaywallModal from "@/components/PaywallModal";
 import CaseSelector from "@/components/CaseSelector";
+import { useCredits } from "@/hooks/use-credits";
+import type { BillingMode } from "@/lib/billing";
 
-const FREE_MESSAGE_LIMIT = 3;
 const PENDING_QUERY_KEY = "lexram_pending_query";
 
 export default function Research2Page() {
   const { selectedMatterId } = useMatterContext();
   const { isAuthenticated } = useDashboardAuth();
+  const credits = useCredits();
   const router = useRouter();
   const pathname = usePathname();
   const pendingQueryHandled = useRef(false);
@@ -129,16 +131,53 @@ export default function Research2Page() {
     router.push(`/sign-in?${params.toString()}`);
   }, [query, router, pathname]);
 
-  const userMessageCount = messages.filter((m) => m.role === "user").length;
+  // The QueryMode (Instant / Deep / Draft) at the moment the user pressed
+  // send, captured in a ref so the post-stream deduction effect can charge
+  // the correct rate even if the user toggled the pill while waiting.
+  const lastSubmitModeRef = useRef<BillingMode>("instant");
+
   const gatedSubmit = useCallback(() => {
     if (!isAuthenticated) {
       goToSignUp();
       return;
     }
-    if (userMessageCount >= FREE_MESSAGE_LIMIT) { setShowPaywall(true); return; }
+    if (credits.ready && credits.balance <= 0) {
+      setShowPaywall(true);
+      return;
+    }
+    lastSubmitModeRef.current = queryMode;
     handleSubmit();
-  }, [isAuthenticated, userMessageCount, handleSubmit, goToSignUp]);
+  }, [isAuthenticated, credits.ready, credits.balance, queryMode, handleSubmit, goToSignUp]);
   useEffect(() => { handleSubmitRef.current = gatedSubmit; }, [gatedSubmit, handleSubmitRef]);
+
+  // AI message ids we've already billed in this page session. When the user
+  // loads or switches a chat thread, we seed this set with everything the
+  // session already contains — those replies were billed at the time they
+  // were generated, so they must not be charged again.
+  const billedAiIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    billedAiIdsRef.current = new Set(
+      messages.filter((m) => m.role === "ai").map((m) => m.id)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSessionId]);
+
+  // Deduct credits when a brand-new AI reply lands.
+  useEffect(() => {
+    if (!credits.userId) return;
+    const lastAi = [...messages].reverse().find((m) => m.role === "ai");
+    if (!lastAi) return;
+    if (billedAiIdsRef.current.has(lastAi.id)) return;
+    billedAiIdsRef.current.add(lastAi.id);
+    const responseText =
+      lastAi.response?.streamText ||
+      lastAi.response?.shortAnswer ||
+      lastAi.response?.reasoning ||
+      "";
+    if (!responseText) return;
+    const result = credits.deductForResponse(lastSubmitModeRef.current, responseText);
+    if (result?.exhausted) setShowPaywall(true);
+  }, [messages, credits]);
 
   const hasThread = messages.length > 0;
   const lastAiResponse = sourceMessage?.response;
@@ -327,6 +366,8 @@ Enrolment No.: [Number]`,
           onRenameSession={handleRenameSession} historySearch={historySearch}
           setHistorySearch={setHistorySearch} relativeDateLabel={relativeDateLabel}
           onUpgrade={() => setShowPaywall(true)}
+          creditBalance={isAuthenticated ? credits.balance : null}
+          creditCeiling={credits.ceiling}
         />
 
         {/* ── Chat Area ─────────────────────────────────────────────── */}

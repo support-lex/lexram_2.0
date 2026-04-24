@@ -63,53 +63,47 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-md"
+            className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm"
             onClick={onClose}
           />
 
           {/* Modal */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 16 }}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 16 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 300 }}
             className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none"
           >
             <div
-              className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-neutral-950 text-white shadow-[0_24px_80px_-12px_rgba(0,0,0,0.6)] ring-1 ring-white/10 pointer-events-auto"
+              className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-[var(--bg-sidebar)] text-neutral-900 shadow-2xl pointer-events-auto"
               onClick={e => e.stopPropagation()}
             >
-              {/* Hairline gold accent at top */}
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
-
               {/* Close */}
               <button
                 onClick={onClose}
-                aria-label="Close"
-                className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-white/5 hover:bg-white/15 ring-1 ring-white/10 flex items-center justify-center transition-colors"
+                className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-black/10 hover:bg-black/20 flex items-center justify-center transition-colors"
               >
-                <X className="w-4 h-4 text-white" />
+                <X className="w-4 h-4 text-neutral-900" />
               </button>
 
-              <div className="px-6 sm:px-10 py-9 sm:py-11">
+              <div className="px-6 sm:px-10 py-8 sm:py-10">
                 {/* Header */}
-                <div className="text-center mb-9">
+                <div className="text-center mb-8">
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', damping: 15, stiffness: 200, delay: 0.1 }}
-                    className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-400/15 ring-1 ring-amber-400/30 mb-5"
+                    className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--accent)]/15 mb-4"
                   >
-                    <Zap className="w-7 h-7 text-amber-400" />
+                    <Zap className="w-7 h-7 text-[var(--accent)]" />
                   </motion.div>
 
-                  <h2 className="font-serif text-3xl sm:text-4xl font-light tracking-tight text-white mb-3">
-                    You&apos;ve used your{' '}
-                    <span className="text-amber-400 italic">free queries</span>
+                  <h2 className="font-serif text-3xl sm:text-4xl font-light tracking-tight text-neutral-900 mb-2">
+                    You&apos;ve used your <span className="text-[var(--accent)] italic">free queries</span>
                   </h2>
-                  <p className="text-sm text-neutral-300 max-w-md mx-auto leading-relaxed">
-                    Top up to keep your research moving — credits never expire,
-                    no recurring charges.
+                  <p className="text-sm text-neutral-600 max-w-md mx-auto">
+                    Subscribe to continue your AI-powered legal research with unlimited access
                   </p>
                 </div>
 
@@ -121,53 +115,32 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                       initial={{ opacity: 0, y: 16 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.15 + i * 0.08 }}
-                      className={`relative rounded-2xl p-5 flex flex-col transition-colors ${
+                      className={`relative rounded-2xl p-5 flex flex-col ${
                         plan.highlight
-                          ? 'bg-white text-neutral-900 ring-2 ring-amber-400 shadow-[0_12px_40px_-12px_rgba(251,191,36,0.45)]'
-                          : 'bg-neutral-900 text-white ring-1 ring-white/10 hover:ring-white/20'
-                      }`}
+                          ? 'bg-white text-neutral-900 ring-2 ring-[var(--accent)]'
+                          : 'bg-black/5 border border-black/10 hover:bg-black/[0.07] text-neutral-900'
+                      } transition-colors`}
                     >
                       {plan.badge && (
-                        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-amber-400 text-neutral-950 text-[10px] font-bold uppercase tracking-widest py-1 px-3 rounded-full whitespace-nowrap shadow">
+                        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-[var(--accent)] text-neutral-900 text-[10px] font-bold uppercase tracking-widest py-1 px-3 rounded-full whitespace-nowrap">
                           {plan.badge}
                         </div>
                       )}
 
-                      <h3
-                        className={`text-sm font-semibold uppercase tracking-wider mb-3 ${
-                          plan.highlight ? 'text-neutral-500' : 'text-neutral-400'
-                        }`}
-                      >
+                      <h3 className="text-lg font-light mb-1 text-neutral-900">
                         {plan.name}
                       </h3>
-                      <div
-                        className={`font-serif text-3xl font-light tracking-tight mb-1 ${
-                          plan.highlight ? 'text-neutral-900' : 'text-white'
-                        }`}
-                      >
+                      <div className="font-serif text-3xl font-light tracking-tight mb-0.5 text-neutral-900">
                         {plan.price}
                       </div>
-                      <p
-                        className={`text-xs mb-5 ${
-                          plan.highlight ? 'text-neutral-500' : 'text-neutral-400'
-                        }`}
-                      >
+                      <p className={`text-xs mb-4 ${plan.highlight ? 'text-neutral-500' : 'text-neutral-600'}`}>
                         {plan.sub}
                       </p>
 
-                      <ul className="space-y-2.5 mb-6 flex-grow">
+                      <ul className="space-y-2.5 mb-5 flex-grow">
                         {plan.features.map(f => (
-                          <li
-                            key={f}
-                            className={`flex items-start gap-2 text-xs leading-relaxed ${
-                              plan.highlight ? 'text-neutral-700' : 'text-neutral-300'
-                            }`}
-                          >
-                            <CheckCircle2
-                              className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${
-                                plan.highlight ? 'text-amber-500' : 'text-amber-400'
-                              }`}
-                            />
+                          <li key={f} className={`flex items-start gap-2 text-xs ${plan.highlight ? 'text-neutral-700' : 'text-neutral-700'}`}>
+                            <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${plan.highlight ? 'text-neutral-900' : 'text-[var(--accent)]'}`} />
                             {f}
                           </li>
                         ))}
@@ -178,7 +151,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                         className={`w-full py-2.5 rounded-full text-xs font-semibold tracking-wide text-center block transition-colors ${
                           plan.highlight
                             ? 'bg-neutral-900 text-white hover:bg-neutral-800'
-                            : 'bg-white/5 text-white ring-1 ring-white/15 hover:bg-white/10 hover:ring-white/30'
+                            : 'border border-neutral-900/30 text-neutral-900 hover:bg-neutral-900/10'
                         }`}
                       >
                         {plan.cta}
@@ -188,9 +161,9 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-center gap-2 mt-7">
+                <div className="flex items-center justify-center gap-2 mt-6">
                   <Scale className="w-3.5 h-3.5 text-neutral-500" />
-                  <p className="text-[11px] text-neutral-400">
+                  <p className="text-[11px] text-neutral-500">
                     Credits never expire. No recurring charges.
                   </p>
                 </div>

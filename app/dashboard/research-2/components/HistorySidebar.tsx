@@ -2,7 +2,7 @@
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useEffect, useRef, useState } from "react";
-import { Search, X, MessageSquare, SquarePen, Trash2, Pencil, Check, Pin, PinOff } from "lucide-react";
+import { Search, X, MessageSquare, SquarePen, Trash2, Pencil, Check, Pin, PinOff, Zap } from "lucide-react";
 import { pinnedSessionRepository } from "@/modules/chat/repository/feedback.repository";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import type { ResearchSession } from "../types";
@@ -21,6 +21,10 @@ type HistorySidebarProps = {
   setHistorySearch: (v: string) => void;
   relativeDateLabel: (ts: string) => string;
   onUpgrade?: () => void;
+  /** Authenticated user's current credit balance, or null if signed out. */
+  creditBalance?: number | null;
+  /** Highest balance ever held — denominator for the meter's progress bar. */
+  creditCeiling?: number;
 };
 
 function ConversationItem({
@@ -163,6 +167,8 @@ function SidebarContent({
   relativeDateLabel,
   onClose,
   onUpgrade,
+  creditBalance,
+  creditCeiling,
 }: HistorySidebarProps & { onClose: () => void }) {
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => new Set(pinnedSessionRepository.list()));
 
@@ -305,8 +311,43 @@ function SidebarContent({
       {/* Divider */}
       <div className="h-px bg-[var(--oracle-outline-variant,#d0c5b6)]/20 mx-4" />
 
-      {/* Bottom section: Upgrade only */}
-      <div className="px-4 py-4 flex-shrink-0">
+      {/* Bottom section: Credit meter + Upgrade */}
+      <div className="px-4 py-4 flex-shrink-0 space-y-3">
+        {typeof creditBalance === "number" && (
+          <div className="rounded-xl border border-[var(--oracle-outline-variant,#d0c5b6)]/30 bg-white/40 px-3 py-2.5">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                <Zap className="w-3 h-3 text-[var(--accent)]" />
+                Credits
+              </div>
+              <div className="text-[11px] font-mono text-[var(--text-secondary)]">
+                {creditBalance.toLocaleString("en-IN")} / {(creditCeiling ?? creditBalance).toLocaleString("en-IN")}
+              </div>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-[var(--oracle-outline-variant,#d0c5b6)]/30 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  creditBalance <= 0
+                    ? "bg-red-500"
+                    : creditBalance / Math.max(1, creditCeiling ?? creditBalance) < 0.2
+                    ? "bg-amber-500"
+                    : "bg-[var(--accent)]"
+                }`}
+                style={{
+                  width: `${Math.max(
+                    creditBalance > 0 ? 4 : 0,
+                    Math.min(100, (creditBalance / Math.max(1, creditCeiling ?? creditBalance)) * 100)
+                  )}%`,
+                }}
+              />
+            </div>
+            {creditBalance <= 0 && (
+              <p className="mt-1.5 text-[10px] text-red-600 font-medium">
+                You&apos;re out of credits — top up to keep going.
+              </p>
+            )}
+          </div>
+        )}
         <button
           type="button"
           onClick={onUpgrade}

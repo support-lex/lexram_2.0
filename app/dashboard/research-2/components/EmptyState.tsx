@@ -79,14 +79,6 @@ export default function EmptyState({ onPickQuickStart, onUpload }: EmptyStatePro
           })}
         </div>
 
-        {/* Demo button — loads mock messages showcasing all UI blocks */}
-        <button
-          onClick={() => onPickQuickStart("__DEMO__")}
-          className="mt-2 inline-flex items-center gap-2 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-5 py-2 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent)]/10 hover:border-[var(--accent)]/50 transition-all"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-          Demo: Full UI Showcase
-        </button>
       </div>
     </div>
   );

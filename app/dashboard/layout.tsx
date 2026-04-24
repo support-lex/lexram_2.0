@@ -7,13 +7,14 @@ import ShortcutsModal from '@/app/dashboard/research-3/components/ShortcutsModal
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { MatterProvider, useMatterContext } from '@/lib/matter-context';
 import { AppSidebar } from '@/components/app-sidebar';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import AuthBottomSheet from '@/components/auth/AuthBottomSheet';
+import BackendHealthBadge from '@/components/BackendHealthBadge';
 import { DashboardAuthContext, type DashboardAuthContextValue } from '@/lib/dashboard-auth-context';
 import { supabase } from '@/lib/supabase/client';
 
 // Pages that can be accessed without authentication
-const PUBLIC_DASHBOARD_PATHS = ['/dashboard/research-3'];
+const PUBLIC_DASHBOARD_PATHS = ['/dashboard/research-3', '/dashboard/research-2'];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -97,9 +98,15 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     <DashboardAuthContext.Provider value={authContextValue}>
       <SidebarProvider
         defaultOpen={false}
-        style={{ "--sidebar-width": "11rem", "--sidebar-width-icon": "3.25rem" } as React.CSSProperties}
+        style={{ "--sidebar-width": "13rem", "--sidebar-width-icon": "3.25rem" } as React.CSSProperties}
       >
         {isAuthenticated && <AppSidebar />}
+
+        {/* Mobile-only floating menu button — opens the sidebar drawer.
+            The desktop sidebar uses hover-expand which doesn't work on touch. */}
+        {isAuthenticated && (
+          <SidebarTrigger className="md:hidden fixed top-3 left-3 z-50 h-9 w-9 rounded-full bg-[var(--bg-surface)] border border-[var(--border-default)] shadow-md text-[var(--text-primary)]" />
+        )}
 
         <SidebarInset
           className="dashboard-main-inset"
@@ -116,6 +123,9 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
       {!isAuthenticated && (
         <AuthBottomSheet onAuthenticated={handleAuthenticated} />
       )}
+
+      {/* Backend health indicator (LexRam /health probe every 60s) */}
+      {isAuthenticated && <BackendHealthBadge />}
     </DashboardAuthContext.Provider>
   );
 }

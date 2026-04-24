@@ -27,6 +27,12 @@ const nextConfig: NextConfig = {
         source: '/backend/:path*',
         destination: 'http://165.232.176.24:8000/:path*',
       },
+      {
+        // LexRam Legal Research v2 backend — proxied so the HTTPS frontend
+        // can reach the HTTP origin without mixed-content blocking.
+        source: '/legal-api/:path*',
+        destination: 'http://157.245.106.223:8124/:path*',
+      },
     ];
   },
 };

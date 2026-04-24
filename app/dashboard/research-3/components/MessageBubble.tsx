@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import {
   Copy,
-  Landmark,
   Lightbulb,
   ChevronDown,
   ChevronRight,
@@ -15,9 +15,20 @@ import {
   Circle,
   FileText,
   Network,
-  ArrowUpRight,
+  Landmark,
+  RefreshCw,
+  Share2,
+  Pin,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import type { Message } from "../types";
+import InlineBlock from "./inline/InlineBlock";
+import MermaidDiagram from "./inline/MermaidDiagram";
+import InlineAuthorities from "./inline/InlineAuthorities";
+import InlineDraftEditor from "./inline/InlineDraftEditor";
+import CitationBox from "./CitationBox";
+import ProceduralTimeline from "./ProceduralTimeline";
 
 type MessageBubbleProps = {
   message: Message;
@@ -27,10 +38,13 @@ type MessageBubbleProps = {
   expandedThinkingTokens: boolean;
   onToggleWorking: () => void;
   onToggleThinkingTokens: () => void;
-  onOpenAuthorities: (index: number) => void;
-  onOpenEditor: () => void;
-  onOpenWorkflow?: () => void;
   onQuerySelect: (query: string) => void;
+  /** Optional: still used by the page-level paywall flow if a fallback panel exists. */
+  onOpenAuthorities?: (index: number) => void;
+  onOpenEditor?: () => void;
+  onOpenWorkflow?: () => void;
+  /** Extra className forwarded from ChatThread (e.g. entry animation). */
+  className?: string;
 };
 
 const markdownComponents = {
@@ -143,6 +157,7 @@ export default function MessageBubble({
   onOpenEditor,
   onOpenWorkflow,
   onQuerySelect,
+  className,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
 
@@ -156,18 +171,18 @@ export default function MessageBubble({
   // ── User message (right-aligned) ──────────────────────────────────────────
   if (message.role === "user") {
     return (
-      <div className="flex items-end justify-end gap-2.5 group">
-        <div className="max-w-[75%] flex flex-col items-end gap-1">
+      <div className={`flex items-end justify-end gap-2 sm:gap-2.5 group ${className ?? ""}`}>
+        <div className="max-w-[85%] sm:max-w-[75%] flex flex-col items-end gap-1">
           <div className="bg-[var(--accent)] text-white rounded-2xl rounded-br-sm px-4 py-2.5 shadow-sm">
             <p className="text-[14px] leading-6 whitespace-pre-wrap">{message.content}</p>
           </div>
-          <div className="flex items-center gap-2 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          <div className="flex items-center gap-2 px-1">
             <span className="text-[11px] text-[var(--text-muted)]">
               {formatDate(message.timestamp)}
             </span>
             <button
               onClick={() => handleCopy(message.content)}
-              className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] inline-flex items-center gap-0.5"
+              className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] inline-flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
             >
               {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
             </button>
@@ -187,35 +202,91 @@ export default function MessageBubble({
 
   const contentText = response.streamText || response.shortAnswer;
 
-  const renderContentWithCitations = (content: string, citationStart = 0): ReactNode => {
+  const inlineAuthorities = (() => {
+    const fromBlocks = response.uiBlocks?.find((b) => b.type === "authorities");
+    if (fromBlocks && fromBlocks.type === "authorities") return fromBlocks.data;
+    return response.authorities ?? [];
+  })();
+
+  // Custom <cite>N</cite> renderer for LexRam responses. The backend ships
+  // markers like `<cite>1</cite>` or `<cite>2,3,4,5</cite>` in the prose; we
+  // turn each number into a clickable superscript pill that scrolls to the
+  // matching authority card in the right-side panel.
+  const renderCite = (props: any) => {
+    const inner = Array.isArray(props.children) ? props.children.join("") : String(props.children ?? "");
+    const nums = inner
+      .split(/[,\s]+/)
+      .map((s: string) => parseInt(s.trim(), 10))
+      .filter((n: number) => Number.isFinite(n) && n > 0);
+    if (nums.length === 0) return null;
+    return (
+      <span className="inline-flex gap-0.5 align-super">
+        {nums.map((n: number) => {
+          const idx = n - 1;
+          const auth = inlineAuthorities[idx];
+          return (
+            <button
+              key={`cite-${n}`}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (auth && onOpenAuthorities) onOpenAuthorities(idx);
+              }}
+              className="inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] rounded-full bg-[var(--accent)]/10 text-[9px] font-bold text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white hover:scale-110 transition-all duration-150 cursor-pointer"
+              title={auth ? `${n}. ${auth.caseName}` : `Source ${n}`}
+            >
+              {n}
+            </button>
+          );
+        })}
+      </span>
+    );
+  };
+
+  const liveMarkdownComponents = { ...markdownComponents, cite: renderCite };
+
+  // ── "Quick results from the web" preview cards ──────────────────────────
+  // Show up to 2 source cards with favicon + title + snippet + host above
+  // the AI answer, mirroring the Gemini / ChatGPT search-grounded layout.
+  const webPreviews = inlineAuthorities
+    .filter((a) => !!a.linkHint)
+    .slice(0, 2);
+  const getHost = (url: string): string => {
+    try {
+      return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+      return "";
+    }
+  };
+  const getFavicon = (url: string, size = 32): string => {
+    const host = getHost(url);
+    return host ? `https://www.google.com/s2/favicons?domain=${host}&sz=${size}` : "";
+  };
+
+  // The text may now contain inline `<cite>N</cite>` tags from the LexRam
+  // backend. Use rehype-raw so ReactMarkdown parses HTML, and route `<cite>`
+  // through our custom renderer above. If the backend doesn't ship cite tags,
+  // this code path is identical to plain markdown.
+  const hasInlineCites = /<cite>[\s\d,\s]*<\/cite>/i.test(contentText);
+
+  const renderContentWithCitations = (content: string, _citationStart = 0): ReactNode => {
+    void _citationStart;
     const blocks = content
       .split(/\n\s*\n/)
       .map((b) => b.trim())
       .filter(Boolean);
 
-    let citIdx = citationStart;
-    return blocks.map((block, bi) => {
-      const isHeading = /^#{1,6}\s/.test(block);
-      const hasCitation = !isHeading && citIdx < response.authorities.length;
-      const currentCitIdx = hasCitation ? citIdx++ : null;
-
-      return (
-        <div key={`${message.id}-b${bi}`} className="mb-3.5 leading-7 text-[var(--text-primary)]">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {block}
-          </ReactMarkdown>
-          {currentCitIdx !== null && (
-            <button
-              onClick={() => onOpenAuthorities(currentCitIdx)}
-              className="ml-0.5 inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] rounded-full bg-[var(--accent)]/10 text-[9px] font-bold text-[var(--accent)] align-super hover:bg-[var(--accent)] hover:text-white hover:scale-110 transition-all duration-150 cursor-pointer"
-              title={`${currentCitIdx + 1}. ${response.authorities[currentCitIdx]?.caseName}`}
-            >
-              {currentCitIdx + 1}
-            </button>
-          )}
-        </div>
-      );
-    });
+    return blocks.map((block, bi) => (
+      <div key={`${message.id}-b${bi}`} className="mb-3.5 leading-7 text-[var(--text-primary)]">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={hasInlineCites ? [rehypeRaw] : undefined}
+          components={liveMarkdownComponents}
+        >
+          {block}
+        </ReactMarkdown>
+      </div>
+    ));
   };
 
   const streamParagraphCount = contentText
@@ -223,13 +294,13 @@ export default function MessageBubble({
     .filter((b) => b.trim() && !/^#{1,6}\s/.test(b.trim())).length;
 
   return (
-    <div className="flex items-start gap-2.5 group">
+    <div className={`flex items-start gap-2 sm:gap-2.5 group ${className ?? ""}`}>
       {/* Avatar */}
       <div className="w-7 h-7 rounded-full bg-[var(--bg-sidebar)] text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-1">
         L
       </div>
 
-      <div className="flex-1 min-w-0 max-w-[90%]">
+      <div className="flex-1 min-w-0">
         {/* Name + timestamp */}
         <div className="flex items-center gap-2 mb-2">
           <span className="text-sm font-semibold text-[var(--text-primary)]">LexRam</span>
@@ -286,6 +357,61 @@ export default function MessageBubble({
           </div>
         )}
 
+        {/* Quick results from the web — Gemini/ChatGPT-style preview cards */}
+        {webPreviews.length > 0 && (
+          <div className="mb-3">
+            <div className="text-[13px] text-[var(--text-secondary)] mb-2">
+              Quick results from the web:
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {webPreviews.map((a, i) => {
+                const host = getHost(a.linkHint!);
+                const favicon = getFavicon(a.linkHint!, 32);
+                return (
+                  <a
+                    key={`web-${i}`}
+                    href={a.linkHint}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block rounded-2xl border border-[var(--border-light)] bg-[var(--surface-hover)]/40 hover:bg-[var(--surface-hover)] hover:border-[var(--border-default)] transition-colors p-3.5 group min-w-0"
+                  >
+                    <div className="text-[13px] font-semibold text-[var(--text-primary)] line-clamp-2 leading-snug mb-1.5">
+                      {a.caseName}
+                    </div>
+                    <div className="text-[12px] text-[var(--text-secondary)] line-clamp-2 leading-snug mb-2.5">
+                      {a.proposition}
+                    </div>
+                    <div className="flex items-center gap-1.5 min-w-0 text-[11px] text-[var(--text-muted)]">
+                      {favicon && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={favicon}
+                          alt=""
+                          width={14}
+                          height={14}
+                          className="w-3.5 h-3.5 rounded-sm flex-shrink-0"
+                        />
+                      )}
+                      <span className="truncate font-medium text-[var(--text-secondary)]">
+                        {host || a.court}
+                      </span>
+                      <span className="opacity-40">·</span>
+                      <span className="truncate">{a.linkHint}</span>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 2-column row: answer (+ procedural timeline + draft + actions) on
+            the left, dark Authorities card pinned on the right. The whole row
+            scrolls together inside ChatThread — no separate scroll panel. On
+            screens narrower than lg, the right column stacks below the bubble. */}
+        <div className="flex flex-col lg:flex-row gap-3 lg:items-start">
+        <div className="flex-1 min-w-0">
+
         {/* Main content bubble */}
         <div className="rounded-2xl rounded-tl-sm bg-[var(--bg-surface)] border border-[var(--border-light)] shadow-sm px-5 py-4 text-[15px]">
           {renderContentWithCitations(contentText, 0)}
@@ -299,111 +425,160 @@ export default function MessageBubble({
             </>
           )}
 
-          {/* Artifact reference buttons */}
-          {(response.authorities.length > 0 ||
-            response.workflowSteps.length > 0 ||
-            response.draftReady) && (
-            <>
-              <hr className="my-3 border-[var(--border-default)]" />
-              <div className="flex flex-wrap gap-2">
-                {response.workflowSteps.length > 0 && onOpenWorkflow && (
-                  <button
-                    onClick={onOpenWorkflow}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-hover)] ring-1 ring-[var(--border-default)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] hover:ring-[var(--text-primary)]/30 hover:shadow-sm transition-all"
-                  >
-                    <Network className="w-3.5 h-3.5" />
-                    Mind Map
-                    <span className="ml-0.5 opacity-60">{response.workflowSteps.length}</span>
-                    <ArrowUpRight className="w-3 h-3 ml-0.5 opacity-50" />
-                  </button>
-                )}
-                {response.authorities.length > 0 && (
-                  <button
-                    onClick={() => onOpenAuthorities(0)}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 ring-1 ring-amber-500/20 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-500/15 hover:ring-amber-500/30 transition-all"
-                  >
-                    <Landmark className="w-3.5 h-3.5" />
-                    Authorities
-                    <span className="ml-0.5 opacity-70">{response.authorities.length}</span>
-                    <ArrowUpRight className="w-3 h-3 ml-0.5 opacity-50" />
-                  </button>
-                )}
-                {response.draftReady && (
-                  <button
-                    onClick={onOpenEditor}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-500/15 hover:ring-blue-500/30 transition-all"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    Draft Document
-                    <ArrowUpRight className="w-3 h-3 ml-0.5 opacity-50" />
-                  </button>
-                )}
+          {/* ── Draft-mode fallback warning ─────────────────────────────── */}
+          {/* User picked Draft mode but backend returned research-style output
+              instead of a drafted document. Surface it honestly rather than
+              faking a draft in the editor. */}
+          {message.mode === "draft" &&
+            !(response.uiBlocks ?? []).some((b) => b.type === "draft") && (
+              <div className="mt-3 rounded-lg border border-amber-300/60 bg-amber-50/60 px-3 py-2.5 flex items-start gap-2.5">
+                <span className="mt-0.5 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-700 text-[10px] font-bold">!</span>
+                <div className="text-[12px] text-amber-900 leading-relaxed">
+                  <strong className="font-semibold">Draft not generated.</strong> The
+                  server returned research output instead of a drafted document.
+                  Try a more specific prompt, e.g.&nbsp;
+                  <em>
+                    "Draft a bail application for [accused name] in FIR [no.] PS
+                    [station] under Section 302 BNS."
+                  </em>
+                </div>
               </div>
-            </>
-          )}
+            )}
 
-          {/* Metadata row */}
-          {response.authorities.length > 0 && (
-            <>
-              <hr className="my-3 border-[var(--border-light)]" />
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 ring-1 ring-amber-500/20 px-2.5 py-0.5 text-[11px] text-amber-700">
-                  <Landmark className="w-3 h-3" />
-                  {response.authorities.length} cited
-                </span>
-                {response.authorities.slice(0, 3).map((a, i) => (
-                  <button
-                    key={`${a.citation}-${i}`}
-                    onClick={() => onOpenAuthorities(i)}
-                    className="inline-flex items-center rounded-full border border-[var(--border-default)] bg-[var(--surface-hover)] px-2.5 py-0.5 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-white hover:border-[var(--accent)] transition-colors max-w-[140px] truncate"
-                  >
-                    {a.caseName}
-                  </button>
-                ))}
-              </div>
-            </>
+          {/* ── Inline UI blocks (model-driven, only when present) ───────── */}
+          {response.uiBlocks && response.uiBlocks.length > 0 && (
+            <div className="mt-2">
+              {response.uiBlocks.map((block, bi) => {
+                if (block.type === "mindmap") {
+                  return (
+                    <InlineBlock
+                      key={`mm-${bi}`}
+                      icon={<Network className="w-3.5 h-3.5" />}
+                      label="View Diagram"
+                      defaultOpen={false}
+                    >
+                      <MermaidDiagram source={block.data} />
+                    </InlineBlock>
+                  );
+                }
+                if (block.type === "authorities") {
+                  return (
+                    <InlineBlock
+                      key={`auth-${bi}`}
+                      icon={<Landmark className="w-3.5 h-3.5" />}
+                      label="View Authorities"
+                      count={block.data.length}
+                      defaultOpen={true}
+                    >
+                      <InlineAuthorities authorities={block.data} />
+                    </InlineBlock>
+                  );
+                }
+                if (block.type === "draft") {
+                  return (
+                    <InlineBlock
+                      key={`draft-${bi}`}
+                      icon={<FileText className="w-3.5 h-3.5" />}
+                      label="View Draft"
+                      defaultOpen={false}
+                    >
+                      <InlineDraftEditor
+                        content={block.data}
+                        storageKey={`lexram-research3-editor-${message.id}`}
+                      />
+                    </InlineBlock>
+                  );
+                }
+                return null;
+              })}
+            </div>
           )}
         </div>
 
-        {/* Actions row (shown on hover) */}
-        <div className="flex items-center gap-1.5 mt-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+        {/* Procedural timeline — cream card with gold connector line. Renders
+            when the answer has structured workflow steps (procedural flow). */}
+        {response.workflowSteps && response.workflowSteps.length > 0 && (
+          <ProceduralTimeline steps={response.workflowSteps} title="Procedural Timeline" />
+        )}
+
+        {/* Citations are no longer rendered inline — they live in the right
+            side panel (AuthoritiesSidePanel) keyed to the selected/latest AI
+            message. The inline `<cite>N</cite>` superscripts in the prose
+            still scroll-to / select the matching authority on click. */}
+
+        {/* Hover toolbar — copy, regenerate, share, pin, thumbs */}
+        <div className="flex items-center gap-0.5 mt-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
           <button
             onClick={() => handleCopy(contentText)}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+            title="Copy"
           >
             {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
             Copy
           </button>
-          {response.draftReady && (
-            <button
-              onClick={onOpenEditor}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
-            >
-              <FileText className="w-3 h-3" /> Open in editor
-            </button>
-          )}
+          <button
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+            title="Regenerate"
+          >
+            <RefreshCw className="w-3 h-3" /> Redo
+          </button>
+          <button
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+            title="Share"
+          >
+            <Share2 className="w-3 h-3" />
+          </button>
+          <button
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+            title="Pin to matter"
+          >
+            <Pin className="w-3 h-3" />
+          </button>
+          <span className="w-px h-3.5 bg-[var(--border-default)] mx-0.5" />
+          <button
+            className="inline-flex items-center rounded-lg p-1 text-[var(--text-muted)] hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+            title="Good answer"
+          >
+            <ThumbsUp className="w-3 h-3" />
+          </button>
+          <button
+            className="inline-flex items-center rounded-lg p-1 text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50 transition-colors"
+            title="Bad answer"
+          >
+            <ThumbsDown className="w-3 h-3" />
+          </button>
         </div>
 
-        {/* Follow-up suggestions */}
-        {response.nextQuestions.length > 0 && (
+        {/* Follow-up suggestion chips — categorized style */}
+        {response.nextQuestions && response.nextQuestions.length > 0 && (
           <div className="mt-3">
-            <div className="text-[11px] font-medium text-[var(--text-muted)] mb-1.5 px-1">
-              Suggested follow-ups
+            <div className="text-[10px] font-semibold tracking-widest text-[var(--text-muted)] mb-2 px-1">
+              CONTINUE WITH
             </div>
             <div className="flex flex-wrap gap-1.5">
               {response.nextQuestions.map((q, i) => (
                 <button
                   key={i}
                   onClick={() => onQuerySelect(q)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--surface-hover)] px-3 py-1 text-[12px] text-[var(--text-secondary)] hover:border-[var(--accent)]/50 hover:text-[var(--text-primary)] transition-colors max-w-[280px]"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface)] px-3.5 py-1.5 text-[12px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--text-primary)] hover:shadow-sm transition-all max-w-[300px] lexram-hover-glow"
                 >
-                  <Lightbulb className="w-3 h-3 text-[var(--text-muted)] flex-shrink-0" />
+                  <Lightbulb className="w-3 h-3 text-[var(--accent)] flex-shrink-0" />
                   <span className="truncate">{q}</span>
                 </button>
               ))}
             </div>
           </div>
         )}
+        </div>
+        {/* ── Right column: dark "AUTHORITIES / N CITED" card pinned next to
+            this AI message. Rendered only when this message has authorities
+            so the chat column doesn't shift around for citationless answers. */}
+        {inlineAuthorities.length > 0 && (
+          <div className="lg:w-[320px] lg:flex-shrink-0 -mt-1">
+            <CitationBox citations={inlineAuthorities} />
+          </div>
+        )}
+        </div>
       </div>
     </div>
   );

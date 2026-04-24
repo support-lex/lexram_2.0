@@ -1,12 +1,7 @@
 "use client";
 
 import { Search, FileSearch, FileText } from "lucide-react";
-import type { QuickStartCategory } from "../types";
 import { UNIFIED_QUICK_STARTS } from "../types";
-import ChatInput from "./ChatInput";
-import type { ComponentProps } from "react";
-
-type ChatInputProps = ComponentProps<typeof ChatInput>;
 
 const CATEGORY_ICONS = {
   Search,
@@ -14,28 +9,33 @@ const CATEGORY_ICONS = {
   FileText,
 };
 
-type EmptyStateProps = Omit<ChatInputProps, "hasThread">;
+interface EmptyStateProps {
+  onPickQuickStart: (query: string) => void;
+  onUpload: () => void;
+}
 
-export default function EmptyState(props: EmptyStateProps) {
+/**
+ * Empty-state hero shown above the chat input when there are no messages yet.
+ * NOTE: this component intentionally does NOT render the chat input — the
+ * input is hoisted up to page.tsx so it stays at a fixed position when
+ * transitioning from "no messages" to "has messages".
+ */
+export default function EmptyState({ onPickQuickStart, onUpload }: EmptyStateProps) {
   return (
-    <div
-      className="flex flex-col h-full bg-[radial-gradient(ellipse_at_top,_var(--surface-glass),_transparent_60%)]"
-      {...props.dropHandlers}
-    >
-      {/* Center content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 gap-8 pb-4">
+    <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-[radial-gradient(ellipse_at_top,_var(--surface-glass),_transparent_60%)]">
+      <div className="min-h-full flex flex-col items-center justify-center px-4 sm:px-6 gap-6 sm:gap-8 py-8">
         {/* Heading */}
         <div className="text-center">
-          <h1 className="text-3xl font-serif font-bold text-[var(--text-primary)] mb-2">
+          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[var(--text-primary)] mb-2">
             What can I help with?
           </h1>
-          <p className="text-sm text-[var(--text-muted)]">
+          <p className="text-xs sm:text-sm text-[var(--text-muted)]">
             Research Indian case law, analyze documents, or draft legal content
           </p>
         </div>
 
         {/* Quick-start cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-2xl stagger-children">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full max-w-2xl stagger-children">
           {UNIFIED_QUICK_STARTS.map((category) => {
             const Icon =
               CATEGORY_ICONS[category.icon as keyof typeof CATEGORY_ICONS] ?? Search;
@@ -63,10 +63,9 @@ export default function EmptyState(props: EmptyStateProps) {
                       key={chip.label}
                       onClick={() => {
                         if (chip.action === "upload") {
-                          props.fileInputRef.current?.click();
+                          onUpload();
                         } else if (chip.query) {
-                          props.setQuery(chip.query);
-                          setTimeout(() => props.queryTextareaRef.current?.focus(), 0);
+                          onPickQuickStart(chip.query);
                         }
                       }}
                       className="text-left text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] px-2.5 py-1.5 rounded-lg transition-colors truncate"
@@ -80,9 +79,6 @@ export default function EmptyState(props: EmptyStateProps) {
           })}
         </div>
       </div>
-
-      {/* Input at bottom */}
-      <ChatInput {...props} hasThread={false} />
     </div>
   );
 }

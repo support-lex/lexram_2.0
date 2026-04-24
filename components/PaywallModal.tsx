@@ -147,7 +147,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                       </ul>
 
                       <Link
-                        href="/sign-in"
+                        href="/dashboard/subscription"
                         className={`w-full py-2.5 rounded-full text-xs font-semibold tracking-wide text-center block transition-colors ${
                           plan.highlight
                             ? 'bg-black text-white hover:bg-gray-800'

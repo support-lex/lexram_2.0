@@ -16,8 +16,10 @@ import ChatThread from "./components/ChatThread";
 import ChatInput from "./components/ChatInput";
 import AuthoritiesPanel from "./components/AuthoritiesPanel";
 import ShortcutsModal from "./components/ShortcutsModal";
+import DocumentDialog from "./components/DocumentDialog";
 import PaywallModal from "@/components/PaywallModal";
 import SignupPromptModal from "@/components/SignupPromptModal";
+import CaseSelector from "@/components/CaseSelector";
 
 const GUEST_MESSAGE_LIMIT = 1;
 const FREE_MESSAGE_LIMIT = 3;
@@ -28,6 +30,13 @@ export default function Research3Page() {
   const pendingQueryHandled = useRef(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [showDocumentDialog, setShowDocumentDialog] = useState(false);
+  const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
+  // Which AI message's authorities are pinned in the side panel. null = follow
+  // the latest AI message (default). Set when the user clicks a <cite> in an
+  // older bubble — without this, the panel always snaps to the latest message
+  // and earlier-question sources disappear after a follow-up.
+  const [selectedSourceMessageId, setSelectedSourceMessageId] = useState<string | null>(null);
 
   // ── Hooks ──────────────────────────────────────────────────────────────
   const {
@@ -43,6 +52,8 @@ export default function Research3Page() {
     handleNewSession,
     handleSelectSession,
     handleDeleteSession,
+    handleRenameSession,
+    ensureSession,
     historyContextValue,
   } = useResearchSessions(selectedMatterId);
 
@@ -51,6 +62,9 @@ export default function Research3Page() {
     setQuery,
     mode,
     setMode,
+    queryMode,
+    setQueryMode,
+    statusMessage,
     isSearching,
     error,
     streamingText,
@@ -77,10 +91,19 @@ export default function Research3Page() {
     handleSubmit,
     stopGeneration,
     addFiles,
+    attachCaseDocs,
     buildSessionDraft,
-  } = useResearchChat(messages, setMessages);
+  } = useResearchChat(messages, setMessages, { ensureSession });
 
   const lastAi = [...messages].reverse().find((m) => m.role === "ai");
+  // Reset the per-message override whenever a new AI message arrives so the
+  // panel resumes following the latest answer for the next turn.
+  useEffect(() => {
+    setSelectedSourceMessageId(null);
+  }, [lastAi?.id]);
+  const sourceMessage = selectedSourceMessageId
+    ? messages.find((m) => m.id === selectedSourceMessageId) ?? lastAi
+    : lastAi;
 
   const {
     showArtifacts,
@@ -155,15 +178,28 @@ export default function Research3Page() {
 
   // ── Derived values ─────────────────────────────────────────────────────
   const hasThread = messages.length > 0;
-  const lastAiResponse = lastAi?.response;
-  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
+  const lastAiResponse = sourceMessage?.response;
+  // The user question that produced the currently-displayed sources, not just
+  // the most recent question — keeps the panel header in sync with the panel
+  // body when the user pins an older message's authorities.
+  const sourceMessageIndex = sourceMessage
+    ? messages.findIndex((m) => m.id === sourceMessage.id)
+    : -1;
+  const lastUserMessage =
+    sourceMessageIndex > 0
+      ? [...messages.slice(0, sourceMessageIndex)].reverse().find((m) => m.role === "user")
+      : [...messages].reverse().find((m) => m.role === "user");
 
   const userInitials = "U";
   const currentSessionTitle =
     sessions.find((s) => s.id === currentSessionId)?.title ?? "New Conversation";
 
   // ── Handlers ───────────────────────────────────────────────────────────
-  const handleOpenAuthorities = (index: number) => {
+  const handleOpenAuthorities = (index: number, messageId?: string) => {
+    // Pin the panel to the message the citation came from. Without this the
+    // panel always shows the latest AI answer, so clicking [1] inside Q1 after
+    // Q2 has been asked would show Q2's sources instead of Q1's.
+    if (messageId) setSelectedSourceMessageId(messageId);
     setSelectedAuthorityIndex(index);
     setArtifactTab("authorities");
     setShowArtifacts(true);
@@ -192,6 +228,8 @@ export default function Research3Page() {
     setQuery,
     mode,
     setMode,
+    queryMode,
+    setQueryMode,
     onSubmit: gatedSubmit,
     onStop: stopGeneration,
     isGenerating: isSearching,
@@ -212,7 +250,9 @@ export default function Research3Page() {
     setWritingStyle,
     selectedPromptPreset,
     setSelectedPromptPreset,
-    onFileClick: () => fileInputRef.current?.click(),
+    // Click the paperclip → open the documents dialog (list + upload).
+    // The hidden OS file input is still wired for drag-drop into the chat area.
+    onFileClick: () => setShowDocumentDialog(true),
   };
 
   return (
@@ -229,7 +269,13 @@ export default function Research3Page() {
 
       <div
         ref={containerRef}
-        className="flex h-full overflow-hidden bg-[var(--bg-primary)] relative"
+        // Bind explicitly to viewport height (svh accounts for mobile chrome).
+        // Using h-full is unsafe here because the dashboard SidebarInset only
+        // sets `minHeight`, so % heights cascade through an undefined parent
+        // and the row collapses to content height — which means the History
+        // rail's tall content pushes the chat panel down, dragging the input
+        // bar out of view. Hard-binding to 100svh + max-h locks the bounds.
+        className="flex h-[100svh] max-h-[100svh] overflow-hidden bg-[var(--bg-primary)] relative"
       >
         {/* ── Left: History Sidebar ───────────────────────────────────── */}
         <HistorySidebar
@@ -241,136 +287,91 @@ export default function Research3Page() {
           onSelectSession={handleSelectSession}
           onNewSession={handleNewSession}
           onDeleteSession={handleDeleteSession}
+          onRenameSession={handleRenameSession}
           historySearch={historySearch}
           setHistorySearch={setHistorySearch}
           relativeDateLabel={relativeDateLabel}
         />
 
         {/* ── Center: Chat area ───────────────────────────────────────── */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <div className="flex items-center justify-between px-4 md:px-6 py-2 border-b border-[var(--border-default)] bg-[var(--bg-surface)]/80 backdrop-blur-sm">
-            <button
-              onClick={() => setShowHistory((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
-              title="Toggle chat history"
-            >
-              <History className="w-3.5 h-3.5" />
-              History
-            </button>
-            <div className="max-w-[60%] truncate text-xs font-medium text-[var(--text-muted)]">
+        <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-2 border-b border-[var(--border-default)] bg-[var(--bg-surface)]/80 backdrop-blur-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                onClick={() => setShowHistory((v) => !v)}
+                className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+                title="Toggle chat history"
+              >
+                <History className="w-3.5 h-3.5" />
+                History
+              </button>
+              {currentSessionId && (
+                <CaseSelector
+                  sessionId={currentSessionId}
+                  value={currentCaseId}
+                  onChange={(id) => setCurrentCaseId(id)}
+                  className="w-56"
+                />
+              )}
+            </div>
+            <div className="max-w-[40%] truncate text-xs font-medium text-[var(--text-muted)]">
               {currentSessionTitle}
             </div>
           </div>
 
-          {/* Mobile pane switcher */}
-          {hasThread && (
-            <div className="flex lg:hidden border-b border-[var(--border-default)] bg-[var(--bg-surface)] flex-shrink-0">
-              <button
-                onClick={() => setMobilePane("chat")}
-                className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-                  mobilePane === "chat"
-                    ? "text-[var(--accent)] border-b-2 border-[var(--accent)]"
-                    : "text-[var(--text-muted)]"
-                }`}
-              >
-                Chat
-              </button>
-              <button
-                onClick={() => setMobilePane("authorities")}
-                className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-                  mobilePane === "authorities"
-                    ? "text-[var(--accent)] border-b-2 border-[var(--accent)]"
-                    : "text-[var(--text-muted)]"
-                }`}
-              >
-                Artifacts
-              </button>
-            </div>
-          )}
+          {/* Gold streaming progress bar — indeterminate shimmer at top */}
+          {isSearching && <div className="lexram-progress-bar flex-shrink-0" />}
 
           {/* Main content */}
           <div className="flex flex-1 min-h-0 overflow-hidden">
-            {/* Chat panel */}
-            <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            {/* Chat panel — flexbox column with single, fixed-position ChatInput.
+                `min-h-0` on the column is essential: without it, ChatThread's
+                growing content can push the column past its parent's height
+                and the input would drift downward. With it, ChatThread takes
+                the remaining space (flex-1) and scrolls internally; ChatInput
+                stays anchored to the bottom of the column. */}
+            <div
+              className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden relative"
+              {...dropHandlers}
+            >
               {hasThread ? (
-                <>
-                  <ChatThread
-                    messages={messages}
-                    isSearching={isSearching}
-                    streamingText={streamingText}
-                    error={error}
-                    userInitials={userInitials}
-                    expandedWorking={expandedWorking}
-                    expandedThinkingTokens={expandedThinkingTokens}
-                    toggleWorking={toggleWorking}
-                    toggleThinkingTokens={toggleThinkingTokens}
-                    onOpenAuthorities={handleOpenAuthorities}
-                    onOpenEditor={handleOpenEditor}
-                    onOpenWorkflow={handleOpenWorkflow}
-                    onQuerySelect={handleQuerySelect}
-                    onBuildSessionDraft={buildSessionDraft}
-                    mobilePane={mobilePane}
-                  />
-                  <ChatInput {...chatInputProps} hasThread={true} />
-                </>
+                <ChatThread
+                  messages={messages}
+                  isSearching={isSearching}
+                  streamingText={streamingText}
+                  statusMessage={statusMessage}
+                  error={error}
+                  userInitials={userInitials}
+                  expandedWorking={expandedWorking}
+                  expandedThinkingTokens={expandedThinkingTokens}
+                  toggleWorking={toggleWorking}
+                  toggleThinkingTokens={toggleThinkingTokens}
+                  onOpenAuthorities={handleOpenAuthorities}
+                  onOpenEditor={handleOpenEditor}
+                  onOpenWorkflow={handleOpenWorkflow}
+                  onQuerySelect={handleQuerySelect}
+                  onBuildSessionDraft={buildSessionDraft}
+                  mobilePane={mobilePane}
+                />
               ) : (
-                <EmptyState {...chatInputProps} />
+                <EmptyState
+                  onPickQuickStart={handleQuerySelect}
+                  onUpload={() => fileInputRef.current?.click()}
+                />
               )}
+
+              {/* The chat input is always rendered here, as the last child of
+                  the flex column. It does NOT participate in flex-grow, so it
+                  always sits at the bottom of the column at a stable height,
+                  regardless of how tall the chat thread or empty state grows. */}
+              <ChatInput {...chatInputProps} hasThread={hasThread} />
+              <div className="flex-shrink-0 text-center py-1.5 text-[10px] text-[var(--text-muted)] tracking-wide">
+                Verified with LexRam Sovereignty Engine &middot; AI can hallucinate legal citations.
+              </div>
             </div>
 
-            {/* Drag resize handle */}
-            {showArtifacts && (
-              <div
-                onMouseDown={handleDragStart}
-                className={`hidden lg:flex w-1 cursor-col-resize flex-shrink-0 items-center justify-center bg-[var(--border-default)] hover:bg-[var(--accent)]/40 transition-colors ${isDragging ? "bg-[var(--accent)]/40" : ""}`}
-              />
-            )}
-
-            {/* Artifacts panel */}
-            {showArtifacts && (
-              <div
-                className="hidden lg:flex lg:flex-col flex-shrink-0 overflow-hidden border-l border-[var(--border-default)]"
-                style={{ width: `${artifactsWidth}%` }}
-              >
-                <AuthoritiesPanel
-                  showArtifacts={showArtifacts}
-                  mobilePane={mobilePane}
-                  artifactTab={artifactTab}
-                  setArtifactTab={setArtifactTab}
-                  lastResponse={lastAiResponse}
-                  currentQuestion={lastUserMessage?.content}
-                  workflowCount={lastAiResponse?.workflowSteps?.length ?? 0}
-                  authorityCount={lastAiResponse?.authorities?.length ?? 0}
-                  selectedAuthorityIndex={selectedAuthorityIndex}
-                  onSelectAuthority={setSelectedAuthorityIndex}
-                  liveEditorContent={liveEditorContent}
-                  isDraftArtifactStreaming={isSearching && activeRunMode === "draft"}
-                  sessionId={currentSessionId}
-                  width={artifactsWidth}
-                />
-              </div>
-            )}
-
-            {/* Mobile artifacts pane */}
-            {mobilePane === "authorities" && (
-              <div className="lg:hidden flex-1 flex flex-col overflow-hidden border-l border-[var(--border-default)]">
-                <AuthoritiesPanel
-                  showArtifacts={true}
-                  mobilePane={mobilePane}
-                  artifactTab={artifactTab}
-                  setArtifactTab={setArtifactTab}
-                  lastResponse={lastAiResponse}
-                  currentQuestion={lastUserMessage?.content}
-                  workflowCount={lastAiResponse?.workflowSteps?.length ?? 0}
-                  authorityCount={lastAiResponse?.authorities?.length ?? 0}
-                  selectedAuthorityIndex={selectedAuthorityIndex}
-                  onSelectAuthority={setSelectedAuthorityIndex}
-                  liveEditorContent={liveEditorContent}
-                  isDraftArtifactStreaming={isSearching && activeRunMode === "draft"}
-                  sessionId={currentSessionId}
-                />
-              </div>
-            )}
+            {/* Citations are rendered next to each AI message bubble inside
+                the chat scroll (see MessageBubble) — no separate side rail. */}
           </div>
         </div>
       </div>
@@ -394,6 +395,17 @@ export default function Research3Page() {
       <ShortcutsModal
         open={showShortcuts}
         onClose={() => setShowShortcuts(false)}
+      />
+
+      {/* Document dialog — list + upload session documents */}
+      <DocumentDialog
+        open={showDocumentDialog}
+        onOpenChange={setShowDocumentDialog}
+        caseId={currentCaseId}
+        onAttach={(docs) => {
+          attachCaseDocs(docs);
+          setShowDocumentDialog(false);
+        }}
       />
     </ResearchHistoryContext.Provider>
   );

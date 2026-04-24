@@ -1,7 +1,8 @@
 "use client";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Search, X, MessageSquare, SquarePen, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Search, X, MessageSquare, SquarePen, Trash2, Pencil, Check } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import type { ResearchSession } from "../types";
 
@@ -14,6 +15,7 @@ type HistorySidebarProps = {
   onSelectSession: (id: string) => void;
   onNewSession: () => void;
   onDeleteSession?: (id: string) => void;
+  onRenameSession?: (id: string, title: string) => void;
   historySearch: string;
   setHistorySearch: (v: string) => void;
   relativeDateLabel: (ts: string) => string;
@@ -24,14 +26,35 @@ function ConversationItem({
   isActive,
   onSelect,
   onDelete,
+  onRename,
   relativeDateLabel,
 }: {
   session: ResearchSession;
   isActive: boolean;
   onSelect: () => void;
   onDelete?: () => void;
+  onRename?: (title: string) => void;
   relativeDateLabel: (ts: string) => string;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(session.title);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      setDraft(session.title);
+      setTimeout(() => inputRef.current?.select(), 0);
+    }
+  }, [editing, session.title]);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== session.title && onRename) {
+      onRename(trimmed);
+    }
+    setEditing(false);
+  };
+
   return (
     <div
       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all group/item relative cursor-pointer ${
@@ -39,10 +62,10 @@ function ConversationItem({
           ? "bg-[var(--accent)]/10 text-[var(--text-primary)]"
           : "hover:bg-[var(--surface-hover)] text-[var(--text-secondary)]"
       }`}
-      onClick={onSelect}
+      onClick={() => { if (!editing) onSelect(); }}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelect(); }}
+      onKeyDown={(e) => { if (!editing && (e.key === "Enter" || e.key === " ")) onSelect(); }}
     >
       {isActive && (
         <div className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-full bg-[var(--accent)]" />
@@ -55,31 +78,71 @@ function ConversationItem({
         }`}
       />
       <div className="flex-1 min-w-0">
-        <div
-          className={`text-[13px] truncate font-medium leading-5 ${
-            isActive ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
-          }`}
-        >
-          {session.title}
-        </div>
+        {editing ? (
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Enter") commit();
+              else if (e.key === "Escape") { setEditing(false); setDraft(session.title); }
+            }}
+            onBlur={commit}
+            className="w-full bg-[var(--bg-surface)] border border-[var(--accent)]/40 rounded px-1.5 py-0.5 text-[13px] font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)] leading-5"
+          />
+        ) : (
+          <div
+            className={`text-[13px] truncate font-medium leading-5 ${
+              isActive ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
+            }`}
+          >
+            {session.title}
+          </div>
+        )}
         <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
           {relativeDateLabel(session.updatedAt)}
         </div>
       </div>
-      {onDelete && (
+
+      {editing ? (
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (window.confirm("Delete this conversation? This cannot be undone.")) {
-              onDelete();
-            }
-          }}
-          title="Delete conversation"
-          className="opacity-0 group-hover/item:opacity-100 p-1 rounded hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-500 transition-all"
+          onClick={(e) => { e.stopPropagation(); commit(); }}
+          title="Save"
+          className="p-1 rounded hover:bg-[var(--accent)]/10 text-[var(--accent)] transition-all"
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          <Check className="w-3.5 h-3.5" />
         </button>
+      ) : (
+        <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
+          {onRename && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+              title="Rename conversation"
+              className="p-1 rounded hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm("Delete this conversation? This cannot be undone.")) {
+                  onDelete();
+                }
+              }}
+              title="Delete conversation"
+              className="p-1 rounded hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-500 transition-all"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -92,6 +155,7 @@ function SidebarContent({
   onSelectSession,
   onNewSession,
   onDeleteSession,
+  onRenameSession,
   historySearch,
   setHistorySearch,
   relativeDateLabel,
@@ -159,6 +223,7 @@ function SidebarContent({
                   isActive={currentSessionId === session.id}
                   onSelect={() => onSelectSession(session.id)}
                   onDelete={onDeleteSession ? () => onDeleteSession(session.id) : undefined}
+                  onRename={onRenameSession ? (title) => onRenameSession(session.id, title) : undefined}
                   relativeDateLabel={relativeDateLabel}
                 />
               ))}

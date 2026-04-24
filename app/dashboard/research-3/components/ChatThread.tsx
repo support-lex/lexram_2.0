@@ -11,13 +11,14 @@ type ChatThreadProps = {
   messages: Message[];
   isSearching: boolean;
   streamingText: string;
+  statusMessage?: string;
   error: string | null;
   userInitials: string;
   expandedWorking: Record<string, boolean>;
   expandedThinkingTokens: Record<string, boolean>;
   toggleWorking: (id: string) => void;
   toggleThinkingTokens: (id: string) => void;
-  onOpenAuthorities: (index: number) => void;
+  onOpenAuthorities: (index: number, messageId: string) => void;
   onOpenEditor: () => void;
   onOpenWorkflow: () => void;
   onQuerySelect: (query: string) => void;
@@ -29,6 +30,7 @@ export default function ChatThread({
   messages,
   isSearching,
   streamingText,
+  statusMessage,
   error,
   userInitials,
   expandedWorking,
@@ -67,9 +69,9 @@ export default function ChatThread({
         const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
         shouldAutoScrollRef.current = distanceFromBottom < 120;
       }}
-      className={`flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pt-6 pb-6 ${mobilePane === "authorities" ? "hidden lg:block" : ""}`}
+      className={`flex-1 overflow-y-auto custom-scrollbar px-3 sm:px-4 md:px-8 pt-4 sm:pt-6 pb-6 ${mobilePane === "authorities" ? "hidden lg:block" : ""}`}
     >
-      <div className="max-w-[860px] mx-auto space-y-6">
+      <div className="max-w-[860px] lg:max-w-[1180px] mx-auto space-y-4 sm:space-y-6">
         {messages.map((message, index) => {
           const sourceQuery =
             messages.slice(0, index).reverse().find((m) => m.role === "user")?.content ||
@@ -78,6 +80,7 @@ export default function ChatThread({
           return (
             <MessageBubble
               key={message.id}
+              className="lexram-msg-enter"
               message={message}
               userInitials={userInitials}
               formatDate={formatDate}
@@ -85,7 +88,7 @@ export default function ChatThread({
               expandedThinkingTokens={Boolean(expandedThinkingTokens[message.id])}
               onToggleWorking={() => toggleWorking(message.id)}
               onToggleThinkingTokens={() => toggleThinkingTokens(message.id)}
-              onOpenAuthorities={(i) => onOpenAuthorities(i)}
+              onOpenAuthorities={(i) => onOpenAuthorities(i, message.id)}
               onOpenEditor={onOpenEditor}
               onOpenWorkflow={onOpenWorkflow}
               onQuerySelect={onQuerySelect}
@@ -93,7 +96,9 @@ export default function ChatThread({
           );
         })}
 
-        {isSearching && <StreamingIndicator streamingText={streamingText} />}
+        {isSearching && (
+          <StreamingIndicator streamingText={streamingText} statusMessage={statusMessage} />
+        )}
 
         {error && (
           <div className="flex items-start gap-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl p-4">

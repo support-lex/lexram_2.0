@@ -16,6 +16,15 @@ export type WorkflowStep = {
   detail?: string;
 };
 
+// ─── Inline UI blocks (model-driven) ──────────────────────────────────────────
+// The model emits these only when a richer-than-prose representation actually
+// helps. Frontend renders them inline inside the message bubble. Anything not
+// in this list is silently ignored, so the contract is forward-compatible.
+export type MindmapBlock      = { type: "mindmap";     data: string };          // Mermaid source
+export type AuthoritiesBlock  = { type: "authorities"; data: Authority[] };
+export type DraftBlock        = { type: "draft";       data: string };          // markdown / plain text
+export type UiBlock = MindmapBlock | AuthoritiesBlock | DraftBlock;
+
 export type LegalAnswer = {
   thinkingText?: string;
   streamText?: string;
@@ -23,10 +32,16 @@ export type LegalAnswer = {
   reasoning: string;
   authorityStrength: "Strong" | "Moderate" | "Limited";
   divergenceStatus: "Aligned" | "Split" | "Unsettled";
-  authorities: Authority[];
-  draftReady: string;
-  nextQuestions: string[];
-  workflowSteps: WorkflowStep[];
+
+  // ─── Optional artifact fields ───────────────────────────────────────────────
+  // The model may omit any of these. Frontend must handle absence gracefully.
+  authorities?:   Authority[];
+  draftReady?:    string;
+  workflowSteps?: WorkflowStep[];
+  nextQuestions?: string[];
+
+  // ─── Inline UI blocks (preferred path) ─────────────────────────────────────
+  uiBlocks?: UiBlock[];
 };
 
 export type Message = {
@@ -53,6 +68,8 @@ export type AttachedFile = {
   size: number;
   type: string;
   content?: string;
+  source?: "local" | "case";
+  caseDocId?: string;
 };
 
 export type PromptPreset = {

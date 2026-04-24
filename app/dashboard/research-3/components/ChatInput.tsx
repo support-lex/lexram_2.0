@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   Paperclip,
   Send,
@@ -10,11 +10,14 @@ import {
   Globe,
   GlobeLock,
   FileText,
+  Mic,
+  MicOff,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import type { AttachedFile, CommandMode, OutputFormat, AnalysisDepth, WritingStyle } from "../types";
 import { PROMPT_PRESETS } from "../types";
+import type { QueryMode } from "@/modules/legal/api/queryStream";
 
 /** Grouped types — reduce the 26-flat-prop surface to logical clusters */
 
@@ -22,6 +25,7 @@ import { PROMPT_PRESETS } from "../types";
 export type ChatConfig = {
   query: string;
   mode: CommandMode;
+  queryMode: QueryMode;
   webSearchEnabled: boolean;
   outputFormat: OutputFormat;
   analysisDepth: AnalysisDepth;
@@ -33,6 +37,7 @@ export type ChatConfig = {
 export type ChatConfigSetters = {
   setQuery: (v: string) => void;
   setMode: (m: CommandMode) => void;
+  setQueryMode: (m: QueryMode) => void;
   setWebSearchEnabled: (v: boolean) => void;
   setOutputFormat: (v: OutputFormat) => void;
   setAnalysisDepth: (v: AnalysisDepth) => void;
@@ -110,6 +115,8 @@ export default function ChatInput({
   resizeTextarea,
   webSearchEnabled,
   setWebSearchEnabled,
+  queryMode,
+  setQueryMode,
   outputFormat,
   setOutputFormat,
   analysisDepth,
@@ -129,10 +136,114 @@ export default function ChatInput({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (!isGenerating && query.trim()) onSubmit();
+      // (no-op marker — anchor for the upcoming speech recognition block)
     }
   };
 
   const currentModeLabel = MODES.find((m) => m.value === mode)?.label ?? "Research";
+
+  // ── Voice typing (Web Speech API) ─────────────────────────────────────────
+  // Uses the browser's built-in SpeechRecognition (Chrome/Edge/Safari). Falls
+  // back to a disabled tooltip on browsers that don't support it (Firefox).
+  // Continuous + interim results so the textarea fills as the user speaks.
+  const recognitionRef = useRef<any>(null);
+  const baseQueryRef = useRef<string>("");
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(true);
+
+  // ms of silence with no new transcript before we auto-stop the mic
+  const SILENCE_TIMEOUT_MS = 2500;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const SR =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      setSpeechSupported(false);
+      return;
+    }
+    const r = new SR();
+    r.continuous = true;
+    r.interimResults = true;
+    r.lang = "en-IN";
+
+    const armSilenceTimer = () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => {
+        try {
+          r.stop();
+        } catch {
+          /* noop */
+        }
+      }, SILENCE_TIMEOUT_MS);
+    };
+
+    r.onresult = (event: any) => {
+      let interim = "";
+      let finalText = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) finalText += t;
+        else interim += t;
+      }
+      const merged = `${baseQueryRef.current}${baseQueryRef.current && (finalText || interim) ? " " : ""}${finalText}${interim}`;
+      setQuery(merged.replace(/\s+/g, " ").trimStart());
+      if (finalText) baseQueryRef.current = `${baseQueryRef.current}${baseQueryRef.current ? " " : ""}${finalText.trim()}`.trim();
+      // Reset the silence countdown — every new chunk of speech buys 2.5s.
+      armSilenceTimer();
+    };
+    r.onstart = () => armSilenceTimer();
+    r.onspeechstart = () => armSilenceTimer();
+    r.onend = () => {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      setIsListening(false);
+    };
+    r.onerror = () => {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      setIsListening(false);
+    };
+    recognitionRef.current = r;
+    return () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      try {
+        r.stop();
+      } catch {
+        /* noop */
+      }
+    };
+    // setQuery is stable enough — re-binding on every keystroke would
+    // recreate the recognizer mid-utterance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggleVoiceTyping = () => {
+    const r = recognitionRef.current;
+    if (!r) return;
+    if (isListening) {
+      try {
+        r.stop();
+      } catch {
+        /* noop */
+      }
+      setIsListening(false);
+      return;
+    }
+    baseQueryRef.current = query.trim();
+    try {
+      r.start();
+      setIsListening(true);
+      queryTextareaRef.current?.focus();
+    } catch {
+      setIsListening(false);
+    }
+  };
 
   return (
     <div
@@ -149,32 +260,47 @@ export default function ChatInput({
         </div>
       )}
 
-      <div className={`max-w-3xl mx-auto ${hasThread ? "px-4 py-3" : "px-4 pb-6"}`}>
+      {/* Width + padding MUST match ChatThread so the bubbles and input column
+          line up at every viewport, regardless of whether the history rail is open. */}
+      <div className={`max-w-[860px] mx-auto ${hasThread ? "px-3 sm:px-4 md:px-8 py-3" : "px-3 sm:px-4 md:px-8 pb-4 sm:pb-6"}`}>
         {/* Attached files */}
         {attachedFiles.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2.5">
-            {attachedFiles.map((file) => (
-              <div
-                key={file.id}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs text-[var(--text-secondary)]"
-              >
-                <FileText className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                <span className="max-w-[120px] truncate">{file.name}</span>
-                <button
-                  onClick={() => removeFile(file.id)}
-                  className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            {attachedFiles.map((file) => {
+              const fromCase = file.source === "case";
+              return (
+                <div
+                  key={file.id}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors ${
+                    fromCase
+                      ? "border-[var(--accent)]/40 bg-[var(--accent)]/5 text-[var(--text-primary)]"
+                      : "border-[var(--border-default)] bg-[var(--surface-hover)] text-[var(--text-secondary)]"
+                  }`}
+                  title={fromCase ? "From case library" : file.name}
                 >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
+                  <FileText className={`w-3.5 h-3.5 ${fromCase ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`} />
+                  <span className="max-w-[120px] truncate">{file.name}</span>
+                  {fromCase && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--accent)] px-1 py-0 rounded bg-[var(--accent)]/15 leading-tight">
+                      case
+                    </span>
+                  )}
+                  <button
+                    onClick={() => removeFile(file.id)}
+                    className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* Main input container */}
-        <div className="flex items-end gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-[0_4px_24px_-4px_rgba(0,0,0,0.08)] px-3 py-2.5 focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]/20 transition-all">
+        {/* Main input container — stacks on mobile (textarea on top, toolbar + send below). */}
+        <div className="flex flex-col sm:flex-row sm:items-end gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-[0_4px_24px_-4px_rgba(0,0,0,0.08)] px-3 py-2.5 focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]/20 transition-all">
           {/* Left actions */}
-          <div className="flex items-center gap-1 flex-shrink-0 pb-0.5">
+          <div className="flex items-center gap-1 flex-shrink-0 pb-0.5 order-2 sm:order-1 flex-wrap">
             {/* Attach file */}
             <button
               type="button"
@@ -202,6 +328,50 @@ export default function ChatInput({
                 <GlobeLock className="w-4 h-4" />
               )}
             </button>
+
+            {/* Instant / Deep query mode toggle (LexRam backend) */}
+            <div
+              className="ml-1 inline-flex items-center rounded-lg bg-[var(--surface-hover)] p-0.5 border border-[var(--border-default)]"
+              role="group"
+              aria-label="Query depth"
+            >
+              <button
+                type="button"
+                onClick={() => setQueryMode("instant")}
+                title="Instant — fast answer"
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                  queryMode === "instant"
+                    ? "bg-white text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                Instant
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueryMode("deep")}
+                title="Deep — slower, more thorough analysis"
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                  queryMode === "deep"
+                    ? "bg-white text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                Deep
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueryMode("draft")}
+                title="Draft a legal document using this session's research"
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                  queryMode === "draft"
+                    ? "bg-white text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                Draft
+              </button>
+            </div>
           </div>
 
           {/* Textarea */}
@@ -214,12 +384,12 @@ export default function ChatInput({
               hasThread ? "Ask a follow-up…" : "Ask a legal question…"
             }
             rows={1}
-            className="flex-1 resize-none bg-transparent text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none leading-6 max-h-[220px] overflow-y-auto custom-scrollbar py-0.5"
+            className="order-1 sm:order-2 w-full sm:flex-1 resize-none bg-transparent text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none leading-6 max-h-[220px] overflow-y-auto custom-scrollbar py-0.5"
             style={{ paddingBottom: "1px" }}
           />
 
           {/* Right actions */}
-          <div className="flex items-center gap-1.5 flex-shrink-0 pb-0.5">
+          <div className="flex items-center gap-1.5 flex-shrink-0 pb-0.5 order-3 ml-auto sm:ml-0">
             {/* Settings popover */}
             <Popover>
               <PopoverTrigger
@@ -358,6 +528,29 @@ export default function ChatInput({
               <span className="px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] text-xs font-semibold border border-[var(--accent)]/20">
                 {currentModeLabel}
               </span>
+            )}
+
+            {/* Voice typing — Web Speech API. Hidden when the browser doesn't
+                support SpeechRecognition (e.g. Firefox). Pulses red while
+                listening so the user knows the mic is hot. */}
+            {speechSupported && (
+              <button
+                type="button"
+                onClick={toggleVoiceTyping}
+                disabled={isGenerating}
+                className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+                  isListening
+                    ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+                }`}
+                title={isListening ? "Stop voice typing" : "Voice typing"}
+              >
+                {isListening ? (
+                  <MicOff className="w-4 h-4" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </button>
             )}
 
             {/* Send / Stop */}

@@ -326,6 +326,7 @@ Enrolment No.: [Number]`,
           onNewSession={handleNewSession} onDeleteSession={handleDeleteSession}
           onRenameSession={handleRenameSession} historySearch={historySearch}
           setHistorySearch={setHistorySearch} relativeDateLabel={relativeDateLabel}
+          onUpgrade={() => setShowPaywall(true)}
         />
 
         {/* ── Chat Area ─────────────────────────────────────────────── */}

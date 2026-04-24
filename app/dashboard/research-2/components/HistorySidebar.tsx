@@ -20,6 +20,7 @@ type HistorySidebarProps = {
   historySearch: string;
   setHistorySearch: (v: string) => void;
   relativeDateLabel: (ts: string) => string;
+  onUpgrade?: () => void;
 };
 
 function ConversationItem({
@@ -161,6 +162,7 @@ function SidebarContent({
   setHistorySearch,
   relativeDateLabel,
   onClose,
+  onUpgrade,
 }: HistorySidebarProps & { onClose: () => void }) {
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => new Set(pinnedSessionRepository.list()));
 
@@ -305,9 +307,13 @@ function SidebarContent({
 
       {/* Bottom section: Upgrade only */}
       <div className="px-4 py-4 flex-shrink-0">
-        <a href="/dashboard/subscription" className="block w-full py-2.5 rounded-xl text-sm font-semibold text-[var(--accent)] border border-[var(--oracle-primary-container,#c6a76e)]/40 hover:border-[var(--oracle-primary-container,#c6a76e)] hover:bg-[var(--accent)]/5 transition-all animate-[lexram-focus-pulse_3s_ease-in-out_infinite] text-center">
+        <button
+          type="button"
+          onClick={onUpgrade}
+          className="block w-full py-2.5 rounded-xl text-sm font-semibold text-[var(--accent)] border border-[var(--oracle-primary-container,#c6a76e)]/40 hover:border-[var(--oracle-primary-container,#c6a76e)] hover:bg-[var(--accent)]/5 transition-all animate-[lexram-focus-pulse_3s_ease-in-out_infinite] text-center"
+        >
           Upgrade to Pro
-        </a>
+        </button>
       </div>
     </div>
   );

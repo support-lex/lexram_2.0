@@ -20,7 +20,7 @@ export default function Hero() {
     const q = (text ?? query).trim();
     if (!q) return;
     sessionStorage.setItem('lexram_pending_query', q);
-    router.push('/dashboard/research-3');
+    router.push('/dashboard/research-2');
   }
 
   return (

@@ -32,7 +32,10 @@ export async function middleware(request: NextRequest) {
   const isDashboard = pathname.startsWith('/dashboard');
   const isResearch2 = pathname.startsWith(RESEARCH_2_PATH);
 
-  if (isDashboard && !user) {
+  // Guests are allowed on research-2 — the page itself caps them at one
+  // message before triggering the signup modal. Any other dashboard route
+  // still requires auth.
+  if (isDashboard && !isResearch2 && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/sign-in';
     url.searchParams.set('redirect', RESEARCH_2_PATH);

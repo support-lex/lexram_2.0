@@ -23,8 +23,8 @@ import PaywallModal from "@/components/PaywallModal";
 import SignupPromptModal from "@/components/SignupPromptModal";
 import CaseSelector from "@/components/CaseSelector";
 
-const GUEST_MESSAGE_LIMIT = 1;
 const FREE_MESSAGE_LIMIT = 3;
+const PENDING_QUERY_KEY = "lexram_pending_query";
 
 export default function Research2Page() {
   const { selectedMatterId } = useMatterContext();
@@ -85,16 +85,26 @@ export default function Research2Page() {
   } = useResearchUI({ lastAi, queryTextareaRef, handleSubmitRef });
 
   const shouldAutoSubmit = useRef(false);
+  const guestPromptShown = useRef(false);
   useEffect(() => {
     if (pendingQueryHandled.current) return;
-    const pending = sessionStorage.getItem("lexram_pending_query");
+    const pending = sessionStorage.getItem(PENDING_QUERY_KEY);
     if (!pending) return;
-    pendingQueryHandled.current = true;
-    sessionStorage.removeItem("lexram_pending_query");
     setQuery(pending);
-    shouldAutoSubmit.current = true;
+    if (isAuthenticated) {
+      // Authed: consume the pending query and submit with a real Bearer token.
+      pendingQueryHandled.current = true;
+      sessionStorage.removeItem(PENDING_QUERY_KEY);
+      shouldAutoSubmit.current = true;
+    } else if (!guestPromptShown.current) {
+      // Guest: the LexRam backend rejects anonymous queries (401), so we
+      // can't auto-submit. Keep the query stashed in sessionStorage so it
+      // can be auto-submitted once the user finishes signup and comes back.
+      guestPromptShown.current = true;
+      setShowSignupPrompt(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuthenticated]);
   useEffect(() => {
     if (shouldAutoSubmit.current && query.trim()) {
       shouldAutoSubmit.current = false;
@@ -116,10 +126,16 @@ export default function Research2Page() {
 
   const userMessageCount = messages.filter((m) => m.role === "user").length;
   const gatedSubmit = useCallback(() => {
-    if (!isAuthenticated && userMessageCount >= GUEST_MESSAGE_LIMIT) { setShowSignupPrompt(true); return; }
-    if (isAuthenticated && userMessageCount >= FREE_MESSAGE_LIMIT) { setShowPaywall(true); return; }
+    if (!isAuthenticated) {
+      // Stash what the user typed so it can auto-submit after signup.
+      const trimmed = query.trim();
+      if (trimmed) sessionStorage.setItem(PENDING_QUERY_KEY, trimmed);
+      setShowSignupPrompt(true);
+      return;
+    }
+    if (userMessageCount >= FREE_MESSAGE_LIMIT) { setShowPaywall(true); return; }
     handleSubmit();
-  }, [isAuthenticated, userMessageCount, handleSubmit]);
+  }, [isAuthenticated, userMessageCount, query, handleSubmit]);
   useEffect(() => { handleSubmitRef.current = gatedSubmit; }, [gatedSubmit, handleSubmitRef]);
 
   const hasThread = messages.length > 0;

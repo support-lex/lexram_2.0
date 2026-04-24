@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { History, Share, MoreHorizontal, Users, Pin, Archive, Trash2, Check, Link2 } from "lucide-react";
 import { pinnedSessionRepository } from "@/modules/chat/repository/feedback.repository";
 import { useMatterContext } from "@/lib/matter-context";
@@ -20,7 +20,6 @@ import AuthoritiesPanel from "./components/AuthoritiesPanel";
 import ShortcutsModal from "./components/ShortcutsModal";
 import DocumentDialog from "./components/DocumentDialog";
 import PaywallModal from "@/components/PaywallModal";
-import SignupPromptModal from "@/components/SignupPromptModal";
 import CaseSelector from "@/components/CaseSelector";
 
 const FREE_MESSAGE_LIMIT = 3;
@@ -28,10 +27,11 @@ const PENDING_QUERY_KEY = "lexram_pending_query";
 
 export default function Research2Page() {
   const { selectedMatterId } = useMatterContext();
-  const { isAuthenticated, markAuthenticated } = useDashboardAuth();
+  const { isAuthenticated } = useDashboardAuth();
+  const router = useRouter();
+  const pathname = usePathname();
   const pendingQueryHandled = useRef(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [showDocumentDialog, setShowDocumentDialog] = useState(false);
   const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
   const [selectedSourceMessageId, setSelectedSourceMessageId] = useState<string | null>(null);
@@ -85,7 +85,6 @@ export default function Research2Page() {
   } = useResearchUI({ lastAi, queryTextareaRef, handleSubmitRef });
 
   const shouldAutoSubmit = useRef(false);
-  const guestPromptShown = useRef(false);
   useEffect(() => {
     if (pendingQueryHandled.current) return;
     const pending = sessionStorage.getItem(PENDING_QUERY_KEY);
@@ -96,13 +95,10 @@ export default function Research2Page() {
       pendingQueryHandled.current = true;
       sessionStorage.removeItem(PENDING_QUERY_KEY);
       shouldAutoSubmit.current = true;
-    } else if (!guestPromptShown.current) {
-      // Guest: the LexRam backend rejects anonymous queries (401), so we
-      // can't auto-submit. Keep the query stashed in sessionStorage so it
-      // can be auto-submitted once the user finishes signup and comes back.
-      guestPromptShown.current = true;
-      setShowSignupPrompt(true);
     }
+    // Guest: leave the query populated in the input and the key in
+    // sessionStorage. The inline "Sign up to get 3 free queries" CTA in
+    // ChatInput handles the conversion — no modal on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
   useEffect(() => {
@@ -124,18 +120,24 @@ export default function Research2Page() {
     }
   }, [searchParams, sessions, handleSelectSession]);
 
+  const goToSignUp = useCallback(() => {
+    const trimmed = query.trim();
+    if (trimmed) sessionStorage.setItem(PENDING_QUERY_KEY, trimmed);
+    const params = new URLSearchParams();
+    if (pathname) params.set("redirect", pathname);
+    params.set("intent", "signup");
+    router.push(`/sign-in?${params.toString()}`);
+  }, [query, router, pathname]);
+
   const userMessageCount = messages.filter((m) => m.role === "user").length;
   const gatedSubmit = useCallback(() => {
     if (!isAuthenticated) {
-      // Stash what the user typed so it can auto-submit after signup.
-      const trimmed = query.trim();
-      if (trimmed) sessionStorage.setItem(PENDING_QUERY_KEY, trimmed);
-      setShowSignupPrompt(true);
+      goToSignUp();
       return;
     }
     if (userMessageCount >= FREE_MESSAGE_LIMIT) { setShowPaywall(true); return; }
     handleSubmit();
-  }, [isAuthenticated, userMessageCount, query, handleSubmit]);
+  }, [isAuthenticated, userMessageCount, handleSubmit, goToSignUp]);
   useEffect(() => { handleSubmitRef.current = gatedSubmit; }, [gatedSubmit, handleSubmitRef]);
 
   const hasThread = messages.length > 0;
@@ -300,6 +302,8 @@ Enrolment No.: [Number]`,
     outputFormat, setOutputFormat, analysisDepth, setAnalysisDepth,
     writingStyle, setWritingStyle, selectedPromptPreset, setSelectedPromptPreset,
     onFileClick: () => setShowDocumentDialog(true),
+    isAuthenticated,
+    onSignUp: goToSignUp,
   };
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -418,7 +422,6 @@ Enrolment No.: [Number]`,
         </div>
       </div>
 
-      <SignupPromptModal open={showSignupPrompt} onAuthenticated={() => { setShowSignupPrompt(false); markAuthenticated(); }} />
       <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} />
       <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
       <DocumentDialog

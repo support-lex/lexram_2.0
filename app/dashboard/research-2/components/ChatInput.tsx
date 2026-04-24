@@ -69,6 +69,8 @@ type ChatInputProps = ChatConfig &
     onStop: () => void;
     isGenerating: boolean;
     hasThread: boolean;
+    isAuthenticated?: boolean;
+    onSignUp?: () => void;
   };
 
 const MODES: { value: CommandMode; label: string }[] = [
@@ -127,6 +129,8 @@ export default function ChatInput({
   setSelectedPromptPreset,
   hasThread,
   onFileClick,
+  isAuthenticated = true,
+  onSignUp,
 }: ChatInputProps) {
   useEffect(() => {
     resizeTextarea(queryTextareaRef.current);
@@ -294,6 +298,24 @@ export default function ChatInput({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Guest CTA — takes the place of the old SignupPromptModal. Clicking
+            sends the user to /sign-in with the current query stashed for
+            auto-submit after they finish signup. */}
+        {!isAuthenticated && (
+          <div className="flex justify-center mb-2.5">
+            <button
+              type="button"
+              onClick={onSignUp}
+              className="px-3 py-1 rounded-full text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+            >
+              Sign up to get{" "}
+              <span className="text-[var(--accent)] font-semibold underline underline-offset-2 decoration-[var(--accent)]/40">
+                3 free queries
+              </span>
+            </button>
           </div>
         )}
 

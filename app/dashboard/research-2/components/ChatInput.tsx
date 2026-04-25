@@ -354,7 +354,7 @@ export default function ChatInput({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={hasThread ? "Inquire further..." : "Ask The Oracle anything..."}
+            placeholder={hasThread ? "Inquire further..." : "Ask Lexram anything..."}
             rows={1}
             className="flex-1 resize-none bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 outline-none leading-6 max-h-[120px] overflow-y-auto custom-scrollbar py-1.5"
           />

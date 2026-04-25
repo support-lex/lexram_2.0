@@ -357,7 +357,7 @@ export default function MessageBubble({
       <div className="flex-1 min-w-0">
         {/* Name + timestamp */}
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm font-semibold text-[var(--text-primary)] oracle-serif italic">The Oracle</span>
+          <span className="text-sm font-semibold text-[var(--text-primary)] oracle-serif italic">Lexram</span>
           <span className="text-[11px] text-[var(--text-muted)]">
             {formatDate(message.timestamp)}
           </span>
@@ -411,11 +411,11 @@ export default function MessageBubble({
           </div>
         )}
 
-        {/* Quick results from the web — Gemini/ChatGPT-style preview cards */}
+        {/* Quick results — preview cards for the web sources cited */}
         {webPreviews.length > 0 && (
           <div className="mb-3">
             <div className="text-[13px] text-[var(--text-secondary)] mb-2">
-              Quick results from the web:
+              Quick results:
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {webPreviews.map((a, i) => {

@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { History, Share, MoreHorizontal, Users, Pin, Archive, Trash2, Check, Link2 } from "lucide-react";
-import { pinnedSessionRepository } from "@/modules/chat/repository/feedback.repository";
+import { History, Share, MoreHorizontal, Users, Pin, PinOff, Archive, Trash2, Check, Link2 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  pinnedSessionRepository,
+  archivedSessionRepository,
+} from "@/modules/chat/repository/feedback.repository";
 import { useMatterContext } from "@/lib/matter-context";
 import { ResearchHistoryContext } from "@/lib/research-history-context";
 import { useDashboardAuth } from "@/lib/dashboard-auth-context";
@@ -37,6 +41,7 @@ export default function Research2Page() {
   const [selectedSourceMessageId, setSelectedSourceMessageId] = useState<string | null>(null);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [isCurrentPinned, setIsCurrentPinned] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close 3-dot menu on outside click
@@ -49,6 +54,10 @@ export default function Research2Page() {
     return () => document.removeEventListener("mousedown", handler);
   }, [showHeaderMenu]);
 
+  // Keep isCurrentPinned synced with the active session + the menu state.
+  // We re-read on menu-open so the toggle label reflects pin changes that
+  // happened in the sidebar without needing a global event bus.
+
   const [showShareDialog, setShowShareDialog] = useState(false);
 
   const {
@@ -57,6 +66,39 @@ export default function Research2Page() {
     relativeDateLabel, handleNewSession, handleSelectSession,
     handleDeleteSession, handleRenameSession, ensureSession, historyContextValue,
   } = useResearchSessions(selectedMatterId);
+
+  // Keep `isCurrentPinned` synced — refreshed on session change AND on
+  // menu-open so the label flips correctly after the user pins/unpins
+  // somewhere else in the app (e.g. the history sidebar's pin button).
+  useEffect(() => {
+    setIsCurrentPinned(currentSessionId ? pinnedSessionRepository.isPinned(currentSessionId) : false);
+  }, [currentSessionId, showHeaderMenu]);
+
+  const handleTogglePin = () => {
+    if (!currentSessionId) return;
+    if (pinnedSessionRepository.isPinned(currentSessionId)) {
+      pinnedSessionRepository.unpin(currentSessionId);
+      setIsCurrentPinned(false);
+      toast.success("Chat unpinned");
+    } else {
+      pinnedSessionRepository.pin(currentSessionId);
+      setIsCurrentPinned(true);
+      toast.success("Chat pinned");
+    }
+    setShowHeaderMenu(false);
+  };
+
+  const handleArchiveCurrent = () => {
+    if (!currentSessionId) return;
+    archivedSessionRepository.archive(currentSessionId);
+    // Tell the sidebar to refresh its archived set without a full reload.
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("lexram-archive-changed"));
+    }
+    toast.success("Chat archived");
+    setShowHeaderMenu(false);
+    handleNewSession();
+  };
 
   const {
     query, setQuery, mode, setMode, queryMode, setQueryMode,
@@ -362,10 +404,26 @@ Enrolment No.: [Number]`,
                       <button onClick={() => setShowHeaderMenu(false)} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors">
                         <Users className="w-4 h-4 text-[var(--text-muted)]" /> Start a group chat
                       </button>
-                      <button onClick={() => { if (currentSessionId) pinnedSessionRepository.pin(currentSessionId); setShowHeaderMenu(false); }} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors">
-                        <Pin className="w-4 h-4 text-[var(--text-muted)]" /> Pin chat
+                      <button
+                        onClick={handleTogglePin}
+                        disabled={!currentSessionId}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isCurrentPinned ? (
+                          <>
+                            <PinOff className="w-4 h-4 text-[var(--text-muted)]" /> Unpin chat
+                          </>
+                        ) : (
+                          <>
+                            <Pin className="w-4 h-4 text-[var(--text-muted)]" /> Pin chat
+                          </>
+                        )}
                       </button>
-                      <button onClick={() => { setShowHistory(true); setShowHeaderMenu(false); }} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors">
+                      <button
+                        onClick={handleArchiveCurrent}
+                        disabled={!currentSessionId}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
                         <Archive className="w-4 h-4 text-[var(--text-muted)]" /> Archive
                       </button>
                       <div className="h-px bg-[var(--border-light)] my-1" />
@@ -409,7 +467,7 @@ Enrolment No.: [Number]`,
                 <ChatInput {...chatInputProps} hasThread={hasThread} />
               </div>
               <div className="flex-shrink-0 text-center py-1.5 text-[10px] text-[var(--text-muted)] font-medium tracking-wide uppercase">
-                The Oracle can make mistakes. Verify legal data.
+                Lexram can make mistakes. Verify legal data.
               </div>
             </div>
           </div>

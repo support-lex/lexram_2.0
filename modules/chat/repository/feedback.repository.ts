@@ -9,6 +9,7 @@ export type FeedbackRating = "up" | "down";
 
 const LS_FEEDBACK_KEY = "lexram_feedback";
 const LS_PINNED_KEY = "lexram_pinned";
+const LS_ARCHIVED_KEY = "lexram_archived";
 
 function readLS<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -133,5 +134,58 @@ export const pinnedSessionRepository = {
           .match({ user_id: userId, session_id: sessionId });
       } catch { /* ignore */ }
     })();
+  },
+
+  isPinned(sessionId: string): boolean {
+    return readLS<string[]>(LS_PINNED_KEY, []).includes(sessionId);
+  },
+};
+
+// ── Archived Sessions ────────────────────────────────────────────────────
+// Same shape as pinnedSessionRepository. Archived ids are filtered out of
+// the visible history list; the underlying session row is not deleted.
+
+export const archivedSessionRepository = {
+  list(): string[] {
+    return readLS<string[]>(LS_ARCHIVED_KEY, []);
+  },
+
+  archive(sessionId: string): boolean {
+    const ids = readLS<string[]>(LS_ARCHIVED_KEY, []);
+    if (!ids.includes(sessionId)) {
+      ids.unshift(sessionId);
+      writeLS(LS_ARCHIVED_KEY, ids);
+    }
+    (async () => {
+      try {
+        const { data: userData } = await supabase().auth.getUser();
+        const userId = userData.user?.id;
+        if (!userId) return;
+        await supabase()
+          .from("archived_sessions")
+          .upsert({ user_id: userId, session_id: sessionId }, { onConflict: "user_id,session_id" });
+      } catch { /* table may not exist — ignore */ }
+    })();
+    return true;
+  },
+
+  unarchive(sessionId: string): void {
+    const ids = readLS<string[]>(LS_ARCHIVED_KEY, []);
+    writeLS(LS_ARCHIVED_KEY, ids.filter((id) => id !== sessionId));
+    (async () => {
+      try {
+        const { data: userData } = await supabase().auth.getUser();
+        const userId = userData.user?.id;
+        if (!userId) return;
+        await supabase()
+          .from("archived_sessions")
+          .delete()
+          .match({ user_id: userId, session_id: sessionId });
+      } catch { /* ignore */ }
+    })();
+  },
+
+  isArchived(sessionId: string): boolean {
+    return readLS<string[]>(LS_ARCHIVED_KEY, []).includes(sessionId);
   },
 };

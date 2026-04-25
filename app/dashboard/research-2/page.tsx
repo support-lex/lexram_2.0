@@ -313,6 +313,20 @@ Enrolment No.: [Number]`,
           {/* Header — clean title only when no chat; Share + ··· when thread active */}
           <header className="flex items-center justify-between px-6 h-14 border-b border-[var(--oracle-outline-variant,#d0c5b6)]/10 bg-white/80 backdrop-blur-xl z-20 relative">
             <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => setShowHistory((v) => !v)}
+                aria-label={showHistory ? "Hide history" : "Show history"}
+                aria-pressed={showHistory}
+                title={showHistory ? "Hide history" : "Show history"}
+                className={`p-2 rounded-lg transition-colors ${
+                  showHistory
+                    ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                    : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                <History className="w-4 h-4" />
+              </button>
               <span className="text-base oracle-serif italic text-[var(--text-primary)]">LexRam</span>
               {currentSessionId && (
                 <CaseSelector

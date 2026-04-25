@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { AlertCircle, FileText } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import MessageBubble from "./MessageBubble";
 import StreamingIndicator from "./StreamingIndicator";
@@ -46,7 +46,9 @@ export default function ChatThread({
   onOpenEditor,
   onOpenWorkflow,
   onQuerySelect,
-  onBuildSessionDraft,
+  // onBuildSessionDraft kept on the interface for backwards compat — the
+  // session-level "Build Draft" button has been removed from the UI, so the
+  // prop is intentionally not destructured here.
   mobilePane,
   sessionId,
   onRegenerate,
@@ -64,8 +66,6 @@ export default function ChatThread({
     programmaticScrollRef.current = true;
     endRef.current?.scrollIntoView({ behavior: streamingText ? "auto" : "smooth" });
   }, [messages, isSearching, streamingText]);
-
-  const hasAiResponses = messages.some((m) => m.role === "ai" && m.response);
 
   return (
     <div
@@ -119,17 +119,6 @@ export default function ChatThread({
           <div className="flex items-start gap-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl p-4">
             <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <span>{error}</span>
-          </div>
-        )}
-
-        {hasAiResponses && !isSearching && (
-          <div className="flex justify-center py-4">
-            <button
-              onClick={onBuildSessionDraft}
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[var(--accent-hover)] transition-colors"
-            >
-              <FileText className="w-4 h-4" /> Build Draft From Session
-            </button>
           </div>
         )}
 

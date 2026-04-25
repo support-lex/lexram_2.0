@@ -31,6 +31,7 @@ import {
   BarChart3,
   Wrench,
   Sparkles,
+  X,
 } from "lucide-react"
 
 // Main navigation items with sub-menus
@@ -134,7 +135,7 @@ const navMain = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const currentUser = useCurrentUser()
-  const { setOpen, isMobile } = useSidebar()
+  const { setOpen, isMobile, setOpenMobile } = useSidebar()
   const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Hover-to-expand: open immediately on mouse enter, collapse after a tiny
@@ -175,29 +176,41 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              render={<Link href="/dashboard" />}
-              className="sidebar-logo"
-            >
-              <div 
-                className="flex aspect-square size-8 items-center justify-center rounded-md border shrink-0"
-                style={{
-                  borderColor: "color-mix(in srgb, var(--accent) 40%, transparent)",
-                  color: "var(--accent)",
-                }}
+            <div className="flex items-center gap-2">
+              <SidebarMenuButton
+                size="lg"
+                render={<Link href="/dashboard" />}
+                className="sidebar-logo flex-1"
               >
-                <Scale className="size-4" />
-              </div>
-              <div className="sidebar-brand-text grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-serif font-bold text-[var(--text-on-sidebar)]">
-                  LexRam
-                </span>
-                <span className="truncate text-xs text-[var(--text-on-sidebar)]/60">
-                  Legal AI
-                </span>
-              </div>
-            </SidebarMenuButton>
+                <div
+                  className="flex aspect-square size-8 items-center justify-center rounded-md border shrink-0"
+                  style={{
+                    borderColor: "color-mix(in srgb, var(--accent) 40%, transparent)",
+                    color: "var(--accent)",
+                  }}
+                >
+                  <Scale className="size-4" />
+                </div>
+                <div className="sidebar-brand-text grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-serif font-bold text-[var(--text-on-sidebar)]">
+                    LexRam
+                  </span>
+                  <span className="truncate text-xs text-[var(--text-on-sidebar)]/60">
+                    Legal AI
+                  </span>
+                </div>
+              </SidebarMenuButton>
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setOpenMobile(false)}
+                  aria-label="Close menu"
+                  className="mr-1 grid size-8 shrink-0 place-items-center rounded-md text-[var(--text-on-sidebar)]/70 hover:bg-white/10 hover:text-[var(--text-on-sidebar)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 transition-colors"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              )}
+            </div>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

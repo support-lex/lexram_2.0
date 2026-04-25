@@ -66,6 +66,8 @@ function ConversationItem({
       onClick={() => { if (!editing) onSelect(); }}
       role="button"
       tabIndex={0}
+      title={editing ? undefined : session.title}
+      aria-label={session.title}
       onKeyDown={(e) => { if (!editing && (e.key === "Enter" || e.key === " ")) onSelect(); }}
     >
       {isActive && (

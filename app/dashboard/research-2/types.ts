@@ -39,6 +39,10 @@ export type LegalAnswer = {
   draftReady?:    string;
   workflowSteps?: WorkflowStep[];
   nextQuestions?: string[];
+  /** Plain-text heading rendered above the follow-up chip row. Lives on the
+   *  answer (not in `nextQuestions`) so the chip renderer never paints a
+   *  heading like "Related Questions You Might Find Helpful" as a button. */
+  nextQuestionsHeading?: string;
 
   // ─── Inline UI blocks (preferred path) ─────────────────────────────────────
   uiBlocks?: UiBlock[];

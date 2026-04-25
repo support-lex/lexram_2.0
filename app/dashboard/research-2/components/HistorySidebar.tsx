@@ -66,7 +66,6 @@ function ConversationItem({
       onClick={() => { if (!editing) onSelect(); }}
       role="button"
       tabIndex={0}
-      title={editing ? undefined : session.title}
       aria-label={session.title}
       onKeyDown={(e) => { if (!editing && (e.key === "Enter" || e.key === " ")) onSelect(); }}
     >
@@ -97,7 +96,7 @@ function ConversationItem({
           />
         ) : (
           <div
-            className={`text-[13px] truncate font-medium leading-5 ${
+            className={`text-[13px] truncate font-medium leading-5 group-hover/item:whitespace-normal group-hover/item:overflow-visible group-hover/item:text-clip group-hover/item:break-words ${
               isActive ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
             }`}
           >

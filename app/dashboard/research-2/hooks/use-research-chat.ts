@@ -650,6 +650,27 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         // Strip the <follow_up> block from the displayed text
         cleanedText = cleanedText.replace(/<follow_up>[\s\S]*?<\/follow_up>/gi, "").replace(/\n{3,}/g, "\n\n").trim();
 
+        // Some backends emit "Related Questions You Might Find Helpful" as a
+        // plain markdown section at the bottom of the answer instead of inside
+        // <follow_up>...</follow_up>. The same content already renders below
+        // as the "CONTINUE WITH" chip row, so showing it inline duplicates the
+        // questions and (in some layouts) ends up wrapped by the inline UI
+        // block card. Drop the section — heading line + everything after it.
+        const RELATED_RE =
+          /(?:\n|^)[ \t]*(?:#{1,6}[ \t]+|\*{1,2}[ \t]*)?Related[ \t]+Questions[\s\S]*$/i;
+        const relatedMatch = cleanedText.match(RELATED_RE);
+        if (relatedMatch) {
+          // Pull questions out of the stripped section so we don't lose them
+          // if the `done` event didn't ship structured follow-ups.
+          const block = relatedMatch[0];
+          const extra = block
+            .split(/\n/)
+            .map((l) => l.replace(/^[\s\-\*\d.]+/, "").trim())
+            .filter((l) => l.length > 10 && !/related\s+questions/i.test(l));
+          followUpQuestions.push(...extra);
+          cleanedText = cleanedText.replace(RELATED_RE, "").trim();
+        }
+
         const parsed = parseLexramSources(cleanedText);
         const a = normalizeAnswer({ streamText: parsed.cleanText });
         if (parsed.authorities.length > 0) {

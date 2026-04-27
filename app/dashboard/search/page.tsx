@@ -552,7 +552,7 @@ export default function SearchPage() {
                       : 'Enter case name, section, or legal query…'
                 }
                 className={cn(
-                  'flex-1 bg-transparent outline-none text-[var(--text-primary)] placeholder-[var(--text-secondary)]/70',
+                  'flex-1 bg-transparent outline-none border-0 appearance-none focus:outline-none focus:ring-0 text-[var(--text-primary)] placeholder-[var(--text-secondary)]/70',
                   submittedQ ? 'text-[15px]' : 'text-[15px] md:text-base',
                 )}
               />

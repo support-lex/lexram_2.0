@@ -320,7 +320,7 @@ export default function ChatInput({
             and Web on/off toggle have been removed; this row now only
             carries the active query mode selector. */}
         <div className="flex items-center justify-center mb-3">
-          <div className="inline-flex items-center rounded-full bg-white/80 backdrop-blur-md border border-[var(--oracle-outline-variant,#d0c5b6)]/20 p-0.5 shadow-sm">
+          <div className="inline-flex items-center rounded-full bg-white/80 backdrop-blur-md p-0.5 shadow-sm">
             <button
               type="button"
               onClick={() => setQueryMode("instant")}
@@ -378,7 +378,7 @@ export default function ChatInput({
             onKeyDown={handleKeyDown}
             placeholder={hasThread ? "Inquire further..." : "Ask Lexram anything..."}
             rows={1}
-            className="flex-1 resize-none bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 outline-none leading-6 max-h-[120px] overflow-y-auto custom-scrollbar py-1.5"
+            className="flex-1 resize-none bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 outline-none border-0 appearance-none focus:outline-none focus:ring-0 leading-6 max-h-[120px] overflow-y-auto custom-scrollbar py-1.5"
           />
 
           {/* Right: mic + send */}

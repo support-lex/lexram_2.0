@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import https from 'node:https';
 import http from 'node:http';
 import { URL } from 'node:url';
+import { normalizeFetchError, normalizeUpstreamError } from '@/lib/upstream-error';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -52,21 +53,19 @@ export async function GET(req: NextRequest) {
 
   try {
     const { status, body, contentType } = await getUpstream(target, 12000);
-    return new NextResponse(body, {
-      status,
-      headers: { 'content-type': contentType, 'cache-control': 'no-store' },
-    });
+    // Upstream success — pass through verbatim.
+    if (status >= 200 && status < 300) {
+      return new NextResponse(body, {
+        status,
+        headers: { 'content-type': contentType, 'cache-control': 'no-store' },
+      });
+    }
+    // Upstream returned an error — normalize so the client never sees raw
+    // stack traces or backend internals like 127.0.0.1:8080 / GraphQL URLs.
+    const normalized = normalizeUpstreamError(body, status);
+    return NextResponse.json(normalized.body, { status: normalized.status });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'unknown';
-    const isTimeout = /timeout/i.test(msg);
-    return NextResponse.json(
-      {
-        error: isTimeout
-          ? 'The RAG service is warming up. Try again in 30 seconds.'
-          : 'Proxy failed',
-        detail: msg,
-      },
-      { status: isTimeout ? 504 : 502 },
-    );
+    const normalized = normalizeFetchError(err);
+    return NextResponse.json(normalized.body, { status: normalized.status });
   }
 }

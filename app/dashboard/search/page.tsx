@@ -258,7 +258,21 @@ export default function SearchPage() {
           const res = await fetch('/api/lexram-db/search?q=' + encodeURIComponent(clean), {
             signal: ac.signal,
           });
-          if (!res.ok) throw new Error(`Search failed (${res.status})`);
+          if (!res.ok) {
+            // Pull the friendly message out of the proxy's error body
+            // (`{ error, message, retry_after_seconds? }`) so the UI shows
+            // human copy instead of "Search failed (503)".
+            let msg = `Search failed (${res.status})`;
+            try {
+              const body = (await res.clone().json()) as { message?: string };
+              if (typeof body?.message === 'string' && body.message.trim()) {
+                msg = body.message;
+              }
+            } catch {
+              /* not JSON — keep the default */
+            }
+            throw new Error(msg);
+          }
           const parsed = (await res.json()) as SearchResults;
           setResults(parsed);
         } catch (e) {

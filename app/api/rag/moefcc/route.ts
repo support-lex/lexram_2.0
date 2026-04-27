@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import https from 'node:https';
 import http from 'node:http';
 import { URL } from 'node:url';
+import { normalizeFetchError, normalizeUpstreamError } from '@/lib/upstream-error';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,21 +56,16 @@ export async function GET(req: NextRequest) {
 
   try {
     const { status, body, contentType } = await getUpstream(target);
-    return new NextResponse(body, {
-      status,
-      headers: { 'content-type': contentType, 'cache-control': 'no-store' },
-    });
+    if (status >= 200 && status < 300) {
+      return new NextResponse(body, {
+        status,
+        headers: { 'content-type': contentType, 'cache-control': 'no-store' },
+      });
+    }
+    const normalized = normalizeUpstreamError(body, status);
+    return NextResponse.json(normalized.body, { status: normalized.status });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'unknown';
-    const isTimeout = /timeout/i.test(msg);
-    return NextResponse.json(
-      {
-        error: isTimeout
-          ? 'The RAG service is warming up. Try again in 30 seconds.'
-          : 'Proxy failed',
-        detail: msg,
-      },
-      { status: isTimeout ? 504 : 502 },
-    );
+    const normalized = normalizeFetchError(err);
+    return NextResponse.json(normalized.body, { status: normalized.status });
   }
 }

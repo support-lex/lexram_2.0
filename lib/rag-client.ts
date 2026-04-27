@@ -1,6 +1,25 @@
 // Typed client for the LexMatrix RAG endpoint, routed through
 // the same-origin /api/rag proxy so browsers don't hit the self-signed cert.
 
+// Pulls the friendly message out of a normalized proxy error body. Our proxy
+// routes return `{ error, message, retry_after_seconds? }` for upstream
+// failures (see lib/upstream-error.ts), so prefer that over a generic "HTTP
+// 503" string. Falls back to a sensible default if the body isn't JSON.
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const json = (await res.clone().json()) as {
+      message?: unknown;
+      error?: unknown;
+      detail?: unknown;
+    };
+    if (typeof json.message === "string" && json.message.trim()) return json.message;
+    if (typeof json.detail === "string" && json.detail.trim()) return json.detail;
+  } catch {
+    /* not JSON — fall through */
+  }
+  return fallback;
+}
+
 export interface RagSource {
   id: number;
   section: string;
@@ -71,11 +90,11 @@ export async function ragQuery(opts: RagQueryOptions): Promise<RagResponse> {
   if (res.status === 400) {
     throw new RagError('Please enter at least 3 characters.', 400);
   }
-  if (res.status === 504) {
-    throw new RagError('The legal search service is warming up. Try again in 30 seconds.', 504);
-  }
   if (!res.ok) {
-    throw new RagError(`Search failed (${res.status})`, res.status);
+    throw new RagError(
+      await readErrorMessage(res, `Search failed (${res.status})`),
+      res.status,
+    );
   }
 
   // Backend returns MoEFCC shape { title, content, parent_id, language, source_type, distance }.
@@ -217,9 +236,12 @@ export async function clusterSearchMoefcc(
     headers: { accept: 'application/json' },
   });
   if (res.status === 400) throw new RagError('Please enter at least 3 characters.', 400);
-  if (res.status === 504)
-    throw new RagError('The RAG service is warming up. Try again in 30 seconds.', 504);
-  if (!res.ok) throw new RagError(`Cluster search failed (${res.status})`, res.status);
+  if (!res.ok) {
+    throw new RagError(
+      await readErrorMessage(res, `Cluster search failed (${res.status})`),
+      res.status,
+    );
+  }
   return (await res.json()) as MoefccClusterResponse;
 }
 
@@ -266,8 +288,12 @@ export async function searchMoefcc(
     headers: { accept: 'application/json' },
   });
   if (res.status === 400) throw new RagError('Please enter at least 3 characters.', 400);
-  if (res.status === 504) throw new RagError('The RAG service is warming up. Try again in 30 seconds.', 504);
-  if (!res.ok) throw new RagError(`Search failed (${res.status})`, res.status);
+  if (!res.ok) {
+    throw new RagError(
+      await readErrorMessage(res, `Search failed (${res.status})`),
+      res.status,
+    );
+  }
   const json = (await res.json()) as MoefccSearchResponse;
   moefccCache.set(key, { at: Date.now(), result: json });
   return json;
@@ -288,8 +314,12 @@ export async function askMoefcc(
     headers: { accept: 'application/json' },
   });
   if (res.status === 400) throw new RagError('Please enter at least 3 characters.', 400);
-  if (res.status === 504) throw new RagError('The RAG service is warming up. Try again in 30 seconds.', 504);
-  if (!res.ok) throw new RagError(`Search failed (${res.status})`, res.status);
+  if (!res.ok) {
+    throw new RagError(
+      await readErrorMessage(res, `Search failed (${res.status})`),
+      res.status,
+    );
+  }
   const json = (await res.json()) as MoefccRAGResponse;
   moefccCache.set(key, { at: Date.now(), result: json });
   return json;

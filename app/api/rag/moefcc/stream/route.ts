@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import https from 'node:https';
 import http from 'node:http';
 import { URL } from 'node:url';
+import { normalizeUpstreamError } from '@/lib/upstream-error';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,8 +67,32 @@ export async function GET(req: NextRequest) {
         },
         (res) => {
           if (!res.statusCode || res.statusCode >= 400) {
-            safeError(new Error(`Upstream ${res.statusCode}`));
-            res.resume();
+            // Read the upstream body so the friendly message can detect
+            // Hasura-down / connection-refused traces and surface a useful
+            // error event instead of "Upstream 500".
+            const status = res.statusCode ?? 502;
+            const chunks: Buffer[] = [];
+            res.on('data', (c) => chunks.push(Buffer.from(c)));
+            res.on('end', () => {
+              if (closed) return;
+              const body = Buffer.concat(chunks).toString('utf-8');
+              const normalized = normalizeUpstreamError(body, status);
+              try {
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    `data: ${JSON.stringify({
+                      event: 'error',
+                      detail: normalized.body.message,
+                      error_type: normalized.body.error,
+                    })}\n\n`,
+                  ),
+                );
+              } catch {
+                /* noop */
+              }
+              safeClose();
+            });
+            res.on('error', safeError);
             return;
           }
           res.on('data', (chunk: Buffer) => {

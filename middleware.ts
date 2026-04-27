@@ -33,21 +33,19 @@ export async function middleware(request: NextRequest) {
   const isResearch2 = pathname.startsWith(RESEARCH_2_PATH);
 
   // Guests are allowed on research-2 — the page itself caps them at one
-  // message before triggering the signup modal. Any other dashboard route
-  // still requires auth.
+  // message before the signup CTA. Any other dashboard route still
+  // requires auth so the legal-research surface stays gated.
   if (isDashboard && !isResearch2 && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/sign-in';
-    url.searchParams.set('redirect', RESEARCH_2_PATH);
+    url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }
 
-  if (isDashboard && user && !isResearch2) {
-    const url = request.nextUrl.clone();
-    url.pathname = RESEARCH_2_PATH;
-    url.search = '';
-    return NextResponse.redirect(url);
-  }
+  // Authed users are now free to roam the entire /dashboard tree —
+  // research-2 stays the post-login default (set in SignInForm), but
+  // the Resources hub at /dashboard/resources and every legacy page
+  // (/dashboard/acts, /amendments, /circulars, …) is reachable again.
 
   return response;
 }

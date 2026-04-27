@@ -27,6 +27,7 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-8">
             <a href="#research" className="font-sans text-sm font-normal tracking-wide text-[var(--text-on-sidebar)]/80 hover:text-[var(--text-on-sidebar)] transition-colors">Research</a>
             <a href="#drafting" className="font-sans text-sm font-normal tracking-wide text-[var(--text-on-sidebar)]/80 hover:text-[var(--text-on-sidebar)] transition-colors">Drafting</a>
+            <Link href="/dashboard/resources" className="font-sans text-sm font-normal tracking-wide text-[var(--text-on-sidebar)]/80 hover:text-[var(--text-on-sidebar)] transition-colors">Resources</Link>
             <a href="#practice-areas" className="font-sans text-sm font-normal tracking-wide text-[var(--text-on-sidebar)]/80 hover:text-[var(--text-on-sidebar)] transition-colors">Practice Areas</a>
             <a href="#pricing" className="font-sans text-sm font-normal tracking-wide text-[var(--text-on-sidebar)]/80 hover:text-[var(--text-on-sidebar)] transition-colors">Pricing</a>
           </div>
@@ -51,6 +52,7 @@ export default function Navbar() {
         <div className="md:hidden bg-[var(--bg-sidebar)] border-b border-[var(--border-default)] px-4 pt-4 pb-6 space-y-2 absolute top-full left-0 w-full">
           <a href="#research" className="block px-4 py-3 font-sans text-base font-normal text-[var(--text-on-sidebar)]/80 hover:bg-[var(--bg-sidebar-hover)] rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>Research</a>
           <a href="#drafting" className="block px-4 py-3 font-sans text-base font-normal text-[var(--text-on-sidebar)]/80 hover:bg-[var(--bg-sidebar-hover)] rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>Drafting</a>
+          <Link href="/dashboard/resources" className="block px-4 py-3 font-sans text-base font-normal text-[var(--text-on-sidebar)]/80 hover:bg-[var(--bg-sidebar-hover)] rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>Resources</Link>
           <a href="#practice-areas" className="block px-4 py-3 font-sans text-base font-normal text-[var(--text-on-sidebar)]/80 hover:bg-[var(--bg-sidebar-hover)] rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>Practice Areas</a>
           <a href="#pricing" className="block px-4 py-3 font-sans text-base font-normal text-[var(--text-on-sidebar)]/80 hover:bg-[var(--bg-sidebar-hover)] rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>Pricing</a>
           <div className="pt-4 flex flex-col gap-3 px-2">

@@ -18,23 +18,16 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import {
-  LayoutDashboard,
-  Search,
   BookOpen,
-  ShieldCheck,
-  BarChart3,
-  Wrench,
   Scale,
   X,
 } from "lucide-react"
 
-// Main navigation items.
-//
-// Research stays the primary action — that's the post-login default the
-// SignInForm redirects to. Everything else lives under "Resources" and is
-// only navigable on dev-lexram via the new top-nav entry; we still surface
-// the items here so the dashboard layout's left rail can be used to move
-// between them once the user is inside.
+// Main navigation: Research as the primary action, plus Resource — a single
+// dropdown holding the Legislation sub-tree. Clicking the Resource label
+// itself routes to the global Search page; the chevron toggles the
+// legislation list. Compliance, Analytics, Admin and the standalone Search
+// entry have been removed from the sidebar.
 const navMain = [
   {
     title: "Research",
@@ -43,18 +36,8 @@ const navMain = [
     isActive: true,
   },
   {
-    title: "Resources",
-    url: "/dashboard/resources",
-    icon: <LayoutDashboard className="size-4" />,
-  },
-  {
-    title: "Search",
+    title: "Resource",
     url: "/dashboard/search",
-    icon: <Search className="size-4" />,
-  },
-  {
-    title: "Legislation",
-    url: "/dashboard/acts",
     icon: <BookOpen className="size-4" />,
     items: [
       { title: "Acts", url: "/dashboard/acts" },
@@ -68,36 +51,6 @@ const navMain = [
       { title: "Gov Documents", url: "/dashboard/gov-docs" },
       { title: "Case Law", url: "/dashboard/case-law" },
       { title: "Version Tracker", url: "/dashboard/version-tracker" },
-    ],
-  },
-  {
-    title: "Compliance",
-    url: "/dashboard/matrix",
-    icon: <ShieldCheck className="size-4" />,
-    items: [
-      { title: "Impact Matrix", url: "/dashboard/matrix" },
-      { title: "Burden Index", url: "/dashboard/burden-index" },
-      { title: "Cross-Industry", url: "/dashboard/cross-industry" },
-      { title: "Amendment Chain", url: "/dashboard/amendment-chain" },
-    ],
-  },
-  {
-    title: "Analytics",
-    url: "/dashboard/legal-analytics",
-    icon: <BarChart3 className="size-4" />,
-    items: [
-      { title: "Legal Analytics", url: "/dashboard/legal-analytics" },
-      { title: "Industry Dashboard", url: "/dashboard/industry-dashboard" },
-      { title: "Cross-References", url: "/dashboard/cross-refs" },
-    ],
-  },
-  {
-    title: "Admin",
-    url: "/dashboard/admin",
-    icon: <Wrench className="size-4" />,
-    items: [
-      { title: "Admin Panel", url: "/dashboard/admin" },
-      { title: "Crawler", url: "/dashboard/crawler" },
     ],
   },
 ]
@@ -127,15 +80,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: "",
   }
 
-  // Mark the active nav item based on the current path. Research only matches
-  // the research-2 prefix exactly so opening a Resources sub-page doesn't
-  // accidentally light up Research.
+  // Active state:
+  //   * Research lights up only on /dashboard/research-2.
+  //   * Resource lights up on /dashboard/search OR any of its legislation sub-routes.
   const navItems = navMain.map((item) => {
-    const isActive = item.url === "/dashboard/research-2"
-      ? pathname.startsWith("/dashboard/research-2")
-      : item.url === "/dashboard/resources"
-        ? pathname === "/dashboard/resources"
-        : pathname.startsWith(item.url)
+    let isActive: boolean
+    if (item.url === "/dashboard/research-2") {
+      isActive = pathname.startsWith("/dashboard/research-2")
+    } else if (item.title === "Resource") {
+      isActive =
+        pathname === "/dashboard/search" ||
+        (item.items?.some((sub) => pathname.startsWith(sub.url)) ?? false)
+    } else {
+      isActive = pathname.startsWith(item.url)
+    }
     return { ...item, isActive }
   })
 

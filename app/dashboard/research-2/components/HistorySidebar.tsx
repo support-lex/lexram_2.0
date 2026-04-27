@@ -3,7 +3,10 @@
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useEffect, useRef, useState } from "react";
 import { Search, X, MessageSquare, SquarePen, Trash2, Pencil, Check, Pin, PinOff, Zap } from "lucide-react";
-import { pinnedSessionRepository } from "@/modules/chat/repository/feedback.repository";
+import {
+  pinnedSessionRepository,
+  archivedSessionRepository,
+} from "@/modules/chat/repository/feedback.repository";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import type { ResearchSession } from "../types";
 
@@ -71,18 +74,12 @@ function ConversationItem({
       onClick={() => { if (!editing) onSelect(); }}
       role="button"
       tabIndex={0}
+      aria-label={session.title}
       onKeyDown={(e) => { if (!editing && (e.key === "Enter" || e.key === " ")) onSelect(); }}
     >
       {isActive && (
         <div className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-full bg-[var(--accent)]" />
       )}
-      <MessageSquare
-        className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${
-          isActive
-            ? "text-[var(--accent)]"
-            : "text-[var(--text-muted)] group-hover/item:text-[var(--text-secondary)]"
-        }`}
-      />
       <div className="flex-1 min-w-0">
         {editing ? (
           <input
@@ -100,7 +97,7 @@ function ConversationItem({
           />
         ) : (
           <div
-            className={`text-[13px] truncate font-medium leading-5 ${
+            className={`text-[13px] truncate font-medium leading-5 group-hover/item:whitespace-normal group-hover/item:overflow-visible group-hover/item:text-clip group-hover/item:break-words ${
               isActive ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
             }`}
           >
@@ -171,6 +168,18 @@ function SidebarContent({
   creditCeiling,
 }: HistorySidebarProps & { onClose: () => void }) {
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => new Set(pinnedSessionRepository.list()));
+  // Archived ids — filtered out of the visible history. The 3-dot menu in the
+  // chat header writes to `archivedSessionRepository`; this Set is read once
+  // on mount and refreshed on the global `lexram-archive-changed` event so
+  // archive actions reflect immediately.
+  const [archivedIds, setArchivedIds] = useState<Set<string>>(() => new Set(archivedSessionRepository.list()));
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const refresh = () => setArchivedIds(new Set(archivedSessionRepository.list()));
+    window.addEventListener("lexram-archive-changed", refresh);
+    return () => window.removeEventListener("lexram-archive-changed", refresh);
+  }, []);
 
   const togglePin = async (sessionId: string) => {
     if (pinnedIds.has(sessionId)) {
@@ -182,30 +191,17 @@ function SidebarContent({
     }
   };
 
-  const pinnedSessions = filteredSessions.filter((s) => pinnedIds.has(s.id));
+  const visibleSessions = filteredSessions.filter((s) => !archivedIds.has(s.id));
+  const pinnedSessions = visibleSessions.filter((s) => pinnedIds.has(s.id));
   const unpinnedGrouped = Object.fromEntries(
     Object.entries(groupedSessions).map(([group, sessions]) => [
       group,
-      sessions.filter((s) => !pinnedIds.has(s.id)),
+      sessions.filter((s) => !pinnedIds.has(s.id) && !archivedIds.has(s.id)),
     ]).filter(([, sessions]) => (sessions as any[]).length > 0)
   );
   return (
     <div className="flex flex-col h-full bg-[#fafaf8]">
-      {/* Branding */}
-      <div className="px-6 pt-6 pb-2 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center text-white">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-          </div>
-          <div>
-            <h1 className="text-base font-semibold text-[var(--text-primary)] oracle-serif">LexRam</h1>
-            <p className="text-[9px] uppercase tracking-[0.2em] text-[var(--text-muted)]">Legal Intelligence</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Divider */}
-      <div className="h-px bg-[var(--oracle-outline-variant,#d0c5b6)]/20 mx-4 my-3" />
+      <div className="pt-3" />
 
       {/* New Thread */}
       <div className="px-3 flex-shrink-0">

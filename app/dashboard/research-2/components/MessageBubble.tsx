@@ -357,7 +357,7 @@ export default function MessageBubble({
       <div className="flex-1 min-w-0">
         {/* Name + timestamp */}
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm font-semibold text-[var(--text-primary)] oracle-serif italic">The Oracle</span>
+          <span className="text-sm font-semibold text-[var(--text-primary)] oracle-serif italic">Lexram</span>
           <span className="text-[11px] text-[var(--text-muted)]">
             {formatDate(message.timestamp)}
           </span>
@@ -411,11 +411,11 @@ export default function MessageBubble({
           </div>
         )}
 
-        {/* Quick results from the web — Gemini/ChatGPT-style preview cards */}
+        {/* Quick results — preview cards for the web sources cited */}
         {webPreviews.length > 0 && (
           <div className="mb-3">
             <div className="text-[13px] text-[var(--text-secondary)] mb-2">
-              Quick results from the web:
+              Quick results:
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {webPreviews.map((a, i) => {
@@ -615,17 +615,27 @@ export default function MessageBubble({
           </button>
         </div>
 
-        {/* Follow-up suggestion chips — categorized style */}
+        {/* Follow-up suggestions: plain-text heading (when present) above
+            the clickable chip row. The heading is intentionally not a button —
+            it's a label that describes the chip group. */}
         {response.nextQuestions && response.nextQuestions.length > 0 && (
-          <div className="mt-3">
-            <div className="text-[10px] font-semibold tracking-widest text-[var(--text-muted)] mb-2 px-1">
-              CONTINUE WITH
-            </div>
+          <div className="mt-3" role="group" aria-label="Suggested follow-up questions">
+            {response.nextQuestionsHeading ? (
+              <p className="mb-2 px-1 text-[13px] font-medium text-[var(--text-secondary)]">
+                {response.nextQuestionsHeading}
+              </p>
+            ) : (
+              <div className="mb-2 px-1 text-[10px] font-semibold tracking-widest text-[var(--text-muted)]">
+                CONTINUE WITH
+              </div>
+            )}
             <div className="flex flex-wrap gap-1.5">
               {response.nextQuestions.map((q, i) => (
                 <button
-                  key={i}
+                  key={`${i}-${q}`}
+                  type="button"
                   onClick={() => onQuerySelect(q)}
+                  title={q}
                   className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface)] px-3.5 py-1.5 text-[12px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--text-primary)] hover:shadow-sm transition-all max-w-[300px] lexram-hover-glow"
                 >
                   <Lightbulb className="w-3 h-3 text-[var(--accent)] flex-shrink-0" />

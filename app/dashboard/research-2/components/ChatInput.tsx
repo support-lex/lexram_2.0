@@ -2,13 +2,10 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import {
-  Paperclip,
   Send,
   Square,
   X,
   Settings2,
-  Globe,
-  GlobeLock,
   FileText,
   Mic,
   MicOff,
@@ -319,27 +316,10 @@ export default function ChatInput({
           </div>
         )}
 
-        {/* Context chips row — Statutes / Judgments / Upload PDF / Instant|Deep toggle */}
-        <div className="flex items-center justify-center gap-3 mb-3">
-          <button
-            type="button"
-            onClick={onFileClick}
-            className="px-4 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-[var(--oracle-outline-variant,#d0c5b6)]/20 text-[11px] font-semibold text-[var(--text-muted)] flex items-center gap-2 shadow-sm hover:border-[var(--accent)]/40 transition-all"
-          >
-            <Paperclip className="w-3.5 h-3.5" />
-            Upload PDF
-          </button>
-          <button
-            type="button"
-            onClick={() => setWebSearchEnabled(!webSearchEnabled)}
-            className={`px-4 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-[var(--oracle-outline-variant,#d0c5b6)]/20 text-[11px] font-semibold flex items-center gap-2 shadow-sm hover:border-[var(--accent)]/40 transition-all ${
-              webSearchEnabled ? "text-[var(--accent)]" : "text-[var(--text-muted)]"
-            }`}
-          >
-            {webSearchEnabled ? <Globe className="w-3.5 h-3.5" /> : <GlobeLock className="w-3.5 h-3.5" />}
-            {webSearchEnabled ? "Web On" : "Web Off"}
-          </button>
-          {/* Instant / Deep / Draft toggle */}
+        {/* Mode pill — centered: Instant / Deep / Draft. The Upload PDF chip
+            and Web on/off toggle have been removed; this row now only
+            carries the active query mode selector. */}
+        <div className="flex items-center justify-center mb-3">
           <div className="inline-flex items-center rounded-full bg-white/80 backdrop-blur-md border border-[var(--oracle-outline-variant,#d0c5b6)]/20 p-0.5 shadow-sm">
             <button
               type="button"
@@ -396,7 +376,7 @@ export default function ChatInput({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={hasThread ? "Inquire further..." : "Ask The Oracle anything..."}
+            placeholder={hasThread ? "Inquire further..." : "Ask Lexram anything..."}
             rows={1}
             className="flex-1 resize-none bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 outline-none leading-6 max-h-[120px] overflow-y-auto custom-scrollbar py-1.5"
           />

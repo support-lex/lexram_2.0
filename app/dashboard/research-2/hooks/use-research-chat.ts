@@ -177,6 +177,45 @@ function normalizeAuthority(a: any): Authority {
   };
 }
 
+// ── Follow-up partitioning ───────────────────────────────────────────────────
+// The backend occasionally lumps a section heading like "Related Questions You
+// Might Find Helpful" into the same array as the actual follow-up questions.
+// If that string lands in `nextQuestions`, the chip renderer paints it as a
+// button — visually wrong (it's a heading, not a question). These helpers
+// detect heading-like entries and lift them into a separate `heading` slot
+// that the UI renders as plain text above the chip row.
+const FOLLOW_UP_HEADING_PATTERNS: RegExp[] = [
+  /^\s*related\s+(?:follow[- ]?up\s+)?questions?\b/i,
+  /\byou\s+might\s+find\s+helpful\b/i,
+  /^\s*(?:suggested|follow[- ]?up|next)\s+questions?\s*[:\-]?\s*$/i,
+  /^\s*here\s+are\s+(?:some\s+)?(?:related|follow[- ]?up|other)/i,
+];
+
+function looksLikeFollowUpHeading(s: string): boolean {
+  if (!s) return false;
+  const trimmed = s.trim();
+  if (!trimmed) return false;
+  // Real follow-ups almost always end with `?`. A heading marker without a
+  // terminal `?` is a label, not a question.
+  if (/\?\s*$/.test(trimmed)) return false;
+  return FOLLOW_UP_HEADING_PATTERNS.some((re) => re.test(trimmed));
+}
+
+function partitionFollowUps(items: string[]): { heading?: string; questions: string[] } {
+  let heading: string | undefined;
+  const questions: string[] = [];
+  for (const raw of items) {
+    const s = (raw ?? "").trim();
+    if (!s) continue;
+    if (!heading && looksLikeFollowUpHeading(s)) {
+      heading = s.replace(/[:.]+\s*$/, "");
+      continue;
+    }
+    questions.push(s);
+  }
+  return { heading, questions };
+}
+
 // Sanitize a label for use inside a Mermaid node — no quotes, brackets or
 // pipes (Mermaid syntax characters), plus length cap.
 function mermaidLabel(text: string, max = 48): string {
@@ -650,6 +689,27 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         // Strip the <follow_up> block from the displayed text
         cleanedText = cleanedText.replace(/<follow_up>[\s\S]*?<\/follow_up>/gi, "").replace(/\n{3,}/g, "\n\n").trim();
 
+        // Some backends emit "Related Questions You Might Find Helpful" as a
+        // plain markdown section at the bottom of the answer instead of inside
+        // <follow_up>...</follow_up>. The same content already renders below
+        // as the "CONTINUE WITH" chip row, so showing it inline duplicates the
+        // questions and (in some layouts) ends up wrapped by the inline UI
+        // block card. Drop the section — heading line + everything after it.
+        const RELATED_RE =
+          /(?:\n|^)[ \t]*(?:#{1,6}[ \t]+|\*{1,2}[ \t]*)?Related[ \t]+Questions[\s\S]*$/i;
+        const relatedMatch = cleanedText.match(RELATED_RE);
+        if (relatedMatch) {
+          // Pull questions out of the stripped section so we don't lose them
+          // if the `done` event didn't ship structured follow-ups.
+          const block = relatedMatch[0];
+          const extra = block
+            .split(/\n/)
+            .map((l) => l.replace(/^[\s\-\*\d.]+/, "").trim())
+            .filter((l) => l.length > 10 && !/related\s+questions/i.test(l));
+          followUpQuestions.push(...extra);
+          cleanedText = cleanedText.replace(RELATED_RE, "").trim();
+        }
+
         const parsed = parseLexramSources(cleanedText);
         const a = normalizeAnswer({ streamText: parsed.cleanText });
         if (parsed.authorities.length > 0) {
@@ -657,9 +717,12 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
           a.uiBlocks = a.uiBlocks?.filter((b) => b.type !== "authorities");
           if (a.uiBlocks && a.uiBlocks.length === 0) a.uiBlocks = undefined;
         }
-        // Attach extracted follow-up questions so MessageBubble renders them as chips
+        // Split heading-like entries out of the follow-up array so the chip
+        // renderer never paints a label as a button.
         if (followUpQuestions.length > 0) {
-          a.nextQuestions = followUpQuestions;
+          const { heading, questions } = partitionFollowUps(followUpQuestions);
+          if (questions.length > 0) a.nextQuestions = questions;
+          if (heading) a.nextQuestionsHeading = heading;
         }
         return a;
       };
@@ -728,8 +791,13 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       // Merge structured follow-up questions from `done`. These take precedence
       // over anything pulled out of a <follow_up>...</follow_up> inline block
       // because the backend team said they're now structured siblings of sources.
+      // The done payload sometimes includes a heading entry like "Related
+      // Questions You Might Find Helpful" alongside the actual questions —
+      // partition it out so the chip renderer doesn't paint a label as a button.
       if (doneFollowUps.length > 0) {
-        answer.nextQuestions = doneFollowUps;
+        const { heading, questions } = partitionFollowUps(doneFollowUps);
+        answer.nextQuestions = questions.length > 0 ? questions : undefined;
+        if (heading) answer.nextQuestionsHeading = heading;
       }
 
       // Merge structured mindmap (mermaid source) from `done`. Same rule: if

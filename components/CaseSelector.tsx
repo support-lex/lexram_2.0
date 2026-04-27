@@ -55,7 +55,6 @@ interface CaseSelectorProps {
 const emptyForm: CaseFormState = { title: '', external_id: '', external_source: '' }
 
 const SOURCE_PRESETS: { label: string; value: string; hint: string }[] = [
-  { label: 'PACER', value: 'PACER', hint: 'US federal' },
   { label: 'CNR', value: 'CNR', hint: 'India eCourts' },
   { label: 'Manual', value: 'manual', hint: 'No external link' },
 ]
@@ -535,7 +534,7 @@ export default function CaseSelector({
             >
               <label htmlFor="case-ext-id" className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                 <HashIcon className="w-3 h-3" />
-                {addForm.external_source === 'CNR' ? 'CNR number' : addForm.external_source === 'PACER' ? 'PACER case number' : 'Reference ID'}
+                {addForm.external_source === 'CNR' ? 'CNR number' : 'Reference ID'}
               </label>
               <input
                 id="case-ext-id"
@@ -545,8 +544,6 @@ export default function CaseSelector({
                 placeholder={
                   addForm.external_source === 'CNR'
                     ? 'DLCT010012342024'
-                    : addForm.external_source === 'PACER'
-                    ? '1:23-cv-04567'
                     : 'External reference'
                 }
                 disabled={addSubmitting}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import PageLayout from "@/components/layout/PageLayout";
-import { Mail, Phone, MapPin, Send, CheckCircle } from "lucide-react";
+import { Mail, Phone, MapPin, Send, CheckCircle, Building2 } from "lucide-react";
 
 export default function ContactClient() {
   const [submitted, setSubmitted] = useState(false);
@@ -22,41 +22,83 @@ export default function ContactClient() {
   return (
     <PageLayout fullWidth>
       <div className="max-w-6xl mx-auto px-6 py-16">
-        <div className="text-center mb-12">
+        <div className="text-center mb-4">
           <h1 className="text-4xl font-serif font-bold text-[var(--text-primary)] mb-4">
             Contact Us
           </h1>
-          <p className="text-xl text-[var(--text-secondary)] max-w-2xl mx-auto">
-            Have questions? We&apos;d love to hear from you. Send us a message and we&apos;ll respond as soon as possible.
+          <p className="text-sm text-[var(--text-muted)]">
+            Last updated on 28-04-2026 14:45:52
           </p>
+          <p className="text-lg text-[var(--text-secondary)] max-w-2xl mx-auto mt-3">
+            You may contact us using the information below.
+          </p>
+        </div>
+
+        {/* Company details band */}
+        <div className="mb-10 mt-10 p-6 rounded-2xl bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] border border-[var(--accent)]/20">
+          <div className="flex items-start gap-4">
+            <Building2 className="w-6 h-6 text-[var(--accent)] shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                Merchant Legal Entity Name
+              </p>
+              <p className="text-[var(--text-primary)] font-semibold text-lg">
+                RAMASUBRAMANIAN AI SOFTWARE PRIVATE LIMITED
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
           {/* Contact Info */}
-          <div className="md:col-span-1 space-y-6">
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-[var(--border-default)]">
-              <Mail className="w-6 h-6 text-[var(--accent)] mb-3" />
-              <h3 className="font-bold text-[var(--text-primary)] mb-1">Email</h3>
-              <a href="mailto:contact@lexram.ai" className="text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors">
-                contact@lexram.ai
-              </a>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-[var(--border-default)]">
-              <Phone className="w-6 h-6 text-[var(--accent)] mb-3" />
-              <h3 className="font-bold text-[var(--text-primary)] mb-1">Phone</h3>
-              <p className="text-[var(--text-secondary)]">+91 80 1234 5678</p>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-[var(--border-default)]">
-              <MapPin className="w-6 h-6 text-[var(--accent)] mb-3" />
-              <h3 className="font-bold text-[var(--text-primary)] mb-1">Office</h3>
-              <p className="text-[var(--text-secondary)]">
-                LexRam Technologies Pvt. Ltd.<br />
-                123 Legal Tech Park<br />
-                Bangalore, Karnataka 560001
+          <div className="md:col-span-1 space-y-4">
+            <div className="bg-[var(--bg-surface)] p-6 rounded-2xl border border-[var(--border-default)]">
+              <MapPin className="w-5 h-5 text-[var(--accent)] mb-3" />
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                Registered Address
+              </h3>
+              <p className="text-[var(--text-secondary)] text-sm leading-relaxed">
+                B 225, Maya Nursing Home, 12th Avenue, Maya Nursing Home, Ashok Nagar,
+                Chennai, Chennai City Corporation, Tamil Nadu — PIN: 600083
               </p>
             </div>
+
+            <div className="bg-[var(--bg-surface)] p-6 rounded-2xl border border-[var(--border-default)]">
+              <MapPin className="w-5 h-5 text-[var(--accent)] mb-3" />
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                Operational Address
+              </h3>
+              <p className="text-[var(--text-secondary)] text-sm leading-relaxed">
+                B 225, Maya Nursing Home, 12th Avenue, Maya Nursing Home, Ashok Nagar,
+                Chennai, Chennai City Corporation, Tamil Nadu — PIN: 600083
+              </p>
+            </div>
+
+            <a
+              href="tel:8754446066"
+              className="block bg-[var(--bg-surface)] p-6 rounded-2xl border border-[var(--border-default)] hover:border-[var(--accent)]/40 transition-colors group"
+            >
+              <Phone className="w-5 h-5 text-[var(--accent)] mb-3" />
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                Telephone No
+              </h3>
+              <p className="text-[var(--text-primary)] font-semibold group-hover:text-[var(--accent)] transition-colors">
+                8754446066
+              </p>
+            </a>
+
+            <a
+              href="mailto:hello@lexram.ai"
+              className="block bg-[var(--bg-surface)] p-6 rounded-2xl border border-[var(--border-default)] hover:border-[var(--accent)]/40 transition-colors group"
+            >
+              <Mail className="w-5 h-5 text-[var(--accent)] mb-3" />
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                E-Mail ID
+              </h3>
+              <p className="text-[var(--text-primary)] font-semibold group-hover:text-[var(--accent)] transition-colors">
+                hello@lexram.ai
+              </p>
+            </a>
           </div>
 
           {/* Contact Form */}

@@ -48,25 +48,12 @@ export interface SendResetOtpResult extends UsecaseResult {
 // ─── Signup: create account, then trigger email OTP gating ────────────────────
 
 export interface SignupInput {
-  first_name: string;
-  last_name: string;
-  country: string;
-  email: string;        // stored as profile metadata only — NOT used for auth
   phone: string;        // the actual auth identifier
   password: string;
   confirm_password: string;
 }
 
 export async function signupUsecase(input: SignupInput): Promise<SignupResult> {
-  if (!input.first_name.trim() || !input.last_name.trim()) {
-    return { success: false, error: 'First and last name are required.' };
-  }
-  if (!input.country.trim()) {
-    return { success: false, error: 'Please select your country.' };
-  }
-  if (!isValidEmail(input.email)) {
-    return { success: false, error: 'Please enter a valid email address.' };
-  }
   const phone = normalizePhone(input.phone);
   if (!isValidPhone(phone)) {
     return {
@@ -81,20 +68,10 @@ export async function signupUsecase(input: SignupInput): Promise<SignupResult> {
     return { success: false, error: 'Passwords do not match.' };
   }
 
-  // Phone-only auth. We deliberately do NOT pass `email` to signUp() because
-  // the Supabase project has email signups disabled. The email is persisted
-  // as profile metadata so it shows up in the dashboard / settings page.
   const { data, error: signUpErr } = await supabase().auth.signUp({
     phone,
     password: input.password,
-    options: {
-      data: {
-        first_name: input.first_name.trim(),
-        last_name: input.last_name.trim(),
-        country: input.country.trim(),
-        email: input.email.trim(),
-      },
-    },
+    options: { data: {} },
   });
   if (signUpErr) {
     console.error('[signup] supabase.auth.signUp error:', signUpErr);

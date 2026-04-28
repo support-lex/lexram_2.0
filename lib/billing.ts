@@ -8,6 +8,25 @@
 
 export const STARTING_BALANCE = 500;
 
+const TESTING_HOSTNAME = "lexram-2-0-ui.vercel.app";
+
+// On lexram-2-0-ui.vercel.app (the test environment) credits are unlimited —
+// deductions are no-ops and balance always reads as STARTING_BALANCE.
+function isUnlimitedMode(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname === TESTING_HOSTNAME;
+}
+
+/**
+ * Returns true on production (lexram.ai) and staging (dev-lexram.vercel.app).
+ * Returns false on the testing environment (lexram-2-0-ui.vercel.app), where
+ * paywall UI and credits should be hidden entirely.
+ */
+export function isPaywallEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.location.hostname !== TESTING_HOSTNAME;
+}
+
 export type BillingMode = "instant" | "deep" | "draft";
 
 export interface RateCard {
@@ -121,6 +140,7 @@ export const billingApi = {
    * First-time callers are auto-issued the STARTING_BALANCE.
    */
   getBalance(userId: string): number {
+    if (isUnlimitedMode()) return STARTING_BALANCE;
     const stored = readNumber(balanceKey(userId));
     if (stored == null) {
       writeNumber(balanceKey(userId), STARTING_BALANCE);
@@ -143,6 +163,9 @@ export const billingApi = {
    * The deduction is clamped to whatever balance remains.
    */
   deduct(userId: string, input: DeductInput): DeductResult {
+    if (isUnlimitedMode()) {
+      return { cost: 0, balanceBefore: STARTING_BALANCE, balanceAfter: STARTING_BALANCE, exhausted: false };
+    }
     const rate = RATE_CARD[input.mode];
     const tokens = Math.max(0, Math.floor(input.outputTokens));
     const cost = Math.max(1, Math.round(rate.baseCost + rate.costPerToken * tokens));
@@ -160,7 +183,7 @@ export const billingApi = {
     };
     writeTransactions(userId, [tx, ...readTransactions(userId)]);
 
-    return { cost, balanceBefore: before, balanceAfter: after, exhausted: after <= 0 };
+    return { cost, balanceBefore: before, balanceAfter: after, exhausted: after === 0 };
   },
 
   /**

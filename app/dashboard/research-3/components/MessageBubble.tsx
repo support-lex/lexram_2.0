@@ -69,21 +69,33 @@ const markdownComponents = {
     <strong className="font-semibold text-[var(--text-primary)]">{children}</strong>
   ),
   em: ({ children }: any) => <em className="italic">{children}</em>,
-  pre: ({ children }: any) => (
-    <div className="my-4 rounded-xl overflow-hidden border border-[var(--border-default)]">
-      <div className="flex items-center px-3 py-1.5 bg-[var(--bg-sidebar)] text-[11px] text-[var(--text-on-sidebar)]">
-        <span className="font-mono opacity-60">Code</span>
+  pre: ({ children }: any) => {
+    // If the fenced block is mermaid, render it unwrapped — the code renderer
+    // below returns a MermaidDiagram and doesn't need the "Code" chrome.
+    const child = Array.isArray(children) ? children[0] : children;
+    if (child?.props?.className?.includes("mermaid")) return <>{children}</>;
+    return (
+      <div className="my-4 rounded-xl overflow-hidden border border-[var(--border-default)]">
+        <div className="flex items-center px-3 py-1.5 bg-[var(--bg-sidebar)] text-[11px] text-[var(--text-on-sidebar)]">
+          <span className="font-mono opacity-60">Code</span>
+        </div>
+        <pre className="p-4 bg-[var(--surface-hover)]/50 overflow-x-auto text-sm font-mono leading-relaxed">
+          {children}
+        </pre>
       </div>
-      <pre className="p-4 bg-[var(--surface-hover)]/50 overflow-x-auto text-sm font-mono leading-relaxed">
+    );
+  },
+  code: ({ children, className }: any) => {
+    // Fenced ```mermaid blocks — render as a live diagram instead of raw text.
+    if (className?.includes("mermaid")) {
+      return <MermaidDiagram source={String(children).trimEnd()} />;
+    }
+    return (
+      <code className="px-1 py-0.5 rounded bg-[var(--surface-hover)] text-[0.9em] font-mono">
         {children}
-      </pre>
-    </div>
-  ),
-  code: ({ children }: any) => (
-    <code className="px-1 py-0.5 rounded bg-[var(--surface-hover)] text-[0.9em] font-mono">
-      {children}
-    </code>
-  ),
+      </code>
+    );
+  },
   blockquote: ({ children }: any) => (
     <blockquote className="border-l-2 border-[var(--accent)]/30 pl-4 italic text-[var(--text-secondary)] my-3 bg-[var(--surface-hover)]/30 py-2 rounded-r-lg">
       {children}

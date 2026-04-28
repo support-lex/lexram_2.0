@@ -1,25 +1,11 @@
 "use client";
 
-import { CheckCircle2, Zap, Users, Building2, ArrowLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { CheckCircle2, Zap, Building2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { isPaywallEnabled } from "@/lib/billing";
 
 const PLANS = [
-  {
-    name: "Trial",
-    price: "Free",
-    subtitle: "To test the waters",
-    highlight: false,
-    badge: null,
-    features: [
-      "500 Free Credits",
-      "~5 Research Queries",
-      "~2 AI-assisted drafts",
-      "Access to all document types",
-    ],
-    cta: "Claim Free Credits",
-    ctaStyle: "border border-[var(--border-default)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)]",
-    icon: <Zap className="w-5 h-5" />,
-  },
   {
     name: "Top-Up",
     price: "₹999",
@@ -57,6 +43,22 @@ const PLANS = [
 ];
 
 export default function SubscriptionPage() {
+  const [paywallEnabled, setPaywallEnabled] = useState(true);
+  useEffect(() => { setPaywallEnabled(isPaywallEnabled()); }, []);
+
+  if (!paywallEnabled) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-[var(--text-muted)] text-sm">This page is not available in the current environment.</p>
+          <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-[var(--accent)] hover:underline">
+            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <div className="max-w-5xl mx-auto px-6 py-8">
@@ -88,7 +90,7 @@ export default function SubscriptionPage() {
         </div>
 
         {/* Plans grid */}
-        <div className="grid md:grid-cols-3 gap-5">
+        <div className="grid md:grid-cols-2 gap-5">
           {PLANS.map((plan) => (
             <div
               key={plan.name}

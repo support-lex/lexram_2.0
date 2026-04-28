@@ -23,23 +23,27 @@ import ChatInput from "./components/ChatInput";
 import AuthoritiesPanel from "./components/AuthoritiesPanel";
 import ShortcutsModal from "./components/ShortcutsModal";
 import DocumentDialog from "./components/DocumentDialog";
-import PaywallModal from "@/components/PaywallModal";
 import CaseSelector from "@/components/CaseSelector";
+import PaywallModal from "@/components/PaywallModal";
 import { useCredits } from "@/hooks/use-credits";
 import type { BillingMode } from "@/lib/billing";
+import { isPaywallEnabled } from "@/lib/billing";
 
 const PENDING_QUERY_KEY = "lexram_pending_query";
 
 export default function Research2Page() {
   const { selectedMatterId } = useMatterContext();
   const { isAuthenticated } = useDashboardAuth();
-  const credits = useCredits();
   const router = useRouter();
   const pathname = usePathname();
   const pendingQueryHandled = useRef(false);
-  const [showPaywall, setShowPaywall] = useState(false);
   const [showDocumentDialog, setShowDocumentDialog] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallEnabled, setPaywallEnabled] = useState(true);
+  useEffect(() => { setPaywallEnabled(isPaywallEnabled()); }, []);
   const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
+  const { balance, ceiling, deductForResponse } = useCredits();
+  const wasSearchingRef = useRef(false);
   const [selectedSourceMessageId, setSelectedSourceMessageId] = useState<string | null>(null);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -173,53 +177,34 @@ export default function Research2Page() {
     router.push(`/sign-in?${params.toString()}`);
   }, [query, router, pathname]);
 
-  // The QueryMode (Instant / Deep / Draft) at the moment the user pressed
-  // send, captured in a ref so the post-stream deduction effect can charge
-  // the correct rate even if the user toggled the pill while waiting.
-  const lastSubmitModeRef = useRef<BillingMode>("instant");
+  // Deduct credits when a response finishes streaming, then show paywall if exhausted.
+  useEffect(() => {
+    if (wasSearchingRef.current && !isSearching) {
+      if (paywallEnabled) {
+        const lastAiMsg = [...messages].reverse().find((m) => m.role === "ai");
+        const text = lastAiMsg?.response?.streamText ?? lastAiMsg?.content ?? "";
+        if (text) {
+          const result = deductForResponse(mode as BillingMode, text);
+          if (result?.exhausted) setShowPaywall(true);
+        }
+      }
+    }
+    wasSearchingRef.current = isSearching;
+  }, [isSearching]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gatedSubmit = useCallback(() => {
     if (!isAuthenticated) {
       goToSignUp();
       return;
     }
-    if (credits.ready && credits.balance <= 0) {
+    if (paywallEnabled && balance <= 0) {
       setShowPaywall(true);
       return;
     }
-    lastSubmitModeRef.current = queryMode;
     handleSubmit();
-  }, [isAuthenticated, credits.ready, credits.balance, queryMode, handleSubmit, goToSignUp]);
+  }, [isAuthenticated, paywallEnabled, balance, handleSubmit, goToSignUp]);
   useEffect(() => { handleSubmitRef.current = gatedSubmit; }, [gatedSubmit, handleSubmitRef]);
 
-  // AI message ids we've already billed in this page session. When the user
-  // loads or switches a chat thread, we seed this set with everything the
-  // session already contains — those replies were billed at the time they
-  // were generated, so they must not be charged again.
-  const billedAiIdsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    billedAiIdsRef.current = new Set(
-      messages.filter((m) => m.role === "ai").map((m) => m.id)
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSessionId]);
-
-  // Deduct credits when a brand-new AI reply lands.
-  useEffect(() => {
-    if (!credits.userId) return;
-    const lastAi = [...messages].reverse().find((m) => m.role === "ai");
-    if (!lastAi) return;
-    if (billedAiIdsRef.current.has(lastAi.id)) return;
-    billedAiIdsRef.current.add(lastAi.id);
-    const responseText =
-      lastAi.response?.streamText ||
-      lastAi.response?.shortAnswer ||
-      lastAi.response?.reasoning ||
-      "";
-    if (!responseText) return;
-    const result = credits.deductForResponse(lastSubmitModeRef.current, responseText);
-    if (result?.exhausted) setShowPaywall(true);
-  }, [messages, credits]);
 
   const hasThread = messages.length > 0;
   const lastAiResponse = sourceMessage?.response;
@@ -407,9 +392,8 @@ Enrolment No.: [Number]`,
           onNewSession={handleNewSession} onDeleteSession={handleDeleteSession}
           onRenameSession={handleRenameSession} historySearch={historySearch}
           setHistorySearch={setHistorySearch} relativeDateLabel={relativeDateLabel}
-          onUpgrade={() => setShowPaywall(true)}
-          creditBalance={isAuthenticated ? credits.balance : null}
-          creditCeiling={credits.ceiling}
+          creditBalance={paywallEnabled ? balance : undefined} creditCeiling={ceiling}
+          onUpgrade={paywallEnabled ? () => setShowPaywall(true) : undefined}
         />
 
         {/* ── Chat Area ─────────────────────────────────────────────── */}
@@ -536,7 +520,7 @@ Enrolment No.: [Number]`,
         </div>
       </div>
 
-      <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} />
+      {paywallEnabled && <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} />}
       <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
       <DocumentDialog
         open={showDocumentDialog}

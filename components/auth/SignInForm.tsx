@@ -25,11 +25,6 @@ import {
 type Mode = 'signin' | 'signup' | 'otp' | 'forgot';
 type OtpIntent = 'signup' | 'reset';
 
-const COUNTRIES = [
-  'India', 'United States', 'United Kingdom', 'Canada', 'Australia',
-  'Singapore', 'UAE', 'Germany', 'France', 'Other',
-];
-
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN = 30;
 
@@ -71,10 +66,6 @@ export default function SignInForm() {
   const [password, setPassword] = useState('');
 
   // Sign-up
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [country, setCountry] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
   const [signupPhone, setSignupPhone] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [signupConfirm, setSignupConfirm] = useState('');
@@ -178,10 +169,6 @@ export default function SignInForm() {
     // handing to the usecase so the E.164 validator (and Supabase) accept it.
     const e164Phone = signupPhone.startsWith('+') ? signupPhone : `+${signupPhone}`;
     const result = await signupUsecase({
-      first_name: firstName,
-      last_name: lastName,
-      country,
-      email: signupEmail,
       phone: e164Phone,
       password: signupPassword,
       confirm_password: signupConfirm,
@@ -433,39 +420,8 @@ export default function SignInForm() {
             initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}
             transition={{ duration: 0.2 }} className="space-y-4" onSubmit={handleSignUp}
           >
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-[var(--text-secondary)]">First name</label>
-                <input type="text" placeholder="Arjun" value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required disabled={loading} className={inputCls} autoComplete="given-name" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-[var(--text-secondary)]">Last name</label>
-                <input type="text" placeholder="Sharma" value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required disabled={loading} className={inputCls} autoComplete="family-name" />
-              </div>
-            </div>
-
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-secondary)]">Country</label>
-              <select value={country} onChange={(e) => setCountry(e.target.value)}
-                required disabled={loading} className={`${inputCls} text-[var(--text-primary)]`}>
-                <option value="" disabled>Select country</option>
-                {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-secondary)]">Email address</label>
-              <input type="email" placeholder="advocate@chambers.com"
-                value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)}
-                required disabled={loading} className={inputCls} autoComplete="email" />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-secondary)]">Phone number</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">Mobile number</label>
               <PhoneInput
                 country={'in'}
                 value={signupPhone}
@@ -481,7 +437,7 @@ export default function SignInForm() {
                 preferredCountries={['in', 'us', 'gb', 'ae', 'sg', 'ca', 'au']}
               />
               <p className="text-xs text-[var(--text-muted)]">
-                Pick your country, then enter your number. We&apos;ll send a 6-digit code via SMS.
+                We&apos;ll send a 6-digit verification code via SMS.
               </p>
             </div>
 

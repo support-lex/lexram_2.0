@@ -35,9 +35,9 @@ function splitLedeAndTitle(c: { caseName: string; citation: string }) {
 
 /**
  * AUTHORITIES card — light paper-style panel inspired by the Stitch reference.
- * Each row is a clean white card: gold lede (case name or statute code), dark
- * bold title underneath, muted description, link icon top-right. No numbered
- * badges, no hover rings — just typography hierarchy doing the work.
+ * Each row is a clean white card: numbered badge on the left, gold lede (case
+ * name or statute code), dark bold title underneath, muted description, link
+ * icon top-right.
  */
 export default function CitationBox({ citations, defaultOpen = true }: CitationBoxProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -78,31 +78,32 @@ export default function CitationBox({ citations, defaultOpen = true }: CitationB
               const { lede, title } = splitLedeAndTitle(c);
               const yearPart = c.year && c.year !== "—" ? ` (${c.year})` : "";
               const inner = (
-                <div className="relative">
-                  {/* Link icon top-right */}
-                  {c.linkHint && (
-                    <Link2 className="absolute top-0 right-0 w-3.5 h-3.5 text-[var(--text-muted)]" />
-                  )}
-                  <div className="min-w-0 pr-6">
-                    {/* Gold lede — case name or statute code */}
-                    <div className="text-[13px] font-semibold text-[var(--accent)] leading-snug truncate">
-                      {lede}
-                    </div>
-                    {/* Dark bold title — citation reporter or section title */}
-                    {title && (
-                      <div className="text-[15px] font-bold text-[var(--text-primary)] leading-snug mt-1">
-                        {title}
-                        {yearPart && (
-                          <span className="font-semibold">{yearPart}</span>
-                        )}
+                <div className="flex items-start gap-3">
+                  <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 rounded-full bg-[var(--bg-sidebar)] text-white text-[10px] font-bold flex-shrink-0">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1 relative">
+                    {c.linkHint && (
+                      <Link2 className="absolute top-0 right-0 w-3.5 h-3.5 text-[var(--text-muted)]" />
+                    )}
+                    <div className="min-w-0 pr-6">
+                      <div className="text-[13px] font-semibold text-[var(--accent)] leading-snug truncate">
+                        {lede}
                       </div>
-                    )}
-                    {/* Muted description — proposition / summary */}
-                    {c.proposition && c.proposition !== title && c.proposition !== lede && (
-                      <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed mt-1.5 line-clamp-2">
-                        {c.proposition}
-                      </p>
-                    )}
+                      {title && (
+                        <div className="text-[15px] font-bold text-[var(--text-primary)] leading-snug mt-1">
+                          {title}
+                          {yearPart && (
+                            <span className="font-semibold">{yearPart}</span>
+                          )}
+                        </div>
+                      )}
+                      {c.proposition && c.proposition !== title && c.proposition !== lede && (
+                        <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed mt-1.5 line-clamp-2">
+                          {c.proposition}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

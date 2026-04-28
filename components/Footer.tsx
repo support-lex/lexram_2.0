@@ -45,6 +45,7 @@ export default function Footer() {
       </div>
       <div className="max-w-7xl mx-auto pt-8 border-t border-[var(--border-default)] text-sm font-normal flex flex-col md:flex-row justify-between items-center gap-4 font-sans">
         <p>© 2026 LexRam Technologies. All rights reserved.</p>
+        <p className="text-xs text-[var(--text-muted)]/60">Powered by Ramasubramanian AI Software Pvt. Ltd.</p>
         <div className="flex gap-6">
           <a href="https://twitter.com/lexram" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors" aria-label="Follow LexRam on Twitter">Twitter</a>
           <a href="https://linkedin.com/company/lexram" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors" aria-label="Follow LexRam on LinkedIn">LinkedIn</a>

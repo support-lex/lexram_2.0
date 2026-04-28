@@ -358,7 +358,7 @@ export function useResearchChat(
   const [statusMessage, setStatusMessage] = useState("");
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(true);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [selectedPromptPreset, setSelectedPromptPreset] = useState<string | null>(
     PROMPT_PRESETS[0]?.id ?? null
   );

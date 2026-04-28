@@ -1,8 +1,15 @@
 'use client';
+import { useState, useEffect } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
+import { isPaywallEnabled } from '@/lib/billing';
 
 export default function PricingSection() {
+  const [paywallEnabled, setPaywallEnabled] = useState(true);
+  useEffect(() => { setPaywallEnabled(isPaywallEnabled()); }, []);
+
+  if (!paywallEnabled) return null;
+
   return (
     <section id="pricing" className="py-32 bg-[var(--bg-sidebar)] text-white px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -18,33 +25,7 @@ export default function PricingSection() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {/* Free Trial */}
-          <div className="bg-white/5 p-10 rounded-[2rem] border border-white/10 flex flex-col hover:bg-white/[0.07] transition-colors">
-            <h3 className="text-2xl font-light text-white mb-2">Trial</h3>
-            <div className="flex items-baseline gap-1 mb-2">
-              <span className="font-serif text-5xl font-light tracking-tight text-white">Free</span>
-            </div>
-            <p className="text-sm text-[var(--text-muted)] mb-10 font-sans">To test the waters</p>
-            <ul className="space-y-6 mb-12 flex-grow">
-              <li className="flex items-start gap-4 text-sm text-[var(--text-secondary)] font-sans">
-                <CheckCircle2 className="w-5 h-5 text-[var(--accent)] shrink-0" /> 500 Free Credits
-              </li>
-              <li className="flex items-start gap-4 text-sm text-[var(--text-secondary)] font-sans">
-                <CheckCircle2 className="w-5 h-5 text-[var(--accent)] shrink-0" /> ~5 Research Queries
-              </li>
-              <li className="flex items-start gap-4 text-sm text-[var(--text-secondary)] font-sans">
-                <CheckCircle2 className="w-5 h-5 text-[var(--accent)] shrink-0" /> ~2 AI-assisted drafts
-              </li>
-              <li className="flex items-start gap-4 text-sm text-[var(--text-secondary)] font-sans">
-                <CheckCircle2 className="w-5 h-5 text-[var(--accent)] shrink-0" /> Access to all document types
-              </li>
-            </ul>
-            <Link href="/sign-in" className="w-full py-4 rounded-full border border-white/20 text-white font-medium hover:bg-white/10 transition-colors text-sm tracking-wide text-center block">
-              Claim Free Credits
-            </Link>
-          </div>
-
+        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {/* Pay As You Go */}
           <div className="bg-white text-black p-10 rounded-[2rem] flex flex-col relative md:my-4 shadow-2xl">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--accent)] text-black text-xs font-bold uppercase tracking-widest py-2 px-6 rounded-full">

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { useCurrentUser, getInitials } from '@/hooks/use-current-user';
 import { logoutUsecase } from '@/modules/auth/usecase/auth.usecase';
 import { supabase } from '@/lib/supabase/client';
+import { isPaywallEnabled } from '@/lib/billing';
 
 const themes = [
   { id: 'light', name: 'Classic', desc: 'Warm white with gold accents', sidebar: '#0F172A', bg: '#FAFAF9', accent: '#B8860B', surface: '#FFFFFF' },
@@ -20,6 +21,8 @@ const themes = [
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [currentTheme, setCurrentTheme] = useState('light');
+  const [paywallEnabled, setPaywallEnabled] = useState(true);
+  useEffect(() => { setPaywallEnabled(isPaywallEnabled()); }, []);
 
   // ── Profile state, hydrated from the signed-in user ────────────────────────
   const currentUser = useCurrentUser();
@@ -112,12 +115,14 @@ export default function SettingsPage() {
             >
               <Shield className="w-4 h-4" /> Security
             </button>
-            <button
-              onClick={() => setActiveTab('billing')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${activeTab === 'billing' ? 'bg-[var(--bg-sidebar)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--border-default)] hover:text-[var(--text-primary)]'}`}
-            >
-              <CreditCard className="w-4 h-4" /> Billing & Plan
-            </button>
+            {paywallEnabled && (
+              <button
+                onClick={() => setActiveTab('billing')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${activeTab === 'billing' ? 'bg-[var(--bg-sidebar)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--border-default)] hover:text-[var(--text-primary)]'}`}
+              >
+                <CreditCard className="w-4 h-4" /> Billing & Plan
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('preferences')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${activeTab === 'preferences' ? 'bg-[var(--bg-sidebar)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--border-default)] hover:text-[var(--text-primary)]'}`}
@@ -345,7 +350,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeTab === 'billing' && (
+          {activeTab === 'billing' && paywallEnabled && (
             <div className="max-w-xl space-y-6">
               <h2 className="font-sans text-xl font-bold text-[var(--text-primary)] border-b border-[var(--border-default)] pb-4">Billing & Credits</h2>
               <div className="bg-[var(--bg-sidebar)] rounded-2xl p-6 text-white">

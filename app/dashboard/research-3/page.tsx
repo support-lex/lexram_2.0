@@ -17,20 +17,29 @@ import ChatInput from "./components/ChatInput";
 import AuthoritiesPanel from "./components/AuthoritiesPanel";
 import ShortcutsModal from "./components/ShortcutsModal";
 import DocumentDialog from "./components/DocumentDialog";
-import PaywallModal from "@/components/PaywallModal";
 import SignupPromptModal from "@/components/SignupPromptModal";
 import CaseSelector from "@/components/CaseSelector";
+import PaywallModal from "@/components/PaywallModal";
+import { useCredits } from "@/hooks/use-credits";
+import type { BillingMode } from "@/lib/billing";
+import { isPaywallEnabled } from "@/lib/billing";
 
-const GUEST_MESSAGE_LIMIT = 1;
-const FREE_MESSAGE_LIMIT = 3;
+const GUEST_MESSAGE_LIMIT =
+  typeof window !== "undefined" && window.location.hostname === "lexram-2-0-ui.vercel.app"
+    ? Infinity
+    : 1;
 
 export default function Research3Page() {
   const { selectedMatterId } = useMatterContext();
   const { isAuthenticated, markAuthenticated } = useDashboardAuth();
   const pendingQueryHandled = useRef(false);
-  const [showPaywall, setShowPaywall] = useState(false);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallEnabled, setPaywallEnabled] = useState(true);
+  useEffect(() => { setPaywallEnabled(isPaywallEnabled()); }, []);
   const [showDocumentDialog, setShowDocumentDialog] = useState(false);
+  const { balance, ceiling, deductForResponse } = useCredits();
+  const wasSearchingRef = useRef(false);
   const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
   // Which AI message's authorities are pinned in the side panel. null = follow
   // the latest AI message (default). Set when the user clicks a <cite> in an
@@ -157,19 +166,34 @@ export default function Research3Page() {
   // ── Free-tier gate ─────────────────────────────────────────────────────
   const userMessageCount = messages.filter(m => m.role === "user").length;
 
+  // Deduct credits when a response finishes streaming, then show paywall if exhausted.
+  useEffect(() => {
+    if (wasSearchingRef.current && !isSearching) {
+      if (paywallEnabled) {
+        const lastAiMsg = [...messages].reverse().find((m) => m.role === "ai");
+        const text = lastAiMsg?.response?.streamText ?? lastAiMsg?.content ?? "";
+        if (text) {
+          const result = deductForResponse(mode as BillingMode, text);
+          if (result?.exhausted) setShowPaywall(true);
+        }
+      }
+    }
+    wasSearchingRef.current = isSearching;
+  }, [isSearching]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const gatedSubmit = useCallback(() => {
     // Guest: 1 message allowed, then show signup
     if (!isAuthenticated && userMessageCount >= GUEST_MESSAGE_LIMIT) {
       setShowSignupPrompt(true);
       return;
     }
-    // Authenticated free user: 3 messages allowed, then show paywall
-    if (isAuthenticated && userMessageCount >= FREE_MESSAGE_LIMIT) {
+    // Authenticated but out of credits
+    if (paywallEnabled && isAuthenticated && balance <= 0) {
       setShowPaywall(true);
       return;
     }
     handleSubmit();
-  }, [isAuthenticated, userMessageCount, handleSubmit]);
+  }, [isAuthenticated, userMessageCount, paywallEnabled, balance, handleSubmit]);
 
   // Keep handleSubmitRef in sync with gated version for auto-submit
   useEffect(() => {
@@ -376,6 +400,8 @@ export default function Research3Page() {
         </div>
       </div>
 
+      {paywallEnabled && <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} />}
+
       {/* Signup prompt — shown after 1 msg for unauthenticated users (non-closable) */}
       <SignupPromptModal
         open={showSignupPrompt}
@@ -385,11 +411,6 @@ export default function Research3Page() {
         }}
       />
 
-      {/* Paywall modal — shown after 3 msgs for authenticated free users */}
-      <PaywallModal
-        open={showPaywall}
-        onClose={() => setShowPaywall(false)}
-      />
 
       {/* Shortcuts modal */}
       <ShortcutsModal

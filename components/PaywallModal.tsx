@@ -11,19 +11,6 @@ interface PaywallModalProps {
 
 const plans = [
   {
-    name: 'Trial',
-    price: 'Free',
-    sub: 'To test the waters',
-    highlight: false,
-    features: [
-      '500 Free Credits',
-      '~5 Research Queries',
-      '~2 AI-assisted drafts',
-      'Access to all document types',
-    ],
-    cta: 'Claim Free Credits',
-  },
-  {
     name: 'Top-Up',
     price: '₹999',
     sub: 'For 10,000 Credits',
@@ -108,7 +95,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                 </div>
 
                 {/* Plans */}
-                <div className="grid sm:grid-cols-3 gap-4">
+                <div className="grid sm:grid-cols-2 gap-4">
                   {plans.map((plan, i) => (
                     <motion.div
                       key={plan.name}

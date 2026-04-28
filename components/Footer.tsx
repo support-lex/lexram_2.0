@@ -30,7 +30,7 @@ export default function Footer() {
             <li><a href="/about" className="hover:text-white transition-colors">About Us</a></li>
             <li><a href="/careers" className="hover:text-white transition-colors">Careers</a></li>
             <li><a href="/blog" className="hover:text-white transition-colors">Blog</a></li>
-            <li><a href="mailto:contact@lexram.ai" className="hover:text-white transition-colors">Contact</a></li>
+            <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
           </ul>
         </div>
         <div>
@@ -38,6 +38,7 @@ export default function Footer() {
           <ul className="space-y-4 text-sm font-normal font-sans">
             <li><a href="/privacy" className="hover:text-white transition-colors">Privacy Policy</a></li>
             <li><a href="/terms" className="hover:text-white transition-colors">Terms of Service</a></li>
+            <li><Link href="/refund-policy" className="hover:text-white transition-colors">Refund Policy</Link></li>
             <li><a href="/cookies" className="hover:text-white transition-colors">Cookie Policy</a></li>
           </ul>
         </div>

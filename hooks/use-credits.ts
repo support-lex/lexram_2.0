@@ -2,52 +2,49 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import {
-  billingApi,
-  estimateTokens,
-  STARTING_BALANCE,
-  type BillingMode,
-  type DeductResult,
-} from "@/lib/billing";
+import { creditsApi } from "@/services/credits";
+import type { BillingMode, DeductResult } from "@/lib/billing";
+
+const DEFAULT_CEILING = 50; // new users receive 50 free credits
 
 export interface UseCreditsResult {
-  /** Supabase user id, or null if signed out. */
   userId: string | null;
-  /** Current credit balance (0 when signed out). */
   balance: number;
-  /** Maximum balance ever held — used to render the meter's progress bar. */
   ceiling: number;
-  /** True once the initial balance has been read from storage. */
   ready: boolean;
-  /**
-   * Charge the user for one AI response. Returns null if signed out.
-   * The cost is base-rate + token-rate * outputTokens for the given mode.
-   */
-  deductForResponse: (mode: BillingMode, responseText: string) => DeductResult | null;
-  /** Add credits to the wallet (demo top-up flow). */
+  deductForResponse: (mode: BillingMode, responseText: string) => Promise<DeductResult | null>;
   topUp: (amount: number) => void;
-  /** Re-read balance from storage. */
   refresh: () => void;
-  /** Demo helper: wipe balance + transactions. */
   reset: () => void;
 }
 
 export function useCredits(): UseCreditsResult {
   const [userId, setUserId] = useState<string | null>(null);
-  const [balance, setBalance] = useState<number>(0);
-  const [ceiling, setCeiling] = useState<number>(STARTING_BALANCE);
-  const [ready, setReady] = useState<boolean>(false);
-  // Latest balance value, captured in a ref so async effects can read the
-  // current ceiling without depending on the state closure.
-  const ceilingRef = useRef<number>(STARTING_BALANCE);
+  const [balance, setBalance] = useState(0);
+  const [ceiling, setCeiling] = useState(DEFAULT_CEILING);
+  const [ready, setReady] = useState(false);
+  const ceilingRef = useRef(DEFAULT_CEILING);
+  // Capture pre-query balance in a ref so deductForResponse can read it
+  const balanceRef = useRef(0);
 
   const adoptBalance = useCallback((value: number) => {
+    balanceRef.current = value;
     setBalance(value);
     if (value > ceilingRef.current) {
       ceilingRef.current = value;
       setCeiling(value);
     }
   }, []);
+
+  const fetchBalance = useCallback(async (): Promise<number> => {
+    try {
+      const { balance: fresh } = await creditsApi.getBalance();
+      adoptBalance(fresh);
+      return fresh;
+    } catch {
+      return balanceRef.current;
+    }
+  }, [adoptBalance]);
 
   useEffect(() => {
     let mounted = true;
@@ -57,7 +54,7 @@ export function useCredits(): UseCreditsResult {
         if (!mounted) return;
         const uid = data.user?.id ?? null;
         setUserId(uid);
-        if (uid) adoptBalance(billingApi.getBalance(uid));
+        if (uid) fetchBalance();
         setReady(true);
       });
 
@@ -65,9 +62,9 @@ export function useCredits(): UseCreditsResult {
       const uid = session?.user?.id ?? null;
       setUserId(uid);
       if (uid) {
-        ceilingRef.current = STARTING_BALANCE;
-        setCeiling(STARTING_BALANCE);
-        adoptBalance(billingApi.getBalance(uid));
+        ceilingRef.current = DEFAULT_CEILING;
+        setCeiling(DEFAULT_CEILING);
+        fetchBalance();
       } else {
         adoptBalance(0);
       }
@@ -77,40 +74,28 @@ export function useCredits(): UseCreditsResult {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [adoptBalance]);
+  }, [adoptBalance, fetchBalance]);
 
+  // Called after each AI response — refreshes balance from the server
+  // (the backend deducts credits automatically on each query).
   const deductForResponse = useCallback(
-    (mode: BillingMode, responseText: string): DeductResult | null => {
+    async (_mode: BillingMode, _responseText: string): Promise<DeductResult | null> => {
       if (!userId) return null;
-      const tokens = estimateTokens(responseText);
-      const result = billingApi.deduct(userId, { mode, outputTokens: tokens });
-      adoptBalance(result.balanceAfter);
-      return result;
+      const balanceBefore = balanceRef.current;
+      const balanceAfter = await fetchBalance();
+      const cost = Math.max(0, balanceBefore - balanceAfter);
+      return { cost, balanceBefore, balanceAfter, exhausted: balanceAfter === 0 };
     },
-    [userId, adoptBalance]
+    [userId, fetchBalance]
   );
 
-  const topUp = useCallback(
-    (amount: number) => {
-      if (!userId) return;
-      const next = billingApi.topUp(userId, amount);
-      adoptBalance(next);
-    },
-    [userId, adoptBalance]
-  );
+  const refresh = useCallback(() => { fetchBalance(); }, [fetchBalance]);
 
-  const refresh = useCallback(() => {
-    if (!userId) return;
-    adoptBalance(billingApi.getBalance(userId));
-  }, [userId, adoptBalance]);
+  // topUp is a hook for external callers; the PaywallModal drives the actual
+  // payment flow and calls refresh() after Cashfree confirms payment.
+  const topUp = useCallback((_amount: number) => { fetchBalance(); }, [fetchBalance]);
 
-  const reset = useCallback(() => {
-    if (!userId) return;
-    billingApi.reset(userId);
-    ceilingRef.current = STARTING_BALANCE;
-    setCeiling(STARTING_BALANCE);
-    adoptBalance(billingApi.getBalance(userId));
-  }, [userId, adoptBalance]);
+  const reset = useCallback(() => { fetchBalance(); }, [fetchBalance]);
 
   return { userId, balance, ceiling, ready, deductForResponse, topUp, refresh, reset };
 }

@@ -86,8 +86,9 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
       });
 
       if (result?.paymentDetails) {
-        setTimeout(() => { refresh(); }, 3000);
-        handleClose();
+        refresh();
+        // Redirect to success page — shows invoice automatically
+        window.location.href = `/payment/success?order_id=${encodeURIComponent(order.order_id)}&credits=${order.credits}&amount=${order.amount}`;
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment failed. Please try again.');

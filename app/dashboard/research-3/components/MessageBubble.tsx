@@ -43,6 +43,8 @@ type MessageBubbleProps = {
   onOpenAuthorities?: (index: number) => void;
   onOpenEditor?: () => void;
   onOpenWorkflow?: () => void;
+  /** Called when the user clicks "Proceed to Draft" inside a plan block. */
+  onProceedWithDraft?: () => void;
   /** Extra className forwarded from ChatThread (e.g. entry animation). */
   className?: string;
 };
@@ -169,6 +171,7 @@ export default function MessageBubble({
   onOpenEditor,
   onOpenWorkflow,
   onQuerySelect,
+  onProceedWithDraft,
   className,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
@@ -484,6 +487,30 @@ export default function MessageBubble({
                     >
                       <InlineAuthorities authorities={block.data} />
                     </InlineBlock>
+                  );
+                }
+                if (block.type === "plan") {
+                  return (
+                    <div key={`plan-${bi}`} className="mt-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--bg-surface)] overflow-hidden">
+                      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border-default)] bg-[var(--surface-hover)]">
+                        <FileText className="w-3.5 h-3.5 text-[var(--accent)]" />
+                        <span className="text-xs font-semibold text-[var(--accent)] uppercase tracking-wider">Drafting Plan</span>
+                      </div>
+                      <div className="px-5 py-4 text-sm text-[var(--text-secondary)] leading-relaxed">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
+                          {block.data}
+                        </ReactMarkdown>
+                      </div>
+                      <div className="px-5 pb-5">
+                        <button
+                          type="button"
+                          onClick={() => onProceedWithDraft?.()}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-semibold hover:bg-[var(--accent-hover)] transition-colors shadow-sm"
+                        >
+                          Proceed to Draft
+                        </button>
+                      </div>
+                    </div>
                   );
                 }
                 if (block.type === "draft") {

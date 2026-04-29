@@ -23,7 +23,8 @@ export type WorkflowStep = {
 export type MindmapBlock      = { type: "mindmap";     data: string };          // Mermaid source
 export type AuthoritiesBlock  = { type: "authorities"; data: Authority[] };
 export type DraftBlock        = { type: "draft";       data: string };          // markdown / plain text
-export type UiBlock = MindmapBlock | AuthoritiesBlock | DraftBlock;
+export type PlanBlock         = { type: "plan";        data: string };          // drafting plan awaiting user confirmation
+export type UiBlock = MindmapBlock | AuthoritiesBlock | DraftBlock | PlanBlock;
 
 export type LegalAnswer = {
   thinkingText?: string;

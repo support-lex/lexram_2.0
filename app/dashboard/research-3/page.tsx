@@ -20,6 +20,7 @@ import DocumentDialog from "./components/DocumentDialog";
 import SignupPromptModal from "@/components/SignupPromptModal";
 import CaseSelector from "@/components/CaseSelector";
 import PaywallModal from "@/components/PaywallModal";
+import DraftStreamModal from "@/components/DraftStreamModal";
 import { useCredits } from "@/hooks/use-credits";
 import type { BillingMode } from "@/lib/billing";
 import { isPaywallEnabled } from "@/lib/billing";
@@ -37,6 +38,8 @@ export default function Research3Page() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallEnabled, setPaywallEnabled] = useState(true);
   useEffect(() => { setPaywallEnabled(isPaywallEnabled()); }, []);
+  const [showDraftModal, setShowDraftModal] = useState(false);
+  const [draftModalData, setDraftModalData] = useState<{ content: string; messageId: string }>({ content: "", messageId: "" });
   const [showDocumentDialog, setShowDocumentDialog] = useState(false);
   const { balance, ceiling, deductForResponse } = useCredits();
   const wasSearchingRef = useRef(false);
@@ -173,8 +176,16 @@ export default function Research3Page() {
         const lastAiMsg = [...messages].reverse().find((m) => m.role === "ai");
         const text = lastAiMsg?.response?.streamText ?? lastAiMsg?.content ?? "";
         if (text) {
-          const result = deductForResponse(mode as BillingMode, text);
-          if (result?.exhausted) setShowPaywall(true);
+          deductForResponse(mode as BillingMode, text).then((result) => {
+            if (result?.exhausted) setShowPaywall(true);
+          });
+        }
+      }
+      if (showDraftModal) {
+        const lastAiMsg = [...messages].reverse().find((m) => m.role === "ai");
+        const draftBlock = lastAiMsg?.response?.uiBlocks?.find((b) => b.type === "draft") as { type: "draft"; data: string } | undefined;
+        if (draftBlock && lastAiMsg) {
+          setDraftModalData({ content: draftBlock.data, messageId: lastAiMsg.id });
         }
       }
     }
@@ -376,6 +387,7 @@ export default function Research3Page() {
                   onQuerySelect={handleQuerySelect}
                   onBuildSessionDraft={buildSessionDraft}
                   mobilePane={mobilePane}
+                  onProceedWithDraft={() => { setShowDraftModal(true); setQuery("yes"); setTimeout(() => handleSubmitRef.current?.(), 50); }}
                 />
               ) : (
                 <EmptyState
@@ -401,6 +413,14 @@ export default function Research3Page() {
       </div>
 
       {paywallEnabled && <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} />}
+      <DraftStreamModal
+        open={showDraftModal}
+        onClose={() => setShowDraftModal(false)}
+        streamingText={streamingText}
+        isSearching={isSearching}
+        content={draftModalData.content}
+        messageId={draftModalData.messageId}
+      />
 
       {/* Signup prompt — shown after 1 msg for unauthenticated users (non-closable) */}
       <SignupPromptModal

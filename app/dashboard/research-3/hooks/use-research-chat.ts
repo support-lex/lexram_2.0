@@ -220,6 +220,10 @@ function normalizeUiBlock(raw: any): UiBlock | null {
     const data = typeof raw.data === "string" ? raw.data.trim() : "";
     return data ? { type: "draft", data } : null;
   }
+  if (type === "plan") {
+    const data = typeof raw.data === "string" ? raw.data.trim() : "";
+    return data ? { type: "plan", data } : null;
+  }
   return null;
 }
 
@@ -762,15 +766,28 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
           text,
         );
       };
+      const looksLikePlan = (text: string): boolean => {
+        if (!text) return false;
+        return /^[\s*#]*(?:Drafting Plan|Draft Plan|Drafting plan)\b/i.test(text);
+      };
       if (effectiveMode === "draft") {
         const hasDraftBlock = answer.uiBlocks?.some((b) => b.type === "draft");
+        const hasPlanBlock  = answer.uiBlocks?.some((b) => b.type === "plan");
         const explicitDraft = (answer.draftReady || "").trim();
         const streamAsDraft = (answer.streamText || "").trim();
-        const promoteText = explicitDraft || (looksLikeRealDraft(streamAsDraft) ? streamAsDraft : "");
-        if (!hasDraftBlock && promoteText) {
-          answer.draftReady = promoteText;
-          const otherBlocks = (answer.uiBlocks ?? []).filter((b) => b.type !== "draft");
-          answer.uiBlocks = [...otherBlocks, { type: "draft", data: promoteText }];
+
+        if (!hasDraftBlock && !hasPlanBlock) {
+          if (looksLikePlan(streamAsDraft)) {
+            const otherBlocks = (answer.uiBlocks ?? []).filter((b) => b.type !== "draft" && b.type !== "plan");
+            answer.uiBlocks = [...otherBlocks, { type: "plan", data: streamAsDraft }];
+          } else {
+            const promoteText = explicitDraft || (looksLikeRealDraft(streamAsDraft) ? streamAsDraft : "");
+            if (promoteText) {
+              answer.draftReady = promoteText;
+              const otherBlocks = (answer.uiBlocks ?? []).filter((b) => b.type !== "draft");
+              answer.uiBlocks = [...otherBlocks, { type: "draft", data: promoteText }];
+            }
+          }
         }
       }
 

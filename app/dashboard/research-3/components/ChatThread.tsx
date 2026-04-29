@@ -24,6 +24,7 @@ type ChatThreadProps = {
   onQuerySelect: (query: string) => void;
   onBuildSessionDraft: () => void;
   mobilePane: "chat" | "authorities";
+  onProceedWithDraft?: () => void;
 };
 
 export default function ChatThread({
@@ -43,6 +44,7 @@ export default function ChatThread({
   onQuerySelect,
   onBuildSessionDraft,
   mobilePane,
+  onProceedWithDraft,
 }: ChatThreadProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -92,6 +94,7 @@ export default function ChatThread({
               onOpenEditor={onOpenEditor}
               onOpenWorkflow={onOpenWorkflow}
               onQuerySelect={onQuerySelect}
+              onProceedWithDraft={onProceedWithDraft}
             />
           );
         })}

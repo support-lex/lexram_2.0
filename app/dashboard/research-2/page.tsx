@@ -25,6 +25,7 @@ import ShortcutsModal from "./components/ShortcutsModal";
 import DocumentDialog from "./components/DocumentDialog";
 import CaseSelector from "@/components/CaseSelector";
 import PaywallModal from "@/components/PaywallModal";
+import DraftStreamModal from "@/components/DraftStreamModal";
 import { useCredits } from "@/hooks/use-credits";
 import type { BillingMode } from "@/lib/billing";
 import { isPaywallEnabled } from "@/lib/billing";
@@ -41,6 +42,8 @@ export default function Research2Page() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallEnabled, setPaywallEnabled] = useState(true);
   useEffect(() => { setPaywallEnabled(isPaywallEnabled()); }, []);
+  const [showDraftModal, setShowDraftModal] = useState(false);
+  const [draftModalData, setDraftModalData] = useState<{ content: string; messageId: string }>({ content: "", messageId: "" });
   const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
   const { balance, ceiling, deductForResponse } = useCredits();
   const wasSearchingRef = useRef(false);
@@ -184,8 +187,17 @@ export default function Research2Page() {
         const lastAiMsg = [...messages].reverse().find((m) => m.role === "ai");
         const text = lastAiMsg?.response?.streamText ?? lastAiMsg?.content ?? "";
         if (text) {
-          const result = deductForResponse(mode as BillingMode, text);
-          if (result?.exhausted) setShowPaywall(true);
+          deductForResponse(mode as BillingMode, text).then((result) => {
+            if (result?.exhausted) setShowPaywall(true);
+          });
+        }
+      }
+      // When draft modal is open and streaming finished, populate with final content
+      if (showDraftModal) {
+        const lastAiMsg = [...messages].reverse().find((m) => m.role === "ai");
+        const draftBlock = lastAiMsg?.response?.uiBlocks?.find((b) => b.type === "draft") as { type: "draft"; data: string } | undefined;
+        if (draftBlock && lastAiMsg) {
+          setDraftModalData({ content: draftBlock.data, messageId: lastAiMsg.id });
         }
       }
     }
@@ -503,6 +515,7 @@ Enrolment No.: [Number]`,
                   onShareSession={() => setShowShareDialog(true)}
                   onPinSession={() => { if (currentSessionId) pinnedSessionRepository.pin(currentSessionId); }}
                   onEditMessage={(content) => { setQuery(content); setTimeout(() => queryTextareaRef.current?.focus(), 0); }}
+                  onProceedWithDraft={() => { setShowDraftModal(true); setQuery("yes"); setTimeout(() => handleSubmitRef.current?.(), 50); }}
                 />
               ) : (
                 <EmptyState onPickQuickStart={handleQuerySelect} onUpload={() => fileInputRef.current?.click()} />
@@ -521,6 +534,14 @@ Enrolment No.: [Number]`,
       </div>
 
       {paywallEnabled && <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} />}
+      <DraftStreamModal
+        open={showDraftModal}
+        onClose={() => setShowDraftModal(false)}
+        streamingText={streamingText}
+        isSearching={isSearching}
+        content={draftModalData.content}
+        messageId={draftModalData.messageId}
+      />
       <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
       <DocumentDialog
         open={showDocumentDialog}

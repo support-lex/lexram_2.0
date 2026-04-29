@@ -29,6 +29,7 @@ type ChatThreadProps = {
   onShareSession?: () => void;
   onPinSession?: () => void;
   onEditMessage?: (content: string) => void;
+  onProceedWithDraft?: () => void;
 };
 
 export default function ChatThread({
@@ -55,6 +56,7 @@ export default function ChatThread({
   onShareSession,
   onPinSession,
   onEditMessage,
+  onProceedWithDraft,
 }: ChatThreadProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -107,6 +109,7 @@ export default function ChatThread({
               onShareSession={onShareSession}
               onPinSession={onPinSession}
               onEditMessage={onEditMessage}
+              onProceedWithDraft={onProceedWithDraft}
             />
           );
         })}

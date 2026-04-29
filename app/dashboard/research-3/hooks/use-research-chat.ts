@@ -780,12 +780,14 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
           if (looksLikePlan(streamAsDraft)) {
             const otherBlocks = (answer.uiBlocks ?? []).filter((b) => b.type !== "draft" && b.type !== "plan");
             answer.uiBlocks = [...otherBlocks, { type: "plan", data: streamAsDraft }];
+            answer.streamText = "";
           } else {
             const promoteText = explicitDraft || (looksLikeRealDraft(streamAsDraft) ? streamAsDraft : "");
             if (promoteText) {
               answer.draftReady = promoteText;
               const otherBlocks = (answer.uiBlocks ?? []).filter((b) => b.type !== "draft");
               answer.uiBlocks = [...otherBlocks, { type: "draft", data: promoteText }];
+              if (!explicitDraft) answer.streamText = "";
             }
           }
         }

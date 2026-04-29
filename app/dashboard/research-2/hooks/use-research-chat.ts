@@ -846,15 +846,19 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
 
         if (!hasDraftBlock && !hasPlanBlock) {
           if (looksLikePlan(streamAsDraft)) {
-            // This is a planning confirmation step — show as plan block, not a draft editor
             const otherBlocks = (answer.uiBlocks ?? []).filter((b) => b.type !== "draft" && b.type !== "plan");
             answer.uiBlocks = [...otherBlocks, { type: "plan", data: streamAsDraft }];
+            // Plan text lives in the plan block only — clear streamText so it doesn't also appear in the bubble
+            answer.streamText = "";
           } else {
             const promoteText = explicitDraft || (looksLikeRealDraft(streamAsDraft) ? streamAsDraft : "");
             if (promoteText) {
               answer.draftReady = promoteText;
               const otherBlocks = (answer.uiBlocks ?? []).filter((b) => b.type !== "draft");
               answer.uiBlocks = [...otherBlocks, { type: "draft", data: promoteText }];
+              // When streamText was promoted to the draft block, clear it so the document
+              // only renders inside the "View Draft" editor, not also in the chat bubble.
+              if (!explicitDraft) answer.streamText = "";
             }
           }
         }

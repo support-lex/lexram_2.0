@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Download, Scale, CheckCircle2, Clock, XCircle, Printer } from 'lucide-react';
+import { X, Download, Scale, CheckCircle2, Clock, XCircle, Printer, Loader2 } from 'lucide-react';
+import { downloadInvoicePDF } from '@/lib/invoice-pdf';
 
 export interface Payment {
   id: string;
@@ -78,36 +79,41 @@ function StatusBadge({ status }: { status?: string }) {
 
 export default function InvoiceView({ payment, userEmail, userName, onClose }: InvoiceViewProps) {
   const invoiceRef = useRef<HTMLDivElement>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const amountINR = payment?.amount_inr ?? payment?.amount ?? 0;
   const credits = payment?.credits ?? 0;
 
-  const handlePrint = useCallback(() => {
-    window.print();
-  }, []);
+  const handlePrint = useCallback(() => { window.print(); }, []);
+
+  const handleDownload = useCallback(async () => {
+    if (!invoiceRef.current || !payment) return;
+    setPdfLoading(true);
+    try {
+      const num = payment.order_id
+        ? `INV-${payment.order_id.split('_').pop()?.toUpperCase().slice(0, 8) ?? payment.id.slice(0, 8).toUpperCase()}`
+        : `INV-${payment.id.slice(0, 8).toUpperCase()}`;
+      await downloadInvoicePDF(invoiceRef.current, `${num}.pdf`);
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [payment]);
 
   return (
     <>
-      {/* Print-only global styles injected via a style tag */}
+      {/* Print styles — visibility trick works at any DOM depth */}
       <style>{`
         @media print {
-          body > *:not(#invoice-print-root) { display: none !important; }
-          #invoice-print-root {
-            position: fixed !important;
-            inset: 0 !important;
-            z-index: 9999 !important;
-            background: white !important;
-            padding: 0 !important;
-            overflow: visible !important;
-          }
-          .invoice-no-print { display: none !important; }
+          body * { visibility: hidden; }
+          .invoice-paper, .invoice-paper * { visibility: visible !important; }
           .invoice-paper {
+            position: absolute !important;
+            left: 0 !important; top: 0 !important;
+            width: 100% !important;
             box-shadow: none !important;
-            border: none !important;
-            max-width: 100% !important;
-            margin: 0 !important;
             padding: 2.5rem !important;
           }
+          .invoice-no-print { display: none !important; }
         }
       `}</style>
 
@@ -144,10 +150,14 @@ export default function InvoiceView({ payment, userEmail, userName, onClose }: I
                       <Printer className="w-3.5 h-3.5" /> Print
                     </button>
                     <button
-                      onClick={handlePrint}
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-colors"
+                      onClick={handleDownload}
+                      disabled={pdfLoading}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 disabled:opacity-60 transition-colors"
                     >
-                      <Download className="w-3.5 h-3.5" /> Download PDF
+                      {pdfLoading
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+                        : <><Download className="w-3.5 h-3.5" /> Download PDF</>
+                      }
                     </button>
                     <button
                       onClick={onClose}

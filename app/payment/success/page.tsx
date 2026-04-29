@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, useRef, Suspense } from 'react';
+import { useEffect, useState, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, Loader2, Scale, ArrowRight, Download, Printer } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
+import { downloadInvoicePDF } from '@/lib/invoice-pdf';
 import type { Payment } from '@/components/InvoiceView';
 
 /* ── Company constants ────────────────────────────────────────── */
@@ -43,13 +44,19 @@ async function fetchPaymentByOrderId(orderId: string): Promise<Payment | null> {
   return json.payment ?? null;
 }
 
-/* ── Print styles ────────────────────────────────────────────── */
+/* ── Print styles (visibility trick — works at any DOM depth) ─── */
 const PRINT_STYLE = `
 @media print {
-  body > *:not(#invoice-print-root) { display: none !important; }
-  #invoice-print-root { position: static !important; }
+  body * { visibility: hidden; }
+  .invoice-printable, .invoice-printable * { visibility: visible !important; }
+  .invoice-printable {
+    position: absolute !important;
+    left: 0 !important; top: 0 !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+  }
   .no-print { display: none !important; }
-  .invoice-card { box-shadow: none !important; border: 1px solid #e5e7eb !important; }
 }
 `;
 
@@ -68,8 +75,23 @@ function SuccessPageContent() {
   const [userEmail, setUserEmail] = useState('');
   const [userName, setUserName]   = useState('');
   const [phase, setPhase]         = useState<'loading' | 'found' | 'timeout'>('loading');
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const attempts = useRef(0);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const attempts   = useRef(0);
+  const invoiceRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadPDF = useCallback(async (p: Payment) => {
+    if (!invoiceRef.current) return;
+    setPdfLoading(true);
+    try {
+      const num = p.order_id
+        ? `INV-${p.order_id.split('_').pop()?.toUpperCase().slice(0, 8) ?? p.id.slice(0, 8).toUpperCase()}`
+        : `INV-${p.id.slice(0, 8).toUpperCase()}`;
+      await downloadInvoicePDF(invoiceRef.current, `${num}.pdf`);
+    } finally {
+      setPdfLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     // Get signed-in user info
@@ -162,16 +184,20 @@ function SuccessPageContent() {
                     <Printer className="w-3.5 h-3.5" /> Print
                   </button>
                   <button
-                    onClick={() => window.print()}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-colors shadow-sm"
+                    onClick={() => handleDownloadPDF(payment)}
+                    disabled={pdfLoading}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 disabled:opacity-60 transition-colors shadow-sm"
                   >
-                    <Download className="w-3.5 h-3.5" /> Download PDF
+                    {pdfLoading
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+                      : <><Download className="w-3.5 h-3.5" /> Download PDF</>
+                    }
                   </button>
                 </div>
               </div>
 
               {/* ── Invoice card ── */}
-              <div className="invoice-card bg-white rounded-3xl shadow-xl overflow-hidden border border-neutral-100">
+              <div ref={invoiceRef} className="invoice-card invoice-printable bg-white rounded-3xl shadow-xl overflow-hidden border border-neutral-100">
 
                 {/* Accent bar */}
                 <div className="h-1.5 bg-gradient-to-r from-amber-400/50 via-amber-400 to-amber-400/50" />

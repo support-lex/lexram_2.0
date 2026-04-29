@@ -5,10 +5,9 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, Loader2, Scale, ArrowRight, Download, Printer } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { downloadInvoicePDF } from '@/lib/invoice-pdf';
+import { openInvoicePDF } from '@/lib/invoice-pdf';
 import type { Payment } from '@/components/InvoiceView';
 
-/* ── Company constants ────────────────────────────────────────── */
 const COMPANY = {
   name: 'Ramasubramanian AI Software Pvt. Ltd.',
   email: 'hello@lexram.ai',
@@ -18,7 +17,6 @@ const COMPANY = {
   website: 'lexram.ai',
 };
 
-/* ── Helpers ─────────────────────────────────────────────────── */
 function fmtINR(n: number) {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency', currency: 'INR', minimumFractionDigits: 0,
@@ -28,7 +26,7 @@ function fmtDate(d?: string) {
   if (!d) return new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 }
-function invoiceNumber(p: Payment) {
+function invoiceNum(p: Payment) {
   if (p.order_id) {
     const parts = p.order_id.split('_');
     return `INV-${(parts[parts.length - 1] ?? p.id.slice(0, 8)).toUpperCase().slice(0, 8)}`;
@@ -36,7 +34,6 @@ function invoiceNumber(p: Payment) {
   return `INV-${p.id.slice(0, 8).toUpperCase()}`;
 }
 
-/* ── Poll for payment in Supabase ────────────────────────────── */
 async function fetchPaymentByOrderId(orderId: string): Promise<Payment | null> {
   const res = await fetch(`/api/payments?order_id=${encodeURIComponent(orderId)}`);
   if (!res.ok) return null;
@@ -44,66 +41,54 @@ async function fetchPaymentByOrderId(orderId: string): Promise<Payment | null> {
   return json.payment ?? null;
 }
 
-/* ── Print styles (visibility trick — works at any DOM depth) ─── */
+/* ── Print styles — visibility trick, works at any DOM depth ──── */
 const PRINT_STYLE = `
 @media print {
   body * { visibility: hidden; }
   .invoice-printable, .invoice-printable * { visibility: visible !important; }
   .invoice-printable {
     position: absolute !important;
-    left: 0 !important; top: 0 !important;
+    inset: 0 !important;
     width: 100% !important;
     box-shadow: none !important;
-    border: 1px solid #e5e7eb !important;
+    border-radius: 0 !important;
   }
   .no-print { display: none !important; }
 }
 `;
 
-/* ─────────────────────────────────────────────────────────────── */
-
 function SuccessPageContent() {
   const params = useSearchParams();
   const router = useRouter();
 
-  // Cashfree query params (sent on redirect)
-  const orderId   = params.get('order_id') ?? params.get('orderId') ?? '';
+  const orderId        = params.get('order_id') ?? params.get('orderId') ?? '';
   const fallbackCredits = Number(params.get('credits') ?? 0);
-  const fallbackAmount  = Number(params.get('amount') ?? 0);
+  const fallbackAmount  = Number(params.get('amount')  ?? 0);
 
-  const [payment, setPayment] = useState<Payment | null>(null);
+  const [payment,   setPayment]   = useState<Payment | null>(null);
   const [userEmail, setUserEmail] = useState('');
-  const [userName, setUserName]   = useState('');
-  const [phase, setPhase]         = useState<'loading' | 'found' | 'timeout'>('loading');
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
-  const attempts   = useRef(0);
-  const invoiceRef = useRef<HTMLDivElement>(null);
+  const [userName,  setUserName]  = useState('');
+  const [phase,     setPhase]     = useState<'loading' | 'found' | 'timeout'>('loading');
 
-  const handleDownloadPDF = useCallback(async (p: Payment) => {
-    if (!invoiceRef.current) return;
-    setPdfLoading(true);
-    try {
-      const num = p.order_id
-        ? `INV-${p.order_id.split('_').pop()?.toUpperCase().slice(0, 8) ?? p.id.slice(0, 8).toUpperCase()}`
-        : `INV-${p.id.slice(0, 8).toUpperCase()}`;
-      await downloadInvoicePDF(invoiceRef.current, `${num}.pdf`);
-    } finally {
-      setPdfLoading(false);
-    }
-  }, []);
+  const pollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const attempts = useRef(0);
 
+  /* ── resolve user info ─────────────────────────────────────── */
   useEffect(() => {
-    // Get signed-in user info
     supabase().auth.getUser().then(({ data }) => {
       setUserEmail(data.user?.email ?? '');
       const m = data.user?.user_metadata ?? {};
       setUserName(`${m.first_name ?? ''} ${m.last_name ?? ''}`.trim() || (data.user?.email ?? ''));
     });
+  }, []);
 
-    if (!orderId) { setPhase('timeout'); return; }
+  /* ── poll Supabase for the payment row ─────────────────────── */
+  useEffect(() => {
+    if (!orderId) {
+      setPhase('timeout');
+      return;
+    }
 
-    // Poll every 2 s up to 30 s for webhook to write the payment row
     const poll = async () => {
       attempts.current += 1;
       const p = await fetchPaymentByOrderId(orderId);
@@ -114,7 +99,7 @@ function SuccessPageContent() {
         return;
       }
       if (attempts.current >= 15) {
-        // 15 × 2s = 30s timeout — show fallback invoice from URL params
+        // 30 s elapsed — show fallback from URL params
         const fallback: Payment = {
           id: orderId,
           order_id: orderId,
@@ -129,20 +114,31 @@ function SuccessPageContent() {
       }
     };
 
-    poll(); // first attempt immediately
+    poll();
     pollRef.current = setInterval(poll, 2000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
+
+  /* ── PDF/print handlers — no ref needed ───────────────────── */
+  const handleDownload = useCallback(() => {
+    if (!payment) return;
+    openInvoicePDF(payment, userEmail, userName);
+  }, [payment, userEmail, userName]);
+
+  const handlePrint = useCallback(() => {
+    if (!payment) return;
+    openInvoicePDF(payment, userEmail, userName);
+  }, [payment, userEmail, userName]);
 
   return (
     <>
       <style>{PRINT_STYLE}</style>
 
-      <div id="invoice-print-root" className="min-h-screen bg-neutral-50 flex flex-col items-center justify-start py-10 px-4">
-
-        {/* Loading state */}
+      <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-start py-10 px-4">
         <AnimatePresence mode="wait">
+
+          {/* ── Loading ─────────────────────────────────────────── */}
           {phase === 'loading' && (
             <motion.div
               key="loading"
@@ -159,6 +155,7 @@ function SuccessPageContent() {
             </motion.div>
           )}
 
+          {/* ── Invoice ─────────────────────────────────────────── */}
           {phase === 'found' && payment && (
             <motion.div
               key="invoice"
@@ -175,35 +172,30 @@ function SuccessPageContent() {
 
               {/* Action bar */}
               <div className="no-print flex items-center justify-between mb-4">
-                <p className="text-xs text-neutral-400 font-mono">{invoiceNumber(payment)}</p>
+                <p className="text-xs text-neutral-400 font-mono">{invoiceNum(payment)}</p>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => window.print()}
+                    onClick={handlePrint}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors shadow-sm"
                   >
                     <Printer className="w-3.5 h-3.5" /> Print
                   </button>
                   <button
-                    onClick={() => handleDownloadPDF(payment)}
-                    disabled={pdfLoading}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 disabled:opacity-60 transition-colors shadow-sm"
+                    onClick={handleDownload}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-colors shadow-sm"
                   >
-                    {pdfLoading
-                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
-                      : <><Download className="w-3.5 h-3.5" /> Download PDF</>
-                    }
+                    <Download className="w-3.5 h-3.5" /> Download PDF
                   </button>
                 </div>
               </div>
 
-              {/* ── Invoice card ── */}
-              <div ref={invoiceRef} className="invoice-card invoice-printable bg-white rounded-3xl shadow-xl overflow-hidden border border-neutral-100">
+              {/* ── Invoice card (on-screen preview) ─── */}
+              <div className="invoice-printable bg-white rounded-3xl shadow-xl overflow-hidden border border-neutral-100">
 
                 {/* Accent bar */}
                 <div className="h-1.5 bg-gradient-to-r from-amber-400/50 via-amber-400 to-amber-400/50" />
 
                 <div className="px-10 py-10">
-
                   {/* Header */}
                   <div className="flex items-start justify-between mb-10">
                     <div>
@@ -222,7 +214,7 @@ function SuccessPageContent() {
                     </div>
                     <div className="text-right">
                       <p className="text-3xl font-serif font-light text-neutral-900 tracking-tight mb-1">Invoice</p>
-                      <p className="text-sm font-mono font-semibold text-neutral-700">{invoiceNumber(payment)}</p>
+                      <p className="text-sm font-mono font-semibold text-neutral-700">{invoiceNum(payment)}</p>
                       <div className="mt-3 space-y-1.5">
                         <div className="flex items-center justify-end gap-3 text-xs text-neutral-400">
                           <span>Date</span>
@@ -238,7 +230,6 @@ function SuccessPageContent() {
                     </div>
                   </div>
 
-                  {/* Divider */}
                   <div className="h-px bg-neutral-100 mb-8" />
 
                   {/* Billed To */}
@@ -246,9 +237,7 @@ function SuccessPageContent() {
                     <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Billed To</p>
                     {userName && <p className="text-sm font-semibold text-neutral-900">{userName}</p>}
                     <p className="text-sm text-neutral-500">{userEmail}</p>
-                    {payment.user_phone && (
-                      <p className="text-sm text-neutral-400">+91 {payment.user_phone}</p>
-                    )}
+                    {payment.user_phone && <p className="text-sm text-neutral-400">+91 {payment.user_phone}</p>}
                   </div>
 
                   {/* Line items */}
@@ -262,9 +251,9 @@ function SuccessPageContent() {
                     <div className="grid grid-cols-12 px-5 py-5 border-t border-neutral-100 items-center">
                       <div className="col-span-6">
                         <p className="text-sm font-semibold text-neutral-900">LexRam AI Credits</p>
-                        <p className="text-xs text-neutral-400 mt-0.5">Valid for all research &amp; drafting queries · Never expire</p>
+                        <p className="text-xs text-neutral-400 mt-0.5">Valid for all research &amp; drafting · Never expire</p>
                       </div>
-                      <div className="col-span-2 text-center text-sm text-neutral-700 tabular-nums font-medium">
+                      <div className="col-span-2 text-center text-sm font-medium text-neutral-700 tabular-nums">
                         {(payment.credits ?? fallbackCredits).toLocaleString('en-IN')}
                       </div>
                       <div className="col-span-2 text-center text-sm text-neutral-400">₹2 / cr</div>
@@ -282,8 +271,7 @@ function SuccessPageContent() {
                         <span className="tabular-nums">{fmtINR(payment.amount_inr ?? payment.amount ?? fallbackAmount)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-neutral-400">
-                        <span>GST (0%)</span>
-                        <span>₹0</span>
+                        <span>GST (0%)</span><span>₹0</span>
                       </div>
                       <div className="h-px bg-neutral-200" />
                       <div className="flex justify-between text-sm font-bold text-neutral-900">
@@ -293,7 +281,7 @@ function SuccessPageContent() {
                     </div>
                   </div>
 
-                  {/* Payment reference */}
+                  {/* Reference */}
                   {(payment.order_id || payment.cashfree_payment_id) && (
                     <div className="rounded-xl bg-neutral-50 border border-neutral-100 px-5 py-4 mb-8 space-y-2">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-1">Payment Reference</p>
@@ -316,7 +304,6 @@ function SuccessPageContent() {
                     </div>
                   )}
 
-                  {/* Footer */}
                   <div className="h-px bg-neutral-100 mb-6" />
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-neutral-400">
@@ -340,6 +327,7 @@ function SuccessPageContent() {
             </motion.div>
           )}
 
+          {/* ── Timeout fallback ─────────────────────────────────── */}
           {phase === 'timeout' && !payment && (
             <motion.div
               key="timeout"
@@ -360,6 +348,7 @@ function SuccessPageContent() {
               </button>
             </motion.div>
           )}
+
         </AnimatePresence>
       </div>
     </>

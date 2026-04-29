@@ -87,10 +87,12 @@ const markdownComponents = {
       </div>
     );
   },
-  code: ({ children, className }: any) => {
-    // Fenced ```mermaid blocks — render as a live diagram instead of raw text.
-    if (className?.includes("mermaid")) {
-      return <MermaidDiagram source={String(children).trimEnd()} />;
+  code: ({ className, children }: any) => {
+    const match = /language-(\w+)/.exec(className || "");
+    const language = match?.[1];
+    const text = String(children).replace(/\n$/, "");
+    if (language === "mermaid") {
+      return <MermaidDiagram source={text} />;
     }
     return (
       <code className="px-1 py-0.5 rounded bg-[var(--surface-hover)] text-[0.9em] font-mono">
@@ -286,10 +288,29 @@ export default function MessageBubble({
 
   const renderContentWithCitations = (content: string, _citationStart = 0): ReactNode => {
     void _citationStart;
-    const blocks = content
-      .split(/\n\s*\n/)
-      .map((b) => b.trim())
-      .filter(Boolean);
+    // Fence-aware split: blank lines inside fenced code blocks (e.g. mermaid)
+    // must NOT cause a paragraph break — a naive /\n\s*\n/ split fragments them.
+    const blocks: string[] = [];
+    {
+      let current: string[] = [];
+      let inFence = false;
+      for (const line of content.split("\n")) {
+        if (/^\s*```/.test(line)) inFence = !inFence;
+        if (!inFence && line.trim() === "") {
+          if (current.length > 0) {
+            const b = current.join("\n").trim();
+            if (b) blocks.push(b);
+            current = [];
+          }
+        } else {
+          current.push(line);
+        }
+      }
+      if (current.length > 0) {
+        const b = current.join("\n").trim();
+        if (b) blocks.push(b);
+      }
+    }
 
     return blocks.map((block, bi) => (
       <div key={`${message.id}-b${bi}`} className="mb-3.5 leading-7 text-[var(--text-primary)]">

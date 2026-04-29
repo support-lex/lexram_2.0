@@ -17,8 +17,12 @@ function getMermaid() {
       m.initialize({
         startOnLoad: false,
         theme: "neutral",
-        securityLevel: "loose", // required for fa: icon nodes
+        securityLevel: "loose", // required for fa: icon nodes and <br/> in labels
         fontFamily: "var(--font-sans, system-ui)",
+        flowchart: {
+          htmlLabels: true,
+          curve: "basis",
+        },
         themeVariables: {
           primaryColor: "#fff8ed",
           primaryBorderColor: "#d4a017",

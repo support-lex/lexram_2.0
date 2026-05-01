@@ -329,6 +329,49 @@ export default function ChatInput({
               )}
             </button>
 
+            {/* Instant / Deep query mode toggle (LexRam backend) */}
+            <div
+              className="ml-1 inline-flex items-center rounded-lg bg-[var(--surface-hover)] p-0.5 border border-[var(--border-default)]"
+              role="group"
+              aria-label="Query depth"
+            >
+              <button
+                type="button"
+                onClick={() => setQueryMode("instant")}
+                title="Instant — fast answer"
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                  queryMode === "instant"
+                    ? "bg-white text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                Instant
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueryMode("deep")}
+                title="Deep — slower, more thorough analysis"
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                  queryMode === "deep"
+                    ? "bg-white text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                Deep
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueryMode("draft")}
+                title="Draft a legal document using this session's research"
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                  queryMode === "draft"
+                    ? "bg-white text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                Draft
+              </button>
+            </div>
           </div>
 
           {/* Textarea */}

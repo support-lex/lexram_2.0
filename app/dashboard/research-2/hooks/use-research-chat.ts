@@ -355,7 +355,7 @@ export function useResearchChat(
 ) {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<CommandMode>("normal");
-  const [queryMode, setQueryMode] = useState<QueryMode>("deep");
+  const [queryMode, setQueryMode] = useState<QueryMode>("instant");
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
@@ -560,6 +560,11 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     }
     if (!sessionId) {
       setError("Could not create a chat session.");
+      setIsSearching(false);
+      return;
+    }
+    if (sessionId.startsWith("temp_")) {
+      setError("Please sign in to start a research session.");
       setIsSearching(false);
       return;
     }

@@ -316,6 +316,47 @@ export default function ChatInput({
           </div>
         )}
 
+        {/* Mode pill — centered: Instant / Deep / Draft. The Upload PDF chip
+            and Web on/off toggle have been removed; this row now only
+            carries the active query mode selector. */}
+        <div className="flex items-center justify-center mb-3">
+          <div className="inline-flex items-center rounded-full bg-white/80 backdrop-blur-md p-0.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setQueryMode("instant")}
+              className={`px-3.5 py-1 text-[11px] font-semibold rounded-full transition-all ${
+                queryMode === "instant"
+                  ? "bg-[var(--accent)] text-white shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              Instant
+            </button>
+            <button
+              type="button"
+              onClick={() => setQueryMode("deep")}
+              className={`px-3.5 py-1 text-[11px] font-semibold rounded-full transition-all ${
+                queryMode === "deep"
+                  ? "bg-[var(--accent)] text-white shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              Deep
+            </button>
+            <button
+              type="button"
+              onClick={() => setQueryMode("draft")}
+              title="Draft a legal document using this session's research"
+              className={`px-3.5 py-1 text-[11px] font-semibold rounded-full transition-all ${
+                queryMode === "draft"
+                  ? "bg-[var(--accent)] text-white shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              Draft
+            </button>
+          </div>
+        </div>
 
         {/* Main input bar — pill shaped, transparent bg, animated gold border */}
         <div className="flex items-center gap-4 rounded-full border border-[var(--oracle-outline-variant,#d0c5b6)]/30 bg-transparent px-5 py-2.5 shadow-[var(--input-shadow)] focus-within:border-[var(--oracle-primary-container,#c6a76e)]/60 focus-within:shadow-[0_0_0_2px_rgba(198,167,110,0.15),var(--input-shadow)] transition-all duration-300">

@@ -44,6 +44,7 @@ export async function streamLexramQuery(
   options: QueryStreamOptions = {}
 ): Promise<void> {
   if (!sessionId) throw new Error("Missing session id for query stream");
+  if (sessionId.startsWith("temp_")) throw new Error("Cannot stream query for an unsaved session — please sign in.");
   if (!query?.trim()) throw new Error("Empty query");
 
   const token = await getAuthToken();

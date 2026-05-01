@@ -316,7 +316,7 @@ export function useResearchChat(
 ) {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<CommandMode>("normal");
-  const [queryMode, setQueryMode] = useState<QueryMode>("deep");
+  const [queryMode, setQueryMode] = useState<QueryMode>("instant");
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");

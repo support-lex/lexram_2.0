@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation"
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
 import { useCurrentUser, getDisplayName } from "@/hooks/use-current-user"
+import { useNetworkAvatar } from "@/hooks/use-network-avatar"
 import {
   Sidebar,
   SidebarContent,
@@ -74,10 +75,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     hoverTimerRef.current = setTimeout(() => setOpen(false), 120)
   }
 
+  const avatarUrl = useNetworkAvatar()
   const user = {
     name: getDisplayName(currentUser),
     email: currentUser?.email || currentUser?.phone || "",
-    avatar: "",
+    avatar: avatarUrl || "",
   }
 
   // Active state:

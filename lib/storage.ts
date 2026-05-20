@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   EVENTS: 'lexram_events',
   TRACKED_CASES: 'lexram_tracked_cases',
   CASE_STATUSES: 'lexram_case_statuses',
+  SESSION_CASES: 'lexram_session_cases',
 } as const;
 
 let storageWarningShown = false;

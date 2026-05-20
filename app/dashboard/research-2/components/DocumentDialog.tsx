@@ -21,7 +21,9 @@ import {
   FileSpreadsheet,
   Image as ImageIcon,
   FileCode2,
+  Eye,
 } from "lucide-react";
+import DocumentViewer from "./DocumentViewer";
 import { toast } from "sonner";
 import {
   documentRepository,
@@ -37,6 +39,17 @@ interface DocumentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   caseId: string | null;
+  /**
+   * Returns a usable case_id when the user starts uploading without an
+   * explicit selection. The page implementation should:
+   *   - return `caseId` if already set;
+   *   - else call ensureSession() (backend auto-creates a private
+   *     Unassigned case for the new session) and resolve to that
+   *     session's case_id once it lands in the local cache.
+   * Without this prop the dialog falls back to its old "pick a case
+   * first" error, preserving prior behaviour for any other caller.
+   */
+  ensureCaseId?: () => Promise<string | null>;
   onAttach?: (
     docs: { id: string; name: string; size?: number; mime_type?: string }[],
   ) => void;
@@ -157,6 +170,7 @@ export default function DocumentDialog({
   open,
   onOpenChange,
   caseId,
+  ensureCaseId,
   onAttach,
 }: DocumentDialogProps) {
   const [docs, setDocs] = useState<SessionDocument[]>([]);
@@ -168,6 +182,8 @@ export default function DocumentDialog({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
+  // Document being previewed; null = viewer closed.
+  const [viewingDoc, setViewingDoc] = useState<SessionDocument | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -270,12 +286,24 @@ export default function DocumentDialog({
   const handleFiles = useCallback(
     async (files: FileList | File[] | null) => {
       if (!files) return;
-      if (!caseId) {
+      const fileArray = Array.from(files);
+      if (fileArray.length === 0) return;
+
+      // Resolve a case_id even when the user hasn't picked one — the
+      // page-level callback creates a private Unassigned case on demand
+      // (via ensureSession) so a fresh chat doesn't have to pre-select.
+      let targetCaseId = caseId;
+      if (!targetCaseId && ensureCaseId) {
+        try {
+          targetCaseId = await ensureCaseId();
+        } catch {
+          targetCaseId = null;
+        }
+      }
+      if (!targetCaseId) {
         setError("Pick a case first — documents attach to the active case.");
         return;
       }
-      const fileArray = Array.from(files);
-      if (fileArray.length === 0) return;
 
       setUploading(true);
       setError(null);
@@ -286,7 +314,7 @@ export default function DocumentDialog({
           continue;
         }
         try {
-          await documentRepository.upload(caseId, file);
+          await documentRepository.upload(targetCaseId, file);
           successCount += 1;
         } catch (err) {
           setError(`${file.name}: ${(err as Error).message}`);
@@ -301,7 +329,7 @@ export default function DocumentDialog({
         refresh();
       }
     },
-    [caseId, refresh],
+    [caseId, ensureCaseId, refresh],
   );
 
   const handleDelete = async (id: string) => {
@@ -358,20 +386,16 @@ export default function DocumentDialog({
               Reference across sessions on this case
             </DialogDescription>
           </DialogHeader>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="-mt-1 -mr-1 p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {/* Close button is provided by DialogContent (showCloseButton). */}
         </div>
 
         {/* ── Body ───────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto custom-scrollbar px-7 pb-5 space-y-5">
-          {/* No-case guard */}
-          {!caseId && (
+          {/* No-case guard — only when we can't auto-resolve a case_id
+              on the user's behalf. When `ensureCaseId` is provided the
+              page will create a private Unassigned case on first upload,
+              so the warning would be misleading. */}
+          {!caseId && !ensureCaseId && (
             <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
               <p className="text-[13px] text-amber-900 flex-1">
@@ -582,6 +606,20 @@ export default function DocumentDialog({
                       {!isConfirming ? (
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           <StatusPill status={d.status} />
+                          {id && (d.status === "ready" || d.status === "low_quality") && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewingDoc(d);
+                              }}
+                              disabled={isDeleting}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all"
+                              title="View document"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {id && (
                             <button
                               type="button"
@@ -686,6 +724,17 @@ export default function DocumentDialog({
           </div>
         </div>
       </DialogContent>
+
+      {/* Inline document preview — re-fetches the doc on open so the signed
+          Supabase URL is always fresh (the backend issues 1-hour URLs and
+          asks the frontend not to cache them). */}
+      {viewingDoc && caseId && (
+        <DocumentViewer
+          caseId={caseId}
+          doc={viewingDoc}
+          onClose={() => setViewingDoc(null)}
+        />
+      )}
     </Dialog>
   );
 }

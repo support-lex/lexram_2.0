@@ -6,6 +6,21 @@ import { creditsApi } from "@/services/credits";
 import type { BillingMode, DeductResult } from "@/lib/billing";
 
 const DEFAULT_CEILING = 50; // new users receive 50 free credits
+const LS_KEY = "lexram_credits_v1";
+
+function readCache(): { balance: number; ceiling: number } | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.balance === "number" && typeof parsed.ceiling === "number") return parsed;
+  } catch {}
+  return null;
+}
+
+function writeCache(balance: number, ceiling: number) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ balance, ceiling })); } catch {}
+}
 
 export interface UseCreditsResult {
   userId: string | null;
@@ -19,13 +34,14 @@ export interface UseCreditsResult {
 }
 
 export function useCredits(): UseCreditsResult {
+  const cached = typeof window !== "undefined" ? readCache() : null;
   const [userId, setUserId] = useState<string | null>(null);
-  const [balance, setBalance] = useState(0);
-  const [ceiling, setCeiling] = useState(DEFAULT_CEILING);
+  const [balance, setBalance] = useState(cached?.balance ?? 0);
+  const [ceiling, setCeiling] = useState(cached?.ceiling ?? DEFAULT_CEILING);
   const [ready, setReady] = useState(false);
-  const ceilingRef = useRef(DEFAULT_CEILING);
+  const ceilingRef = useRef(cached?.ceiling ?? DEFAULT_CEILING);
   // Capture pre-query balance in a ref so deductForResponse can read it
-  const balanceRef = useRef(0);
+  const balanceRef = useRef(cached?.balance ?? 0);
 
   const adoptBalance = useCallback((value: number) => {
     balanceRef.current = value;
@@ -34,6 +50,7 @@ export function useCredits(): UseCreditsResult {
       ceilingRef.current = value;
       setCeiling(value);
     }
+    writeCache(value, ceilingRef.current);
   }, []);
 
   const fetchBalance = useCallback(async (): Promise<number> => {
@@ -58,14 +75,24 @@ export function useCredits(): UseCreditsResult {
         setReady(true);
       });
 
-    const { data: sub } = supabase().auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase().auth.onAuthStateChange((event, session) => {
       const uid = session?.user?.id ?? null;
       setUserId(uid);
       if (uid) {
-        ceilingRef.current = DEFAULT_CEILING;
-        setCeiling(DEFAULT_CEILING);
+        // NEVER reset the ceiling here. This event fires on INITIAL_SESSION
+        // (every page mount) and TOKEN_REFRESHED (hourly while signed in);
+        // resetting ceiling to DEFAULT_CEILING and then fetching a balance
+        // ≥ default made `adoptBalance` grow the ceiling to match the
+        // current balance — leaving the meter at "X / X" (looks full) on
+        // every refresh and once an hour during a session. The ceiling
+        // represents the user's HISTORICAL maximum and only ever needs to
+        // grow (handled inside adoptBalance), never shrink.
         fetchBalance();
-      } else {
+      } else if (event === "SIGNED_OUT") {
+        // Only zero the balance on a real sign-out, not on transient
+        // non-authed events (Supabase occasionally emits one during token
+        // refresh). Keeps cached numbers in place across the auth
+        // refresh window.
         adoptBalance(0);
       }
     });

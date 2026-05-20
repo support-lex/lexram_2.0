@@ -174,6 +174,26 @@ export default function SignInForm() {
       confirm_password: signupConfirm,
     });
     setLoading(false);
+
+    // Phone is already attached to an existing account → bounce the user
+    // into Sign in mode with the phone prefilled, instead of dead-ending
+    // them on a red error banner. Password is cleared because the signup
+    // password is almost certainly NOT the user's existing one.
+    if (!result.success && result.alreadyRegistered) {
+      // PhoneInput strips the leading "+" internally, so feed it the
+      // digits-only form to avoid a doubled-up "++91…" display.
+      setSigninPhone(e164Phone.replace(/^\+/, ''));
+      setSigninMethod('phone');
+      setPassword('');
+      setSignupPassword('');
+      setSignupConfirm('');
+      switchMode('signin');
+      toast.message('Already registered', {
+        description: 'Sign in with your password to continue.',
+      });
+      return;
+    }
+
     if (!result.success) { setError(result.error ?? 'Signup failed.'); return; }
 
     // Move to OTP screen — code goes to the user's phone via SMS.
@@ -254,11 +274,17 @@ export default function SignInForm() {
   const inputCls =
     'w-full px-4 py-3 rounded-xl border border-[var(--border-default)] bg-white text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-accent)] focus:border-[var(--accent)] transition-all disabled:opacity-50';
 
+  // Title for the OTP step is channel-driven, not intent-driven. Signup is
+  // always SMS today (so "Verify your phone"), but the reset flow can be
+  // either email or SMS — pick the right wording from the active channel.
+  const otpTitle =
+    otpChannel === 'sms' ? 'Verify your phone' : 'Verify your email';
+
   const heading = {
     signin: { title: 'Welcome back', sub: 'Sign in with your email or phone number.' },
     signup: { title: 'Create account', sub: 'Join LexRam for AI-powered legal research.' },
     otp: {
-      title: otpIntent === 'signup' ? 'Verify your email' : 'Verify your identity',
+      title: otpTitle,
       sub: `Enter the ${OTP_LENGTH}-digit code sent to ${otpContact || (otpChannel === 'sms' ? 'your phone' : 'your email')}.`,
     },
     forgot: { title: 'Forgot password', sub: 'Enter your email or phone to receive a verification code.' },
@@ -548,7 +574,7 @@ export default function SignInForm() {
           {mode === 'signin' ? (
             <>Don&apos;t have an account?{' '}
               <button onClick={() => switchMode('signup')}
-                className="font-medium text-[var(--text-primary)] hover:underline">Create one</button>
+                className="font-medium text-[var(--text-primary)] hover:underline">Create new account</button>
             </>
           ) : (
             <>Already have an account?{' '}

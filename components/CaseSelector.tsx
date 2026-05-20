@@ -46,10 +46,21 @@ interface CaseFormState {
 }
 
 interface CaseSelectorProps {
-  sessionId: string
+  /**
+   * Active session id. Pass `null` when the user is in the pre-session state
+   * (chat started but no row POSTed yet) — the component then skips the
+   * PATCH /sessions/{id}/case call and relies on the parent's `onChange` to
+   * stash the pick in pendingCaseId, which is forwarded by POST /sessions
+   * on the first message.
+   */
+  sessionId: string | null
   value?: string | null
   onChange?: (caseId: string | null, c: Case | null) => void
   className?: string
+  /** When provided, skips internal /cases fetch and uses this list instead. */
+  externalCases?: Case[]
+  /** Called after a create/delete so the parent can refetch its shared list. */
+  onCasesChanged?: () => void
 }
 
 const emptyForm: CaseFormState = { title: '', external_id: '', external_source: '' }
@@ -76,9 +87,11 @@ export default function CaseSelector({
   value,
   onChange,
   className,
+  externalCases,
+  onCasesChanged,
 }: CaseSelectorProps) {
   const [cases, setCases] = useState<Case[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(!externalCases)
   const [selectedId, setSelectedId] = useState<string | null>(value ?? null)
   const [open, setOpen] = useState(false)
   const [pendingSelect, setPendingSelect] = useState<string | null>(null)
@@ -99,6 +112,7 @@ export default function CaseSelector({
   }, [value])
 
   const fetchCases = useCallback(async () => {
+    if (externalCases) return; // parent owns the list
     setLoading(true)
     try {
       const res = await api.get<{ cases: Case[] } | Case[]>('/cases')
@@ -109,11 +123,16 @@ export default function CaseSelector({
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [externalCases])
+
+  // Sync from external when parent controls the list
+  useEffect(() => {
+    if (externalCases) { setCases(externalCases); setLoading(false); }
+  }, [externalCases])
 
   useEffect(() => {
-    fetchCases()
-  }, [fetchCases])
+    if (!externalCases) fetchCases()
+  }, [fetchCases, externalCases])
 
   const selected = useMemo(
     () => cases.find((c) => c.id === selectedId) ?? null,
@@ -127,8 +146,18 @@ export default function CaseSelector({
     }
     const prev = selectedId
     setSelectedId(c.id)
-    setPendingSelect(c.id)
     onChange?.(c.id, c)
+
+    // Pre-session: there's no row to PATCH yet. The parent's onChange has
+    // already stashed the pick in pendingCaseId, which gets forwarded to
+    // POST /sessions on first message. Skip the API call.
+    if (!sessionId) {
+      toast.success(`Case "${c.title}" will be linked to this chat`)
+      setOpen(false)
+      return
+    }
+
+    setPendingSelect(c.id)
     try {
       await api.patch(`/sessions/${sessionId}/case`, { case_id: c.id })
       toast.success(`Switched to "${c.title}"`)
@@ -165,6 +194,7 @@ export default function CaseSelector({
       setCases((prev) => [created, ...prev])
       setAddOpen(false)
       toast.success('Case created', { description: `"${created.title}" is now active` })
+      onCasesChanged?.()
       await handleSelect(created)
     } catch (err) {
       toast.error(`Create failed: ${extractError(err)}`)
@@ -217,6 +247,7 @@ export default function CaseSelector({
     try {
       await api.delete(`/cases/${target.id}`)
       toast.success('Case archived')
+      onCasesChanged?.()
       setDeleteCase(null)
     } catch (err) {
       setCases(snapshot)
@@ -294,7 +325,17 @@ export default function CaseSelector({
                 </p>
               </div>
             ) : (
-              cases.map((c) => {
+              // Backend now returns one private "Unassigned" case per session.
+              // Show named cases individually; collapse all Unassigned ones
+              // into a single picker row to avoid 20 identical "Unassigned"
+              // entries. Selecting it picks the first underlying id — usable
+              // for the current-session detach flow.
+              [
+                ...cases.filter((c) => c.title !== 'Unassigned'),
+                ...(cases.some((c) => c.title === 'Unassigned')
+                  ? [cases.find((c) => c.title === 'Unassigned')!]
+                  : []),
+              ].map((c) => {
                 const isSelected = c.id === selectedId
                 const isPending = pendingSelect === c.id
                 const isSystem = c.title === 'Unassigned'

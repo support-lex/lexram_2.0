@@ -69,7 +69,7 @@ export function CaseActionButtons({
 
       {/* Draft Email */}
       <Link
-        href={`/dashboard/research-3?draft=email&case=${encodeURIComponent(caseDetails)}`}
+        href={`/dashboard/research-2?draft=email&case=${encodeURIComponent(caseDetails)}`}
         className={`p-1.5 text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg ${ghost} transition-all`}
         title="Research & Draft Client Email"
       >

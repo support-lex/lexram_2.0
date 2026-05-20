@@ -27,11 +27,24 @@ export interface CaseDocument {
   name?: string;
   size?: number;
   bytes?: number;
+  file_size?: number;
   mime_type?: string;
   content_type?: string;
   status?: DocumentStatus;
   created_at?: string;
   uploaded_at?: string;
+  // ── Viewer + metadata fields (post-processing pipeline output) ──
+  // signed_url: temporary Supabase Storage URL (expires in ~1 hour).
+  // Always re-fetch via GET /cases/{cid}/documents/{did} before use.
+  signed_url?: string | null;
+  doc_type?: string;
+  doc_name?: string;
+  summary?: string;
+  key_entities?: string[];
+  token_count?: number;
+  quality_score?: number;
+  indexed?: boolean;
+  error_message?: string;
   [k: string]: unknown;
 }
 

@@ -16,6 +16,7 @@ import {
   lexramSessionId,
   type LexramSession,
 } from '@/modules/legal/repository/session.repository';
+import { getStoredData, setStoredData, STORAGE_KEYS } from '@/lib/storage';
 import type { Message, ResearchSession } from '@/app/dashboard/research-3/types';
 
 interface SupabaseSessionRow {
@@ -49,31 +50,39 @@ function lexramToSession(s: LexramSession, messages: Message[] = []): ResearchSe
     createdAt: String(s.created_at ?? now),
     updatedAt: String(s.updated_at ?? s.created_at ?? now),
     matterId: undefined,
+    // Map case_id from the backend so CasesPanel can filter sessions by case
+    // without depending solely on the localStorage SESSION_CASES cache.
+    caseId: typeof s.case_id === 'string' ? s.case_id : undefined,
   };
 }
 
 export const chatSessionRepository = {
   // ── List sessions ──────────────────────────────────────────────────────────
   // Source of truth = LexRam. Messages are enriched from Supabase by id.
+  //
+  // Both fetches are issued in parallel — RLS scopes the Supabase rows to the
+  // current user, so we can pull the whole set and intersect against the ids
+  // LexRam returns. Saves ~200–400 ms on every list call vs. awaiting LexRam
+  // first and only then issuing the .in('id', ids) query.
   async list(): Promise<ResearchSession[]> {
     try {
-      const lexramSessions = await lexramSessionRepository.list();
-      const ids = lexramSessions.map(lexramSessionId).filter(Boolean);
+      const lexramP = lexramSessionRepository.list();
+      const supabaseP = supabase()
+        .from('chat_sessions')
+        .select('id, messages');
 
-      // Fetch all matching message rows from Supabase in one shot.
+      const [lexramSessions, supabaseRes] = await Promise.all([lexramP, supabaseP]);
+
       let messagesById = new Map<string, Message[]>();
-      if (ids.length > 0) {
-        const { data, error } = await supabase()
-          .from('chat_sessions')
-          .select('id, messages')
-          .in('id', ids);
-        if (error) {
-          console.warn('[chatSessionRepository.list] supabase enrich failed', error);
-        } else if (data) {
-          messagesById = new Map(
-            data.map((r) => [r.id as string, (r.messages as Message[]) || []])
-          );
-        }
+      if (supabaseRes.error) {
+        console.warn(
+          '[chatSessionRepository.list] supabase enrich failed',
+          supabaseRes.error
+        );
+      } else if (supabaseRes.data) {
+        messagesById = new Map(
+          supabaseRes.data.map((r) => [r.id as string, (r.messages as Message[]) || []])
+        );
       }
 
       return lexramSessions.map((s) => {
@@ -92,14 +101,18 @@ export const chatSessionRepository = {
   // ── Create a new session ──────────────────────────────────────────────────
   // Creates the session in LexRam first, then mirrors the row in Supabase
   // (with the LexRam id as the primary key) so messages can be persisted.
+  // When `case_id` is provided, it's sent to POST /sessions so the row is
+  // linked to the case at creation time (no follow-up PATCH /sessions/{id}/case).
   async create(input: {
     title: string;
     messages: Message[];
     matter_id?: string | null;
+    case_id?: string | null;
   }): Promise<ResearchSession | null> {
     try {
       const lexramSession = await lexramSessionRepository.create(
-        input.title || 'New Conversation'
+        input.title || 'New Conversation',
+        { case_id: input.case_id ?? null }
       );
       const id = lexramSessionId(lexramSession);
       if (!id) throw new Error('LexRam returned no session id');
@@ -123,6 +136,19 @@ export const chatSessionRepository = {
         if (error) {
           console.warn('[chatSessionRepository.create] supabase mirror failed', error);
         }
+      }
+
+      // Seed the SESSION_CASES localStorage cache so CasesPanel can filter the
+      // freshly-created session by its case immediately, without waiting for
+      // the next /sessions list refresh.
+      const resolvedCaseId =
+        (typeof lexramSession.case_id === 'string' ? lexramSession.case_id : null) ??
+        input.case_id ??
+        null;
+      if (resolvedCaseId) {
+        const map = getStoredData<Record<string, string>>(STORAGE_KEYS.SESSION_CASES, {});
+        map[id] = resolvedCaseId;
+        setStoredData(STORAGE_KEYS.SESSION_CASES, map);
       }
 
       return lexramToSession(lexramSession, input.messages);

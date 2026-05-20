@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 export default function QuickActions() {
   const actions = [
-    { href: '/dashboard/research-3', icon: Search, title: 'Research', desc: 'AI-powered legal research' },
+    { href: '/dashboard/research-2', icon: Search, title: 'Research', desc: 'AI-powered legal research' },
     { href: '/dashboard/contracts', icon: FileSignature, title: 'Review Contract', desc: 'Analyze risks & clauses' },
     { href: '/dashboard/matters', icon: Building2, title: 'Manage Matters', desc: 'View cases & clients' },
   ];

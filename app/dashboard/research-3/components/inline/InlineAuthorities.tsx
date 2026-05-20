@@ -49,7 +49,7 @@ export default function InlineAuthorities({ authorities }: InlineAuthoritiesProp
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-bold text-[var(--text-primary)] inline-flex items-center gap-2 mb-1">
-                  <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 rounded-full bg-[var(--bg-sidebar)] text-white text-[10px] font-bold">
+                  <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 rounded-full bg-[var(--accent)] text-[var(--accent-text,#fff)] text-[10px] font-bold">
                     {i + 1}
                   </span>
                   {a.caseName}

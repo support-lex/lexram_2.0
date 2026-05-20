@@ -1,0 +1,111 @@
+{
+  "_comment": "Live-playback demo script for the research-2 page. Turns alternate user/ai. User content of '<<chip>>' is replaced at runtime with the suggested-answer the user clicks. AI messages with suggestedAnswers pause playback until a chip is clicked.",
+  "messages": [
+    {
+      "role": "user",
+      "content": "I need help with a breach of contract matter."
+    },
+    {
+      "role": "ai",
+      "response": {
+        "streamText": "Happy to help. What is the **approximate value** of the contract? This decides court jurisdiction and shapes the urgency framing of the notice.",
+        "shortAnswer": "Clarifying the contract value.",
+        "reasoning": "",
+        "authorityStrength": "Strong",
+        "divergenceStatus": "Aligned",
+        "suggestedAnswersHeading": "Pick a range",
+        "suggestedAnswersVariant": "popup",
+        "suggestedAnswers": [
+          "Below ₹3 lakh",
+          "Between ₹3L and ₹10L",
+          "Between ₹10L and ₹50L",
+          "Above ₹50L (commercial court)"
+        ]
+      }
+    },
+    {
+      "role": "user",
+      "content": "<<chip>>"
+    },
+    {
+      "role": "ai",
+      "response": {
+        "streamText": "Got it. Pick a **notice style** — each balances tone and timeline differently:",
+        "shortAnswer": "Pick a notice style.",
+        "reasoning": "",
+        "authorityStrength": "Strong",
+        "divergenceStatus": "Aligned",
+        "suggestedAnswersHeading": "Notice styles",
+        "suggestedAnswersVariant": "list",
+        "suggestedAnswers": [
+          "Standard 15-day notice — formal, neutral tone, single demand",
+          "Final notice — assertive tone, threat of immediate civil action",
+          "Conciliatory notice — invites settlement before legal escalation"
+        ]
+      }
+    },
+    {
+      "role": "user",
+      "content": "<<chip>>"
+    },
+    {
+      "role": "ai",
+      "response": {
+        "streamText": "Before I draft, do you want me to also include the **procedural timeline** and **relevant authorities** in the response?",
+        "shortAnswer": "Confirm scope.",
+        "reasoning": "",
+        "authorityStrength": "Strong",
+        "divergenceStatus": "Aligned",
+        "suggestedAnswersHeading": "Include timeline & authorities?",
+        "suggestedAnswersVariant": "buttons",
+        "suggestedAnswers": [
+          "Yes — include both",
+          "No — notice only"
+        ]
+      }
+    },
+    {
+      "role": "user",
+      "content": "<<chip>>"
+    },
+    {
+      "role": "ai",
+      "response": {
+        "streamText": "## Breach of Contract — Legal Notice & Litigation Overview\n\nUnder Indian contract law, a breach of contract occurs when a party fails to perform their obligations under a valid agreement without lawful excuse. The Indian Contract Act, 1872 <cite>1</cite> provides the foundational framework, while recent Supreme Court rulings <cite>2</cite> have refined the standards for establishing material breach.\n\n### Key Elements to Establish\n1. **Existence of a valid contract** — offer, acceptance, consideration, and lawful object\n2. **Performance obligation** — the defaulting party had a clear, enforceable duty\n3. **Breach** — failure to perform, defective performance, or anticipatory repudiation\n4. **Damages** — quantifiable loss flowing from the breach <cite>3</cite>\n\nThe notice below demands compliance within 15 days, failing which civil proceedings will be initiated under **Order VII Rule 1 of the CPC** <cite>4</cite>.",
+        "shortAnswer": "Legal notice for breach of contract with litigation timeline",
+        "reasoning": "",
+        "authorityStrength": "Strong",
+        "divergenceStatus": "Aligned",
+        "authorities": [
+          { "caseName": "Indian Contract Act, 1872", "citation": "Sections 73, 74, 75", "court": "Statute", "year": "1872", "proposition": "Foundational statute governing breach and damages in India.", "treatment": "followed", "linkHint": "https://indiankanoon.org/doc/171398/" },
+          { "caseName": "M/s Hind Construction v. State of Maharashtra", "citation": "(1979) 2 SCC 70", "court": "Supreme Court of India", "year": "1979", "proposition": "Established that time is not of the essence unless expressly stipulated in the contract.", "treatment": "followed", "linkHint": "https://indiankanoon.org/doc/1248423/" },
+          { "caseName": "Kailash Nath Associates v. DDA", "citation": "(2015) 4 SCC 136", "court": "Supreme Court of India", "year": "2015", "proposition": "Clarified the scope of Section 74 — reasonable compensation for breach, not penalty.", "treatment": "followed", "linkHint": "https://indiankanoon.org/doc/47685041/" },
+          { "caseName": "Code of Civil Procedure, 1908", "citation": "Order VII Rule 1", "court": "Statute", "year": "1908", "proposition": "Prescribes the requirements for filing a civil suit — plaint format, jurisdiction, and cause of action.", "treatment": "uncertain" }
+        ],
+        "workflowSteps": [
+          { "title": "Legal Notice Issued", "detail": "Day 0: Notice dispatched via registered post / courier with acknowledgment." },
+          { "title": "Compliance Period", "detail": "Day 1–15: Recipient has 15 days to cure the breach or respond with justification." },
+          { "title": "Filing of Civil Suit", "detail": "Day 16: If no response, file suit under Order VII Rule 1, CPC in appropriate court." },
+          { "title": "Written Statement", "detail": "Day 46: Defendant files written statement within 30 days of summons (extendable to 90)." },
+          { "title": "Framing of Issues", "detail": "Day 60–90: Court frames issues for trial based on pleadings." },
+          { "title": "Trial & Arguments", "detail": "Day 120+: Evidence, cross-examination, and final arguments." }
+        ],
+        "nextQuestions": [
+          "What are the grounds for claiming liquidated damages under Section 74?",
+          "How to calculate damages for anticipatory breach?",
+          "Draft the plaint for this case"
+        ],
+        "uiBlocks": [
+          {
+            "type": "mindmap",
+            "data": "graph TD\n  A[\"Breach of Contract\"] --> B[\"Legal Notice\\nDay 0\"]\n  A --> C[\"Key Statutes\"]\n  B --> D[\"15-Day Compliance\\nPeriod\"]\n  D --> E[\"File Civil Suit\\nDay 16\"]\n  E --> F[\"Written Statement\\nDay 46\"]\n  F --> G[\"Framing Issues\\nDay 60-90\"]\n  G --> H[\"Trial & Judgment\\nDay 120+\"]\n  C --> I[\"Indian Contract Act\\nSections 73, 74, 75\"]\n  C --> J[\"CPC Order VII\\nRule 1\"]\n  C --> K[\"Limitation Act\\nArticle 55 — 3 years\"]"
+          },
+          {
+            "type": "draft",
+            "data": "# LEGAL NOTICE\n\n**TO:**\nM/s XYZ Enterprises Pvt. Ltd.\n123 Commercial Avenue, Sector 18\nGurugram, Haryana – 122015\n\n**FROM:**\nOffice of [Your Name], Advocate\n[Your Address]\n\n**DATE:** 11 May 2026\n\n**SUBJECT:** Notice for Breach of Contract dated [Date of Contract]\n\n---\n\nDear Sir/Madam,\n\nUnder instructions from and on behalf of my client, **M/s ABC Industries Ltd.** (hereinafter \"my Client\"), I address this notice as follows:\n\n## FACTS\n\n1. My Client and your company entered into a **Supply Agreement** dated [Date] for the supply of [goods/services], with a total contract value of ₹[Amount].\n\n2. As per Clause [X] of the Agreement, you were obligated to deliver [specific obligation] by [Due Date].\n\n3. Despite repeated reminders dated [dates], you have **failed to perform** your contractual obligations, constituting a **material breach** of the Agreement.\n\n## LEGAL POSITION\n\n4. Under **Section 73 of the Indian Contract Act, 1872**, my Client is entitled to compensation for any loss or damage caused by the breach.\n\n5. The Hon'ble Supreme Court in **Kailash Nath Associates v. DDA (2015) 4 SCC 136** has held that reasonable compensation is awardable even in the absence of a liquidated damages clause.\n\n## DEMAND\n\n6. You are hereby called upon to:\n   - **(a)** Fulfill your pending obligations under the Agreement within **15 (fifteen) days** from receipt of this notice; **OR**\n   - **(b)** Pay compensation amounting to **₹[Amount]** towards damages suffered by my Client.\n\n7. Failure to comply within the stipulated period will leave my Client with no alternative but to initiate **civil proceedings** before the competent court, at your risk and cost.\n\nThis notice is issued without prejudice to any other rights and remedies available to my Client under law.\n\n**[Your Name]**\nAdvocate, Bar Council of [State]\nEnrolment No.: [Number]"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-
-const RESEARCH_2_PATH = '/dashboard/research-2';
+import { isPublicDashboardPath } from '@/lib/public-dashboard-paths';
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -30,22 +29,16 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isDashboard = pathname.startsWith('/dashboard');
-  const isResearch2 = pathname.startsWith(RESEARCH_2_PATH);
 
-  // Guests are allowed on research-2 — the page itself caps them at one
-  // message before the signup CTA. Any other dashboard route still
-  // requires auth so the legal-research surface stays gated.
-  if (isDashboard && !isResearch2 && !user) {
+  // Guests can browse the resources hub, every legislation/compliance/analytics
+  // page linked from it, plus research-2 (capped at one message). Admin
+  // surfaces and user-data dashboards still require auth.
+  if (isDashboard && !isPublicDashboardPath(pathname) && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/sign-in';
     url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }
-
-  // Authed users are now free to roam the entire /dashboard tree —
-  // research-2 stays the post-login default (set in SignInForm), but
-  // the Resources hub at /dashboard/resources and every legacy page
-  // (/dashboard/acts, /amendments, /circulars, …) is reachable again.
 
   return response;
 }

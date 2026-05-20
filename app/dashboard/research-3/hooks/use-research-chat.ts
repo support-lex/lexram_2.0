@@ -316,7 +316,7 @@ export function useResearchChat(
 ) {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<CommandMode>("normal");
-  const [queryMode, setQueryMode] = useState<QueryMode>("instant");
+  const [queryMode, setQueryMode] = useState<QueryMode>("deep");
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
@@ -762,13 +762,18 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       // draft has court/petition markers. Match the latter, refuse the former.
       const looksLikeRealDraft = (text: string): boolean => {
         if (!text) return false;
-        return /\b(IN THE (HON(')?BLE )?(COURT|HIGH COURT|SESSIONS|TRIBUNAL|FORUM)|BEFORE THE (HON(')?BLE )?(COURT|JUDGE|MAGISTRATE|HIGH COURT)|RESPECTFULLY SHOWETH|MOST RESPECTFULLY SHOWETH|PRAYER\b.*\bGRANTED|APPLICATION UNDER SECTION|PETITION UNDER|LEGAL NOTICE|MEMORANDUM OF|TO,\s*The (Hon(')?ble|Presiding))\b/i.test(
-          text,
-        );
+        // Only inspect the first 600 chars so a plan that *mentions* court terms
+        // in its proposed-structure section doesn't get misidentified as a draft.
+        const head = text.slice(0, 600);
+        return /\b(IN THE (HON(')?BLE )?(COURT|HIGH COURT|SESSIONS|TRIBUNAL|FORUM)|BEFORE THE (HON(')?BLE )?(COURT|JUDGE|MAGISTRATE|HIGH COURT)|RESPECTFULLY SHOWETH|MOST RESPECTFULLY SHOWETH)\b/i.test(head);
       };
       const looksLikePlan = (text: string): boolean => {
         if (!text) return false;
-        return /^[\s*#]*(?:Drafting Plan|Draft Plan|Drafting plan)\b/i.test(text);
+        // Explicit heading at the top
+        if (/^[\s*#]*(?:Drafting Plan|Draft Plan|Drafting plan)\b/i.test(text)) return true;
+        // Backend phrases that signal a planning response, not a finished document
+        if (/\b(following plan|formulated.*plan|plan.*formulated|one critical question|proceed with drafting\?|proposed structure|placeholders? for missing)\b/i.test(text)) return true;
+        return false;
       };
       if (effectiveMode === "draft") {
         const hasDraftBlock = answer.uiBlocks?.some((b) => b.type === "draft");

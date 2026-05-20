@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { formatDate } from "@/lib/utils";
 import { chatSessionRepository } from "@/modules/chat/repository/chatSession.repository";
+import {
+  pinnedSessionRepository,
+  archivedSessionRepository,
+} from "@/modules/chat/repository/feedback.repository";
 import { supabase } from "@/lib/supabase/client";
+import { getStoredData, setStoredData, STORAGE_KEYS } from "@/lib/storage";
 import type { Message, ResearchSession } from "../types";
 
 // ── Guest (temp) session helpers ──────────────────────────────────────────────
@@ -63,6 +68,13 @@ export function useResearchSessions(selectedMatterId: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [historySearch, setHistorySearch] = useState("");
   const [isAuthed, setIsAuthed] = useState(false);
+  const [sessionsReady, setSessionsReady] = useState(false);
+  // Case the user picked from the header CaseSelector *before* the session
+  // row exists. ensureSession() and the debounced auto-save both forward
+  // this to POST /sessions so the row is linked to the case at creation
+  // time. Reset to null when an existing session is selected or a new one
+  // is started (so each fresh chat begins as Unassigned by default).
+  const [pendingCaseId, setPendingCaseId] = useState<string | null>(null);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sessionsRef = useRef<ResearchSession[]>([]);
@@ -75,12 +87,46 @@ export function useResearchSessions(selectedMatterId: string) {
   // backend session once per page load (first time we learn the user is
   // authed, whether from the initial getUser() probe or a later auth event).
   const migrationDoneRef = useRef(false);
+  // Dedupe ref: tracks the last user id we ran refresh() for. Both the
+  // getUser() probe and onAuthStateChange(INITIAL_SESSION) fire on mount, and
+  // TOKEN_REFRESHED fires hourly — without this guard each one would re-issue
+  // a parallel GET /sessions, racing each other and (when one silently falls
+  // back to Supabase) intermittently wiping the sidebar.
+  const lastRefreshedForUserRef = useRef<string | null>(null);
 
   // ── Load all sessions for the current user from Supabase ───────────────────
   const refresh = useCallback(async () => {
-    const list = await chatSessionRepository.list();
+    let list: ResearchSession[];
+    try {
+      list = await chatSessionRepository.list();
+    } catch (err) {
+      console.error('[useResearchSessions.refresh] failed', err);
+      setSessionsReady(true);
+      return;
+    }
+    // Race safety: if we already have sessions in state and this call came
+    // back empty (e.g. the repository's silent Supabase fallback fired during
+    // a transient LexRam blip), don't overwrite. The next successful refresh
+    // will replace; until then the user keeps seeing their real history.
+    if (list.length === 0 && sessionsRef.current.length > 0) {
+      setSessionsReady(true);
+      return;
+    }
     setSessions(list);
     sessionsRef.current = list;
+    setSessionsReady(true);
+
+    // Seed SESSION_CASES localStorage cache from backend case_id so
+    // the sidebar and page can read case assignments even after a cache clear.
+    const casesMap = getStoredData<Record<string, string>>(STORAGE_KEYS.SESSION_CASES, {});
+    let dirty = false;
+    list.forEach((s) => {
+      if (s.caseId && casesMap[s.id] !== s.caseId) {
+        casesMap[s.id] = s.caseId;
+        dirty = true;
+      }
+    });
+    if (dirty) setStoredData(STORAGE_KEYS.SESSION_CASES, casesMap);
   }, []);
 
   // Swap a guest `temp_*` session in localStorage for a real LexRam + Supabase
@@ -94,9 +140,11 @@ export function useResearchSessions(selectedMatterId: string) {
       return;
     }
     migrationDoneRef.current = true;
-    const firstUser = stored.messages.find((m) => m.role === "user")?.content ?? "";
     const created = await chatSessionRepository.create({
-      title: firstUser.slice(0, 60) || "New Conversation",
+      // "New Chat" lets the backend's Groq auto-title hook run after the
+      // first query lands in the migrated session. See the sibling create()
+      // calls in this file for the full reasoning.
+      title: "New Chat",
       messages: stored.messages,
       matter_id: null,
     });
@@ -108,33 +156,67 @@ export function useResearchSessions(selectedMatterId: string) {
     setMessages(stored.messages);
   }, []);
 
+  // Hydrate localStorage caches for pinned + archived from Supabase. Fire-
+  // and-forget — HistorySidebar will re-render off the localStorage on its
+  // next interaction since pinnedIds is seeded via lazy useState. We also
+  // dispatch a window event so any open sidebars refresh their derived sets.
+  const hydratePinAndArchive = useCallback(async () => {
+    await Promise.all([
+      pinnedSessionRepository.hydrate(),
+      archivedSessionRepository.hydrate(),
+    ]);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("lexram-pin-changed"));
+      window.dispatchEvent(new Event("lexram-archive-changed"));
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
+
+    // Single entry point for "user is signed in, load their data". Both the
+    // getUser() probe and onAuthStateChange fire on mount; the userId-keyed
+    // ref makes this a no-op for the second caller so we issue exactly one
+    // GET /sessions per user, not two racing each other.
+    const runRefreshForUser = async (userId: string) => {
+      if (lastRefreshedForUserRef.current === userId) return;
+      lastRefreshedForUserRef.current = userId;
+      await migrateTempSessionIfNeeded();
+      hydratePinAndArchive();
+      refresh();
+    };
+
     supabase().auth.getUser().then(async ({ data }) => {
       if (!mounted) return;
-      const signedIn = !!data.user;
-      setIsAuthed(signedIn);
-      if (signedIn) {
-        await migrateTempSessionIfNeeded();
-        refresh();
-      }
+      const user = data.user;
+      setIsAuthed(!!user);
+      if (user) await runRefreshForUser(user.id);
     });
 
-    const { data: sub } = supabase().auth.onAuthStateChange(async (_e, session) => {
-      const signedIn = !!session?.user;
+    const { data: sub } = supabase().auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      const user = session?.user ?? null;
+      const signedIn = !!user;
       setIsAuthed(signedIn);
       if (signedIn) {
-        await migrateTempSessionIfNeeded();
-        refresh();
-      } else {
+        await runRefreshForUser(user!.id);
+        return;
+      }
+      // Only wipe the sidebar on an explicit SIGNED_OUT. Supabase's JWT
+      // refresh can transiently emit events where session?.user is undefined
+      // before the new token lands — without this guard the history briefly
+      // disappears mid-session.
+      if (event === 'SIGNED_OUT') {
         setSessions([]);
+        sessionsRef.current = [];
+        lastRefreshedForUserRef.current = null;
       }
     });
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [refresh, migrateTempSessionIfNeeded]);
+  }, [refresh, migrateTempSessionIfNeeded, hydratePinAndArchive]);
 
   // NOTE: there is intentionally no useEffect on `currentSessionId` to load
   // messages from cache. Loading is driven explicitly by handleSelectSession
@@ -190,12 +272,17 @@ export function useResearchSessions(selectedMatterId: string) {
       // Bail out if ensureSession() is already creating one for this thread —
       // otherwise we'd insert a duplicate session row.
       if (creatingSessionRef.current) return;
-      const firstUser = messages.find((m) => m.role === "user")?.content ?? "";
       creatingSessionRef.current = true;
       const created = await chatSessionRepository.create({
-        title: firstUser.slice(0, 60) || "New Conversation",
+        // MUST be literally "New Chat" — that's the trigger condition the
+        // backend checks before running Groq to auto-generate a 4–6 word
+        // title from the first query. Anything else (the old "first 60
+        // chars of the message" or "New Conversation") suppresses the
+        // auto-title entirely. Verified by direct API probe 2026-05-18.
+        title: "New Chat",
         messages,
         matter_id: selectedMatterId !== "all" ? selectedMatterId : null,
+        case_id: pendingCaseId,
       });
       creatingSessionRef.current = false;
       if (!created) return;
@@ -203,12 +290,15 @@ export function useResearchSessions(selectedMatterId: string) {
       setCurrentSessionId(created.id);
       setSessions((prev) => [created, ...prev]);
       sessionsRef.current = [created, ...sessionsRef.current];
+      // The pending case has been baked into the row — clear it so it isn't
+      // re-applied if the user later starts a fresh chat without picking again.
+      setPendingCaseId(null);
     }, 600);
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [messages, currentSessionId, selectedMatterId, isAuthed]);
+  }, [messages, currentSessionId, selectedMatterId, isAuthed, pendingCaseId]);
 
   // ── Ensure a session exists, creating one on demand if not ────────────────
   // Returns the session id. Authed users get a real LexRam + Supabase session;
@@ -229,9 +319,12 @@ export function useResearchSessions(selectedMatterId: string) {
       // and POST a second session for the same thread.
       creatingSessionRef.current = true;
       const created = await chatSessionRepository.create({
-        title: titleHint.slice(0, 60) || "New Conversation",
+        // See debounced-auto-save sibling: must be literally "New Chat" so
+        // the backend's Groq auto-title hook fires on first query.
+        title: "New Chat",
         messages: [],
         matter_id: selectedMatterId !== "all" ? selectedMatterId : null,
+        case_id: pendingCaseId,
       });
       creatingSessionRef.current = false;
       if (!created) return null;
@@ -240,9 +333,10 @@ export function useResearchSessions(selectedMatterId: string) {
       sessionsRef.current = [created, ...sessionsRef.current];
       setCurrentSessionId(created.id);
       setSessions((prev) => [created, ...prev]);
+      setPendingCaseId(null);
       return created.id;
     },
-    [currentSessionId, isAuthed, selectedMatterId]
+    [currentSessionId, isAuthed, selectedMatterId, pendingCaseId]
   );
 
   // ── Delete a session ───────────────────────────────────────────────────────
@@ -327,6 +421,9 @@ export function useResearchSessions(selectedMatterId: string) {
   const handleNewSession = () => {
     setCurrentSessionId(null);
     setMessages([]);
+    // Clear any case the user pre-selected for an earlier "New chat" attempt
+    // they never followed through on, so the picker starts fresh.
+    setPendingCaseId(null);
   };
 
   const handleSelectSession = (id: string) => {
@@ -337,6 +434,8 @@ export function useResearchSessions(selectedMatterId: string) {
     const cached = sessionsRef.current.find((s) => s.id === id);
     setMessages(cached?.messages ?? []);
     setCurrentSessionId(id);
+    // Selecting an existing session moots any pending case from the picker.
+    setPendingCaseId(null);
   };
 
   const historyContextValue = {
@@ -355,6 +454,7 @@ export function useResearchSessions(selectedMatterId: string) {
 
   return {
     sessions,
+    sessionsReady,
     currentSessionId,
     setCurrentSessionId,
     messages,
@@ -370,5 +470,11 @@ export function useResearchSessions(selectedMatterId: string) {
     handleRenameSession,
     ensureSession,
     historyContextValue,
+    pendingCaseId,
+    setPendingCaseId,
+    // Exposed so the chat hook can re-fetch the sessions list ~1.5s after
+    // each stream completes — picks up the LLM-auto-generated session
+    // title that the backend writes asynchronously post-response.
+    refreshSessions: refresh,
   };
 }

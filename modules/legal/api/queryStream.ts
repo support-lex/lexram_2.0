@@ -26,7 +26,13 @@ export interface QueryStreamDoneEvent {
 }
 
 export interface QueryStreamCallbacks {
-  onStatus?: (message: string) => void;
+  /**
+   * Backend may attach a `detail` array of strings to status events — each
+   * one is a short sub-line meant to be rendered beneath the headline so
+   * the user sees what the current tool is actually doing. Absent (or
+   * empty) for node-level pipeline events like "Classifying query…".
+   */
+  onStatus?: (message: string, detail?: string[]) => void;
   onToken?: (content: string) => void;
   onDone?: (event: QueryStreamDoneEvent) => void;
   onError?: (message: string) => void;
@@ -103,9 +109,17 @@ export async function streamLexramQuery(
         try {
           const event = JSON.parse(payload);
           switch (event.type) {
-            case "status":
-              callbacks.onStatus?.(String(event.message ?? ""));
+            case "status": {
+              const detail = Array.isArray(event.detail)
+                ? (event.detail as unknown[])
+                    .filter((d): d is string => typeof d === "string" && d.trim().length > 0)
+                : undefined;
+              callbacks.onStatus?.(
+                String(event.message ?? ""),
+                detail && detail.length > 0 ? detail : undefined,
+              );
               break;
+            }
             case "token":
               callbacks.onToken?.(String(event.content ?? ""));
               break;

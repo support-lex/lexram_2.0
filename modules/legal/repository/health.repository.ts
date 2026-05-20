@@ -2,7 +2,7 @@
 // These two endpoints are unauthenticated, so they're cheap to poll for an
 // "is the backend up?" status indicator in the UI.
 
-import { lexramRequest } from "../api/lexram.api";
+import { LEXRAM_BASE, lexramRequest } from "../api/lexram.api";
 
 export interface HealthResponse {
   status?: string;
@@ -35,7 +35,7 @@ export const healthRepository = {
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), timeoutMs);
-      const res = await fetch("/legal-api/health", {
+      const res = await fetch(`${LEXRAM_BASE}/health`, {
         method: "GET",
         signal: ctrl.signal,
         headers: { Accept: "application/json" },

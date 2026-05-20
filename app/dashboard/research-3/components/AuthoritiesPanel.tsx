@@ -129,7 +129,7 @@ export default function AuthoritiesPanel({
                 <div className="grid gap-5 sm:grid-cols-2">
                   {(lastResponse?.workflowSteps || []).map((step, i) => (
                     <div key={i} className="relative rounded-2xl border-2 border-[var(--border-default)] bg-gradient-to-br from-[var(--bg-surface)] to-[var(--surface-hover)] p-5 shadow-md hover:shadow-lg transition-all">
-                      <div className="absolute -top-4 left-5 inline-flex items-center justify-center min-w-7 h-7 rounded-full bg-[var(--bg-sidebar)] text-white text-xs font-bold shadow-md">
+                      <div className="absolute -top-4 left-5 inline-flex items-center justify-center min-w-7 h-7 rounded-full bg-[var(--accent)] text-[var(--accent-text,#fff)] text-xs font-bold shadow-md">
                         {i + 1}
                       </div>
                       <div className="text-base font-bold text-[var(--text-primary)] mt-3 leading-snug">{step.title}</div>
@@ -197,7 +197,7 @@ export default function AuthoritiesPanel({
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="text-[15px] font-bold text-[var(--text-primary)] hover:underline cursor-pointer inline-flex items-center gap-2 mb-1.5 leading-snug">
-                      <span className="inline-flex items-center justify-center min-w-6 h-6 rounded-full bg-[var(--bg-sidebar)] text-white text-xs font-bold flex-shrink-0">{i + 1}</span>
+                      <span className="inline-flex items-center justify-center min-w-6 h-6 rounded-full bg-[var(--accent)] text-[var(--accent-text,#fff)] text-xs font-bold flex-shrink-0">{i + 1}</span>
                       <span className="line-clamp-2">{a.caseName}</span>
                     </div>
                     <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed line-clamp-3 mb-2">

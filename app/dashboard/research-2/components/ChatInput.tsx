@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, type RefObject } from "react";
 import {
   Send,
   Square,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
+import { useVoiceTyping } from "@/hooks/use-voice-typing";
 import type { AttachedFile, CommandMode, OutputFormat, AnalysisDepth, WritingStyle } from "../types";
 import { PROMPT_PRESETS } from "../types";
 import type { QueryMode } from "@/modules/legal/api/queryStream";
@@ -143,108 +144,12 @@ export default function ChatInput({
 
   const currentModeLabel = MODES.find((m) => m.value === mode)?.label ?? "Research";
 
-  // ── Voice typing (Web Speech API) ─────────────────────────────────────────
-  // Uses the browser's built-in SpeechRecognition (Chrome/Edge/Safari). Falls
-  // back to a disabled tooltip on browsers that don't support it (Firefox).
-  // Continuous + interim results so the textarea fills as the user speaks.
-  const recognitionRef = useRef<any>(null);
-  const baseQueryRef = useRef<string>("");
-  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isListening, setIsListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(true);
-
-  // ms of silence with no new transcript before we auto-stop the mic
-  const SILENCE_TIMEOUT_MS = 2500;
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const SR =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      setSpeechSupported(false);
-      return;
-    }
-    const r = new SR();
-    r.continuous = true;
-    r.interimResults = true;
-    r.lang = "en-IN";
-
-    const armSilenceTimer = () => {
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = setTimeout(() => {
-        try {
-          r.stop();
-        } catch {
-          /* noop */
-        }
-      }, SILENCE_TIMEOUT_MS);
-    };
-
-    r.onresult = (event: any) => {
-      let interim = "";
-      let finalText = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const t = event.results[i][0].transcript;
-        if (event.results[i].isFinal) finalText += t;
-        else interim += t;
-      }
-      const merged = `${baseQueryRef.current}${baseQueryRef.current && (finalText || interim) ? " " : ""}${finalText}${interim}`;
-      setQuery(merged.replace(/\s+/g, " ").trimStart());
-      if (finalText) baseQueryRef.current = `${baseQueryRef.current}${baseQueryRef.current ? " " : ""}${finalText.trim()}`.trim();
-      // Reset the silence countdown — every new chunk of speech buys 2.5s.
-      armSilenceTimer();
-    };
-    r.onstart = () => armSilenceTimer();
-    r.onspeechstart = () => armSilenceTimer();
-    r.onend = () => {
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
-      setIsListening(false);
-    };
-    r.onerror = () => {
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
-      setIsListening(false);
-    };
-    recognitionRef.current = r;
-    return () => {
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      try {
-        r.stop();
-      } catch {
-        /* noop */
-      }
-    };
-    // setQuery is stable enough — re-binding on every keystroke would
-    // recreate the recognizer mid-utterance.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const toggleVoiceTyping = () => {
-    const r = recognitionRef.current;
-    if (!r) return;
-    if (isListening) {
-      try {
-        r.stop();
-      } catch {
-        /* noop */
-      }
-      setIsListening(false);
-      return;
-    }
-    baseQueryRef.current = query.trim();
-    try {
-      r.start();
-      setIsListening(true);
-      queryTextareaRef.current?.focus();
-    } catch {
-      setIsListening(false);
-    }
-  };
+  // Voice typing — shared with EmptyState via the useVoiceTyping hook so
+  // dictation behaves identically in the post-thread input bar and the new-
+  // thread hero. The hook handles Chrome's habit of ending sessions on short
+  // pauses (auto-restarts while the user still intends to dictate).
+  const { isListening, supported: speechSupported, toggle: toggleVoiceTyping } =
+    useVoiceTyping({ query, setQuery, textareaRef: queryTextareaRef });
 
   return (
     <div
@@ -263,7 +168,7 @@ export default function ChatInput({
 
       {/* Width + padding MUST match ChatThread so the bubbles and input column
           line up at every viewport, regardless of whether the history rail is open. */}
-      <div className={`max-w-[860px] mx-auto ${hasThread ? "px-3 sm:px-4 md:px-8 py-3" : "px-3 sm:px-4 md:px-8 pb-4 sm:pb-6"}`}>
+      <div className={`max-w-[760px] mx-auto ${hasThread ? "px-3 sm:px-4 md:px-8 py-3" : "px-3 sm:px-4 md:px-8 pb-4 sm:pb-6"}`}>
         {/* Attached files */}
         {attachedFiles.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2.5">
@@ -316,50 +221,11 @@ export default function ChatInput({
           </div>
         )}
 
-        {/* Mode pill — centered: Instant / Deep / Draft. The Upload PDF chip
-            and Web on/off toggle have been removed; this row now only
-            carries the active query mode selector. */}
-        <div className="flex items-center justify-center mb-3">
-          <div className="inline-flex items-center rounded-full bg-white/80 backdrop-blur-md p-0.5 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setQueryMode("instant")}
-              className={`px-3.5 py-1 text-[11px] font-semibold rounded-full transition-all ${
-                queryMode === "instant"
-                  ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              Instant
-            </button>
-            <button
-              type="button"
-              onClick={() => setQueryMode("deep")}
-              className={`px-3.5 py-1 text-[11px] font-semibold rounded-full transition-all ${
-                queryMode === "deep"
-                  ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              Deep
-            </button>
-            <button
-              type="button"
-              onClick={() => setQueryMode("draft")}
-              title="Draft a legal document using this session's research"
-              className={`px-3.5 py-1 text-[11px] font-semibold rounded-full transition-all ${
-                queryMode === "draft"
-                  ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              Draft
-            </button>
-          </div>
-        </div>
 
-        {/* Main input bar — pill shaped, transparent bg, animated gold border */}
-        <div className="flex items-center gap-4 rounded-full border border-[var(--oracle-outline-variant,#d0c5b6)]/30 bg-transparent px-5 py-2.5 shadow-[var(--input-shadow)] focus-within:border-[var(--oracle-primary-container,#c6a76e)]/60 focus-within:shadow-[0_0_0_2px_rgba(198,167,110,0.15),var(--input-shadow)] transition-all duration-300">
+        {/* Main input bar — proper search-box height, Draft mode toggle
+            lives on the RIGHT corner next to the send button so the
+            left side stays clean (just the attach +). */}
+        <div className="flex items-center gap-2 sm:gap-3 rounded-full border border-[var(--oracle-outline-variant,#d0c5b6)]/30 bg-transparent px-3 sm:px-4 py-2.5 shadow-[var(--input-shadow)] focus-within:border-[var(--oracle-primary-container,#c6a76e)]/60 focus-within:shadow-[0_0_0_2px_rgba(198,167,110,0.15),var(--input-shadow)] transition-all duration-300">
           {/* + button */}
           <button
             type="button"
@@ -381,140 +247,27 @@ export default function ChatInput({
             className="flex-1 resize-none bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 outline-none border-0 appearance-none focus:outline-none focus:ring-0 leading-6 max-h-[120px] overflow-y-auto custom-scrollbar py-1.5"
           />
 
-          {/* Right: mic + send */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {/* Settings (hidden behind popover) */}
-            <Popover>
-              <PopoverTrigger
-                className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors hidden sm:block"
-                title="Settings"
-              >
-                <Settings2 className="w-4 h-4" />
-              </PopoverTrigger>
-              <PopoverContent
-                side="top"
-                align="end"
-                className="w-64 p-3 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl shadow-lg"
-              >
-                {/* Mode */}
-                <div className="mb-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                    Mode
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {MODES.map((m) => (
-                      <button
-                        key={m.value}
-                        onClick={() => setMode(m.value)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                          mode === m.value
-                            ? "bg-[var(--accent)] text-white"
-                            : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-[var(--border-default)]"
-                        }`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+          {/* Right: Draft pill + mic + send */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
 
-                <Separator className="my-2.5 bg-[var(--border-default)]" />
-
-                {/* Output format */}
-                <div className="mb-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                    Output
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {FORMAT_OPTIONS.map((o) => (
-                      <button
-                        key={o.value}
-                        onClick={() => setOutputFormat(o.value)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                          outputFormat === o.value
-                            ? "bg-[var(--accent)] text-white"
-                            : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-[var(--border-default)]"
-                        }`}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Depth */}
-                <div className="mb-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                    Depth
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {DEPTH_OPTIONS.map((o) => (
-                      <button
-                        key={o.value}
-                        onClick={() => setAnalysisDepth(o.value)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                          analysisDepth === o.value
-                            ? "bg-[var(--accent)] text-white"
-                            : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-[var(--border-default)]"
-                        }`}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Writing style */}
-                <div className="mb-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                    Style
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {STYLE_OPTIONS.map((o) => (
-                      <button
-                        key={o.value}
-                        onClick={() => setWritingStyle(o.value)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                          writingStyle === o.value
-                            ? "bg-[var(--accent)] text-white"
-                            : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-[var(--border-default)]"
-                        }`}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <Separator className="my-2.5 bg-[var(--border-default)]" />
-
-                {/* Prompt preset */}
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                    Preset
-                  </div>
-                  <div className="space-y-1">
-                    {PROMPT_PRESETS.map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() =>
-                          setSelectedPromptPreset(
-                            selectedPromptPreset === p.id ? null : p.id
-                          )
-                        }
-                        className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                          selectedPromptPreset === p.id
-                            ? "bg-[var(--accent)] text-white"
-                            : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-[var(--border-default)]"
-                        }`}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+            {/* Draft mode toggle — sits on the right corner of the input */}
+            <button
+              type="button"
+              onClick={() => setQueryMode(queryMode === "draft" ? "deep" : "draft")}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all flex-shrink-0 ${
+                queryMode === "draft"
+                  ? "bg-[var(--accent)] text-white shadow-sm"
+                  : "bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-default)]"
+              }`}
+              title="Draft a legal document"
+            >
+              Draft
+              <span className={`text-[8px] font-bold tracking-wider px-1 py-0.5 rounded ${
+                queryMode === "draft" ? "bg-white/25 text-white" : "bg-amber-100 text-amber-600"
+              }`}>
+                BETA
+              </span>
+            </button>
 
             {/* Voice typing */}
             {speechSupported && (

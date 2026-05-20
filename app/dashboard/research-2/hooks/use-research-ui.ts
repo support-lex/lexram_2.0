@@ -28,11 +28,11 @@ export function useResearchUI({
   const dragStartWidthRef = useRef(50);
   const lastAutoArtifactResponseIdRef = useRef<string | null>(null);
 
-  // Show chat history by default on desktop, keep it closed on mobile.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setShowHistory(window.innerWidth >= 1024);
-  }, []);
+  // (Removed) the threads sidebar used to auto-open on desktop. Per product
+  // request the sidebar now stays closed on every mount — the user opens it
+  // manually with the history toggle (or `Cmd/Ctrl+H`). Keeps the chat card
+  // at full width by default and avoids fighting for screen real estate on
+  // smaller laptops.
 
   // Auto-open the right-side authorities rail whenever a new AI response
   // arrives with parsed sources. The LexRam backend ships inline citations

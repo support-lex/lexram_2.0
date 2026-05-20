@@ -340,12 +340,36 @@ function normalizeAnswer(raw: any, rootQuery = "Query"): LegalAnswer {
       : undefined,
     workflowSteps,
     uiBlocks: uiBlocks.length > 0 ? uiBlocks : undefined,
+    suggestedAnswers: Array.isArray(raw?.suggestedAnswers)
+      ? raw.suggestedAnswers
+          .slice(0, 6)
+          .map((s: any) => String(s).trim())
+          .filter((s: string) => s.length > 0)
+      : undefined,
+    suggestedAnswersHeading: raw?.suggestedAnswersHeading
+      ? String(raw.suggestedAnswersHeading)
+      : undefined,
+    suggestedAnswersVariant:
+      raw?.suggestedAnswersVariant === "inline" ||
+      raw?.suggestedAnswersVariant === "popup" ||
+      raw?.suggestedAnswersVariant === "list" ||
+      raw?.suggestedAnswersVariant === "buttons"
+        ? raw.suggestedAnswersVariant
+        : undefined,
   };
 }
 
 export interface UseResearchChatOptions {
   /** Ensure a LexRam session exists, creating one on demand. Returns the session id. */
   ensureSession: (titleHint: string) => Promise<string | null>;
+  /**
+   * Optional: triggered ~1.5s after the first query finishes streaming so the
+   * sidebar can pick up the LLM-auto-generated session title that the
+   * backend writes asynchronously after the response (per the Session &
+   * Case Changes integration guide — title lands in the DB silently, never
+   * in the query response payload).
+   */
+  refreshSessions?: () => void;
 }
 
 export function useResearchChat(
@@ -355,11 +379,16 @@ export function useResearchChat(
 ) {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<CommandMode>("normal");
-  const [queryMode, setQueryMode] = useState<QueryMode>("instant");
+  const [queryMode, setQueryMode] = useState<QueryMode>("deep");
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  // Optional sub-lines that the backend now ships alongside the status
+  // headline (e.g. "→ Following how courts have interpreted this question
+  // across decades…"). Replaces — never accumulates — on every new status
+  // event so the loading panel reads as "currently doing this", not a log.
+  const [statusDetail, setStatusDetail] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
@@ -374,6 +403,8 @@ export function useResearchChat(
 
   const ensureSessionRef = useRef(options.ensureSession);
   ensureSessionRef.current = options.ensureSession;
+  const refreshSessionsRef = useRef(options.refreshSessions);
+  refreshSessionsRef.current = options.refreshSessions;
 
   const streamRef = useRef("");
   const abortRef = useRef<AbortController | null>(null);
@@ -543,6 +574,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     setIsSearching(true);
     setStreamingText("");
     setStatusMessage("");
+    setStatusDetail([]);
     streamRef.current = "";
     setActiveRunMode(effectiveMode);
     setLiveEditorContent("");
@@ -583,7 +615,13 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         prompt,
         queryMode,
         {
-          onStatus: (message) => setStatusMessage(message),
+          onStatus: (message, detail) => {
+            setStatusMessage(message);
+            // Each status event REPLACES the prior detail (loading panel
+            // is a live "currently doing this" view, not a running log).
+            // Empty array when the new event has no detail at all.
+            setStatusDetail(detail ?? []);
+          },
           onToken: (content) => {
             streamRef.current += content;
             setStreamingText(stripSourceForDisplay(streamRef.current));
@@ -749,6 +787,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         streamRef.current = "";
         setStreamingText("");
         setStatusMessage("Synthesizing answer…");
+        setStatusDetail([]);
 
         // Roughly 4 chars per chunk, ~12ms apart → ~330 chars/sec which feels
         // like a fast LLM. Tunable.
@@ -835,13 +874,18 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       // draft has court/petition markers. Match the latter, refuse the former.
       const looksLikeRealDraft = (text: string): boolean => {
         if (!text) return false;
-        return /\b(IN THE (HON(')?BLE )?(COURT|HIGH COURT|SESSIONS|TRIBUNAL|FORUM)|BEFORE THE (HON(')?BLE )?(COURT|JUDGE|MAGISTRATE|HIGH COURT)|RESPECTFULLY SHOWETH|MOST RESPECTFULLY SHOWETH|PRAYER\b.*\bGRANTED|APPLICATION UNDER SECTION|PETITION UNDER|LEGAL NOTICE|MEMORANDUM OF|TO,\s*The (Hon(')?ble|Presiding))\b/i.test(
-          text,
-        );
+        // Only inspect the first 600 chars so a plan that *mentions* court terms
+        // in its proposed-structure section doesn't get misidentified as a draft.
+        const head = text.slice(0, 600);
+        return /\b(IN THE (HON(')?BLE )?(COURT|HIGH COURT|SESSIONS|TRIBUNAL|FORUM)|BEFORE THE (HON(')?BLE )?(COURT|JUDGE|MAGISTRATE|HIGH COURT)|RESPECTFULLY SHOWETH|MOST RESPECTFULLY SHOWETH)\b/i.test(head);
       };
       const looksLikePlan = (text: string): boolean => {
         if (!text) return false;
-        return /^[\s*#]*(?:Drafting Plan|Draft Plan|Drafting plan)\b/i.test(text);
+        // Explicit heading at the top
+        if (/^[\s*#]*(?:Drafting Plan|Draft Plan|Drafting plan)\b/i.test(text)) return true;
+        // Backend phrases that signal a planning response, not a finished document
+        if (/\b(following plan|formulated.*plan|plan.*formulated|one critical question|proceed with drafting\?|proposed structure|placeholders? for missing)\b/i.test(text)) return true;
+        return false;
       };
       if (effectiveMode === "draft") {
         const hasDraftBlock = answer.uiBlocks?.some((b) => b.type === "draft");
@@ -909,8 +953,19 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       setIsSearching(false);
       setStreamingText("");
       setStatusMessage("");
+      setStatusDetail([]);
       streamRef.current = "";
       setActiveRunMode(null);
+      // Auto-title pickup: the backend runs Groq to generate a 4–6 word
+      // title for new sessions on first query (per the integration guide).
+      // It writes silently to the DB ~1–2s after the stream ends, but
+      // Groq latency varies — a single refresh at 1.5s often misses it,
+      // which is exactly the "not working" symptom. Poll a few times so
+      // we still catch the update if it lands at 3s or 4s.
+      const refresh = refreshSessionsRef.current;
+      if (refresh) {
+        [1500, 3000, 5000].forEach((ms) => setTimeout(() => refresh(), ms));
+      }
     }
   };
 
@@ -1081,6 +1136,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     queryMode,
     setQueryMode,
     statusMessage,
+    statusDetail,
     isSearching,
     error,
     streamingText,

@@ -38,6 +38,12 @@ export interface UsecaseResult {
 
 export interface SignupResult extends UsecaseResult {
   otpPhone?: string;
+  /**
+   * True when the phone is already attached to an existing account. The
+   * caller is expected to flip the form into Sign in mode (with the phone
+   * prefilled) instead of showing the raw error string.
+   */
+  alreadyRegistered?: boolean;
 }
 
 export interface SendResetOtpResult extends UsecaseResult {
@@ -75,6 +81,16 @@ export async function signupUsecase(input: SignupInput): Promise<SignupResult> {
   });
   if (signUpErr) {
     console.error('[signup] supabase.auth.signUp error:', signUpErr);
+    // Distinguish "phone already registered" from generic errors so the
+    // form can auto-switch into Sign in mode instead of dead-ending the
+    // user with a red banner.
+    if (isAlreadyRegisteredError(signUpErr.message)) {
+      return {
+        success: false,
+        alreadyRegistered: true,
+        error: 'An account with this phone number already exists.',
+      };
+    }
     return { success: false, error: friendlyError(signUpErr.message) };
   }
 
@@ -88,6 +104,28 @@ export async function signupUsecase(input: SignupInput): Promise<SignupResult> {
   console.log('session:           ', !!data.session);
   console.log('full data.user:    ', data.user);
   console.groupEnd();
+
+  // Supabase's anti-enumeration protection: when a phone is already attached
+  // to a confirmed account, signUp() returns NO error but `data.user.identities`
+  // comes back as an empty array (and `phone_confirmed_at` is set on the
+  // existing user). Without this branch the form happily marches the user
+  // off to an OTP screen for a code that will never arrive, because no new
+  // signup actually happened. Detect both signals and bounce the caller
+  // back so the form can auto-switch into Sign in mode.
+  const identities = data.user?.identities;
+  const looksAlreadyRegistered =
+    (Array.isArray(identities) && identities.length === 0) ||
+    !!data.user?.phone_confirmed_at;
+  if (looksAlreadyRegistered) {
+    // Tear down any transient session signUp may have created so the user
+    // isn't accidentally logged in with empty metadata.
+    if (data.session) await supabase().auth.signOut();
+    return {
+      success: false,
+      alreadyRegistered: true,
+      error: 'An account with this phone number already exists.',
+    };
+  }
 
   // If phone confirmations are disabled in the Supabase project, signUp()
   // returns an active session — sign it out so the OTP screen still gates entry.
@@ -278,11 +316,27 @@ function friendlyError(msg: string): string {
     return 'Too many requests. Please wait a few seconds before trying again.';
   if (m.includes('invalid login credentials')) return 'Incorrect email/phone or password.';
   if (m.includes('email not confirmed')) return 'Please confirm your email before signing in.';
-  if (m.includes('user already registered') || m.includes('already registered'))
-    return 'An account with this email already exists.';
+  if (isAlreadyRegisteredError(msg))
+    return 'An account with this phone number already exists.';
   if (m.includes('expired')) return 'OTP expired. Please request a new code.';
   if (m.includes('invalid') && (m.includes('otp') || m.includes('token')))
     return 'Invalid OTP. Please check and try again.';
   if (m.includes('user not found')) return 'No account found with this email or phone.';
   return msg;
+}
+
+/**
+ * Returns true for any of Supabase's "phone/user already registered" error
+ * variants. Centralised so the signup form can auto-switch to Sign in
+ * without each call site re-implementing the substring check.
+ */
+function isAlreadyRegisteredError(msg: string): boolean {
+  const m = msg.toLowerCase();
+  return (
+    m.includes('user already registered') ||
+    m.includes('already registered') ||
+    m.includes('phone number already exists') ||
+    m.includes('phone_exists') ||
+    m.includes('user_already_exists')
+  );
 }

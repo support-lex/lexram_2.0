@@ -78,7 +78,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
       );
 
       const { load } = await import('@cashfreepayments/cashfree-js');
-      const cashfree = await load({ mode: 'sandbox' });
+      const cashfree = await load({ mode: 'production' });
 
       const result = await (cashfree as any).checkout({
         paymentSessionId: order.payment_session_id,

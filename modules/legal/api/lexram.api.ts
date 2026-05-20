@@ -1,13 +1,21 @@
 // Thin fetch wrapper for the LexRam Legal Research v2 backend.
-// All calls go through the Next.js rewrite (`/legal-api/*` → http://157.245.106.223:8124/*)
-// so the HTTPS frontend never makes a direct HTTP call (mixed-content safe).
+//
+// Two modes, selected by NEXT_PUBLIC_LEGAL_API_BASE:
+//   - unset (default) → "/legal-api", routed through the Next.js rewrite to
+//     the HTTP origin. Safe for mixed-content but capped at Vercel's 4.5 MB
+//     FUNCTION_PAYLOAD_TOO_LARGE limit (kills large document uploads).
+//   - set (e.g. "https://api.lexram.ai") → browser hits the backend directly,
+//     bypassing the 4.5 MB cap. Requires the backend to terminate TLS and
+//     send CORS headers for the frontend origin.
 //
 // Auth: HTTPBearer. We use the Supabase access token by default; callers can
 // override by passing an explicit token.
 
 import { supabase } from "@/lib/supabase/client";
+import { begin as activityBegin, end as activityEnd } from "@/lib/api-activity";
 
-export const LEXRAM_BASE = "/legal-api";
+export const LEXRAM_BASE =
+  process.env.NEXT_PUBLIC_LEGAL_API_BASE || "/legal-api";
 const BASE = LEXRAM_BASE;
 
 export async function getAuthToken(): Promise<string | null> {
@@ -60,31 +68,38 @@ export async function lexramRequest<T = unknown>(
     headers["Content-Type"] = "application/json; charset=utf-8";
   }
 
-  const res = await fetch(`${BASE}${path}`, {
-    method: opts.method ?? "GET",
-    headers,
-    body,
-    signal: opts.signal,
-  });
-
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
-    try {
-      const errBody = await res.json();
-      detail = errBody?.detail ?? errBody?.message ?? detail;
-      if (Array.isArray(detail)) detail = detail.map((d: any) => d.msg ?? d).join("; ");
-    } catch {
-      /* ignore */
-    }
-    throw new Error(detail);
-  }
-
-  // Some endpoints return empty 200s
-  const text = await res.text();
-  if (!text) return undefined as T;
+  // Bump the global in-flight counter so the top progress bar shows for
+  // every LexRam API call (matched in the finally below).
+  activityBegin();
   try {
-    return JSON.parse(text) as T;
-  } catch {
-    return text as unknown as T;
+    const res = await fetch(`${BASE}${path}`, {
+      method: opts.method ?? "GET",
+      headers,
+      body,
+      signal: opts.signal,
+    });
+
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const errBody = await res.json();
+        detail = errBody?.detail ?? errBody?.message ?? detail;
+        if (Array.isArray(detail)) detail = detail.map((d: any) => d.msg ?? d).join("; ");
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail);
+    }
+
+    // Some endpoints return empty 200s
+    const text = await res.text();
+    if (!text) return undefined as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return text as unknown as T;
+    }
+  } finally {
+    activityEnd();
   }
 }

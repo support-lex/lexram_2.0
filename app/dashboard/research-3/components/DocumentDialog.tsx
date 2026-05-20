@@ -358,14 +358,7 @@ export default function DocumentDialog({
               Reference across sessions on this case
             </DialogDescription>
           </DialogHeader>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="-mt-1 -mr-1 p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {/* Close button is provided by DialogContent (showCloseButton). */}
         </div>
 
         {/* ── Body ───────────────────────────────────────────────────────── */}

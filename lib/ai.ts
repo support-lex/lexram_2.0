@@ -42,6 +42,10 @@ export async function generateContent(options: AIRequestOptions): Promise<AIResp
     if (options.fileData) {
         let contentPayload = options.fileData.text;
 
+        if (contentPayload && contentPayload.length > 150000) {
+            contentPayload = contentPayload.substring(0, 150000) + '...[TRUNCATED TO PREVENT REQUEST SIZE LIMIT]';
+        }
+
         if (!contentPayload && options.fileData.base64) {
             contentPayload = options.fileData.base64.length > 20000
                 ? options.fileData.base64.substring(0, 20000) + '...[TRUNCATED BY SYSTEM TO PREVENT 500 NETWORK ERROR]'

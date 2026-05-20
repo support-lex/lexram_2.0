@@ -1,7 +1,16 @@
-// Feedback & Pin repository — localStorage-first with optional Supabase sync.
-// Works immediately without DB tables. If the Supabase tables exist, data is
-// also persisted there for cross-device sync; if not, localStorage is the
-// single source of truth and errors are silently ignored.
+// Feedback / pin / archive repository.
+//
+// Supabase is the source of truth — pinned and archived state must be shared
+// across devices, not stuck on whatever machine the user pinned from.
+// localStorage is kept as a synchronous cache so existing call sites (e.g.
+// HistorySidebar reading `pinnedSessionRepository.list()` from a useState
+// initializer) don't have to switch to async.
+//
+// Flow on app load: caller invokes `hydrate*()` once after auth resolves.
+// That function pulls the full list from Supabase and replaces the cache.
+// Subsequent reads come from the cache; writes update the cache optimistically
+// and persist to Supabase in the background. On the next page load, the
+// hydrate step re-reconciles in case the background write failed.
 
 import { supabase } from "@/lib/supabase/client";
 
@@ -37,25 +46,53 @@ function fbKey(sessionId: string, messageId: string) {
 }
 
 export const feedbackRepository = {
-  upsert(sessionId: string, messageId: string, rating: FeedbackRating): boolean {
+  /**
+   * Persist a vote (optionally with a free-text comment). The comment is
+   * what the dislike report popup writes — leave it `undefined` for
+   * thumbs-up votes or no-comment thumbs-down. Passing `null` explicitly
+   * clears any previously-saved comment for this message.
+   *
+   * Returns a Promise that resolves when the DB write has completed (so
+   * callers can show a "Report sent" toast). Failures resolve to `false`
+   * — the localStorage write is always synchronous and best-effort.
+   */
+  upsert(
+    sessionId: string,
+    messageId: string,
+    rating: FeedbackRating,
+    comment?: string | null
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
     const map = readLS<FeedbackMap>(LS_FEEDBACK_KEY, {});
     map[fbKey(sessionId, messageId)] = rating;
     writeLS(LS_FEEDBACK_KEY, map);
-    // Background Supabase sync (fire-and-forget)
-    (async () => {
+    return (async () => {
       try {
         const { data: userData } = await supabase().auth.getUser();
         const userId = userData.user?.id;
-        if (!userId) return;
-        await supabase()
+        if (!userId) return { ok: false as const, error: "Not signed in" };
+        const row: Record<string, unknown> = {
+          user_id: userId,
+          session_id: sessionId,
+          message_id: messageId,
+          rating,
+        };
+        // Only include `comment` when the caller explicitly provided one.
+        // `undefined` → preserve whatever's in the row; `null` → clear it.
+        if (comment !== undefined) row.comment = comment;
+        const { error } = await supabase()
           .from("message_feedback")
-          .upsert(
-            { user_id: userId, session_id: sessionId, message_id: messageId, rating },
-            { onConflict: "user_id,session_id,message_id" }
-          );
-      } catch { /* table may not exist — ignore */ }
+          .upsert(row, { onConflict: "user_id,session_id,message_id" });
+        if (error) {
+          console.warn("[feedbackRepository.upsert]", error);
+          return { ok: false as const, error: error.message || "Database error" };
+        }
+        return { ok: true as const };
+      } catch (err) {
+        console.warn("[feedbackRepository.upsert] threw", err);
+        const msg = err instanceof Error ? err.message : "Unexpected error";
+        return { ok: false as const, error: msg };
+      }
     })();
-    return true;
   },
 
   remove(sessionId: string, messageId: string): void {
@@ -96,6 +133,35 @@ export const feedbackRepository = {
 // ── Pinned Sessions ──────────────────────────────────────────────────────
 
 export const pinnedSessionRepository = {
+  /**
+   * Pull the user's pinned-session ids from Supabase and replace the local
+   * cache. Call once after auth resolves so the sidebar reads the
+   * cross-device list instead of whatever this browser remembered.
+   * No-ops for anonymous users.
+   */
+  async hydrate(): Promise<string[]> {
+    try {
+      const { data: userData } = await supabase().auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) return readLS<string[]>(LS_PINNED_KEY, []);
+      const { data, error } = await supabase()
+        .from("pinned_sessions")
+        .select("session_id, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.warn("[pinnedSessionRepository.hydrate]", error);
+        return readLS<string[]>(LS_PINNED_KEY, []);
+      }
+      const ids = (data ?? []).map((r) => r.session_id as string);
+      writeLS(LS_PINNED_KEY, ids);
+      return ids;
+    } catch (err) {
+      console.warn("[pinnedSessionRepository.hydrate] threw", err);
+      return readLS<string[]>(LS_PINNED_KEY, []);
+    }
+  },
+
   list(): string[] {
     return readLS<string[]>(LS_PINNED_KEY, []);
   },
@@ -106,16 +172,20 @@ export const pinnedSessionRepository = {
       ids.unshift(sessionId);
       writeLS(LS_PINNED_KEY, ids);
     }
-    // Background Supabase sync
+    // Persist to Supabase. Failure is logged (so it's visible in DevTools)
+    // but doesn't roll the cache back — the next hydrate() will reconcile.
     (async () => {
       try {
         const { data: userData } = await supabase().auth.getUser();
         const userId = userData.user?.id;
         if (!userId) return;
-        await supabase()
+        const { error } = await supabase()
           .from("pinned_sessions")
           .upsert({ user_id: userId, session_id: sessionId }, { onConflict: "user_id,session_id" });
-      } catch { /* ignore */ }
+        if (error) console.warn("[pinnedSessionRepository.pin]", error);
+      } catch (err) {
+        console.warn("[pinnedSessionRepository.pin] threw", err);
+      }
     })();
     return true;
   },
@@ -128,11 +198,14 @@ export const pinnedSessionRepository = {
         const { data: userData } = await supabase().auth.getUser();
         const userId = userData.user?.id;
         if (!userId) return;
-        await supabase()
+        const { error } = await supabase()
           .from("pinned_sessions")
           .delete()
           .match({ user_id: userId, session_id: sessionId });
-      } catch { /* ignore */ }
+        if (error) console.warn("[pinnedSessionRepository.unpin]", error);
+      } catch (err) {
+        console.warn("[pinnedSessionRepository.unpin] threw", err);
+      }
     })();
   },
 
@@ -146,6 +219,29 @@ export const pinnedSessionRepository = {
 // the visible history list; the underlying session row is not deleted.
 
 export const archivedSessionRepository = {
+  async hydrate(): Promise<string[]> {
+    try {
+      const { data: userData } = await supabase().auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) return readLS<string[]>(LS_ARCHIVED_KEY, []);
+      const { data, error } = await supabase()
+        .from("archived_sessions")
+        .select("session_id, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.warn("[archivedSessionRepository.hydrate]", error);
+        return readLS<string[]>(LS_ARCHIVED_KEY, []);
+      }
+      const ids = (data ?? []).map((r) => r.session_id as string);
+      writeLS(LS_ARCHIVED_KEY, ids);
+      return ids;
+    } catch (err) {
+      console.warn("[archivedSessionRepository.hydrate] threw", err);
+      return readLS<string[]>(LS_ARCHIVED_KEY, []);
+    }
+  },
+
   list(): string[] {
     return readLS<string[]>(LS_ARCHIVED_KEY, []);
   },
@@ -161,10 +257,13 @@ export const archivedSessionRepository = {
         const { data: userData } = await supabase().auth.getUser();
         const userId = userData.user?.id;
         if (!userId) return;
-        await supabase()
+        const { error } = await supabase()
           .from("archived_sessions")
           .upsert({ user_id: userId, session_id: sessionId }, { onConflict: "user_id,session_id" });
-      } catch { /* table may not exist — ignore */ }
+        if (error) console.warn("[archivedSessionRepository.archive]", error);
+      } catch (err) {
+        console.warn("[archivedSessionRepository.archive] threw", err);
+      }
     })();
     return true;
   },
@@ -177,11 +276,14 @@ export const archivedSessionRepository = {
         const { data: userData } = await supabase().auth.getUser();
         const userId = userData.user?.id;
         if (!userId) return;
-        await supabase()
+        const { error } = await supabase()
           .from("archived_sessions")
           .delete()
           .match({ user_id: userId, session_id: sessionId });
-      } catch { /* ignore */ }
+        if (error) console.warn("[archivedSessionRepository.unarchive]", error);
+      } catch (err) {
+        console.warn("[archivedSessionRepository.unarchive] threw", err);
+      }
     })();
   },
 

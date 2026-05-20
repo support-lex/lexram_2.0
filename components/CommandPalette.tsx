@@ -33,7 +33,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   }, [isOpen]);
 
   const quickActions = [
-    { id: 'qa1', title: 'New Research', icon: SearchIcon, action: () => router.push('/dashboard/research-3') },
+    { id: 'qa1', title: 'New Research', icon: SearchIcon, action: () => router.push('/dashboard/research-2') },
     { id: 'qa2', title: 'New Matter', icon: Building2, action: () => router.push('/dashboard/matters') },
     { id: 'qa3', title: 'Upload Document', icon: FolderOpen, action: () => router.push('/dashboard/documents') },
   ];

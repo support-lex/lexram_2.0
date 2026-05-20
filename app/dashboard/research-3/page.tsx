@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { History } from "lucide-react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { History, Briefcase, ArrowUp } from "lucide-react";
+import { toast } from "sonner";
 import { useMatterContext } from "@/lib/matter-context";
 import { ResearchHistoryContext } from "@/lib/research-history-context";
+import { getStoredData, setStoredData, STORAGE_KEYS } from "@/lib/storage";
 import { useDashboardAuth } from "@/lib/dashboard-auth-context";
 
 import { useResearchSessions } from "./hooks/use-research-sessions";
@@ -11,6 +14,7 @@ import { useResearchChat } from "./hooks/use-research-chat";
 import { useResearchUI } from "./hooks/use-research-ui";
 
 import HistorySidebar from "./components/HistorySidebar";
+import CasesPanel from "./components/CasesPanel";
 import EmptyState from "./components/EmptyState";
 import ChatThread from "./components/ChatThread";
 import ChatInput from "./components/ChatInput";
@@ -18,7 +22,8 @@ import AuthoritiesPanel from "./components/AuthoritiesPanel";
 import ShortcutsModal from "./components/ShortcutsModal";
 import DocumentDialog from "./components/DocumentDialog";
 import SignupPromptModal from "@/components/SignupPromptModal";
-import CaseSelector from "@/components/CaseSelector";
+import CaseSelector, { type Case as CaseItem } from "@/components/CaseSelector";
+import api from "@/services/legal-api";
 import PaywallModal from "@/components/PaywallModal";
 import { useCredits } from "@/hooks/use-credits";
 import type { BillingMode } from "@/lib/billing";
@@ -32,6 +37,9 @@ const GUEST_MESSAGE_LIMIT =
 export default function Research3Page() {
   const { selectedMatterId } = useMatterContext();
   const { isAuthenticated, markAuthenticated } = useDashboardAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const pendingQueryHandled = useRef(false);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
@@ -41,7 +49,6 @@ export default function Research3Page() {
   const [showDocumentDialog, setShowDocumentDialog] = useState(false);
   const { balance, ceiling, deductForResponse } = useCredits();
   const wasSearchingRef = useRef(false);
-  const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
   // Which AI message's authorities are pinned in the side panel. null = follow
   // the latest AI message (default). Set when the user clicks a <cite> in an
   // older bubble — without this, the panel always snaps to the latest message
@@ -51,6 +58,7 @@ export default function Research3Page() {
   // ── Hooks ──────────────────────────────────────────────────────────────
   const {
     sessions,
+    sessionsReady,
     messages,
     setMessages,
     currentSessionId,
@@ -65,7 +73,78 @@ export default function Research3Page() {
     handleRenameSession,
     ensureSession,
     historyContextValue,
+    pendingCaseId,
+    setPendingCaseId,
   } = useResearchSessions(selectedMatterId);
+
+  // ── Per-session case selection ─────────────────────────────────────────
+  const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
+  const [showCasesPanel, setShowCasesPanel] = useState(false);
+
+  useEffect(() => {
+    if (!currentSessionId || currentSessionId.startsWith('temp_')) {
+      // Mirror the pre-session case picked in the dialog so the chat header +
+      // File Hub immediately reflect that case even before the row is POSTed.
+      setCurrentCaseId(pendingCaseId);
+      return;
+    }
+    const map = getStoredData<Record<string, string>>(STORAGE_KEYS.SESSION_CASES, {});
+    setCurrentCaseId(map[currentSessionId] ?? null);
+  }, [currentSessionId, pendingCaseId]);
+
+  // Shared cases list
+  const [sharedCases, setSharedCases] = useState<CaseItem[]>([]);
+  const fetchSharedCases = useCallback(async () => {
+    try {
+      const res = await api.get<{ cases: CaseItem[] } | CaseItem[]>("/cases");
+      setSharedCases(Array.isArray(res.data) ? res.data : res.data?.cases ?? []);
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => { fetchSharedCases(); }, [fetchSharedCases]);
+
+  const handleCaseChange = useCallback((id: string | null) => {
+    setCurrentCaseId(id);
+    if (!currentSessionId || currentSessionId.startsWith('temp_')) {
+      // No session yet → stash the pick in pendingCaseId so the upcoming
+      // POST /sessions includes it as case_id.
+      setPendingCaseId(id);
+      return;
+    }
+    const map = getStoredData<Record<string, string>>(STORAGE_KEYS.SESSION_CASES, {});
+    if (id) { map[currentSessionId] = id; } else { delete map[currentSessionId]; }
+    setStoredData(STORAGE_KEYS.SESSION_CASES, map);
+  }, [currentSessionId, setPendingCaseId]);
+
+  // ── New chat → toast nudging the user to pick a case ──────────────────
+  // The case dropdown in the header stays visible so the user can pick (or
+  // leave it as Unassigned, which is the default pre-selection set by the
+  // effect below once /cases has loaded).
+  const handleNewChatWithToast = useCallback(() => {
+    handleNewSession();
+    toast.message("Select a case for this chat", {
+      icon: <ArrowUp className="w-4 h-4 text-[var(--accent)]" />,
+      description: "Use the case dropdown above. Defaults to Unassigned.",
+      duration: 5000,
+      // top-center keeps the toast from overlapping the collapsed left rail
+      // icons (which `top-left` was covering) while staying close enough to
+      // the case dropdown that the ArrowUp icon still reads as "look above".
+      position: "top-center",
+    });
+  }, [handleNewSession]);
+
+  // ── Default the pre-session case to "Unassigned" ──────────────────────
+  // Seed both currentCaseId (UI display) and pendingCaseId (POST /sessions
+  // payload) with the Unassigned row's id once /cases has loaded. Skips
+  // when a session row already exists or the user has already picked.
+  useEffect(() => {
+    if (sharedCases.length === 0) return;
+    if (currentSessionId && !currentSessionId.startsWith('temp_')) return;
+    if (currentCaseId) return;
+    const unassigned = sharedCases.find((c) => c.title === 'Unassigned');
+    if (!unassigned) return;
+    setCurrentCaseId(unassigned.id);
+    setPendingCaseId(unassigned.id);
+  }, [sharedCases, currentSessionId, currentCaseId, setPendingCaseId]);
 
   const {
     query,
@@ -164,6 +243,30 @@ export default function Research3Page() {
     }
   }, [query, handleSubmitRef]);
 
+  // ── Session URL restore: load session from ?session= param — fires once ──
+  const sessionFromUrl = useRef(false);
+  useEffect(() => {
+    if (sessionFromUrl.current || !sessionsReady) return;
+    sessionFromUrl.current = true;
+    const sid = searchParams.get("session");
+    if (sid) handleSelectSession(sid);
+    // intentionally omit searchParams/handleSelectSession — one-shot on load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionsReady]);
+
+  // ── Keep URL in sync with active session so refresh restores the same chat
+  useEffect(() => {
+    if (!sessionsReady) return;
+    const current = searchParams.get("session");
+    if (!currentSessionId || currentSessionId.startsWith("temp_")) {
+      if (current) router.replace(pathname, { scroll: false });
+      return;
+    }
+    if (current !== currentSessionId) {
+      router.replace(`${pathname}?session=${currentSessionId}`, { scroll: false });
+    }
+  }, [currentSessionId, sessionsReady, pathname, router, searchParams]);
+
   // ── Free-tier gate ─────────────────────────────────────────────────────
   const userMessageCount = messages.filter(m => m.role === "user").length;
 
@@ -249,6 +352,15 @@ export default function Research3Page() {
     setTimeout(() => queryTextareaRef.current?.focus(), 0);
   };
 
+  // Submit a bundled answer to a multi-question prompt from the assistant
+  // (the inline numbered-questions form). Pushes the formatted "1. … 2. …"
+  // string into the chat input and fires the same submit path a manual
+  // send would, so the AI sees an ordered, ready-to-parse response.
+  const handleSuggestedAnswer = (answer: string) => {
+    setQuery(answer);
+    setTimeout(() => handleSubmitRef.current?.(), 50);
+  };
+
   const chatInputProps = {
     query,
     setQuery,
@@ -311,7 +423,7 @@ export default function Research3Page() {
           filteredSessions={filteredSessions}
           currentSessionId={currentSessionId}
           onSelectSession={handleSelectSession}
-          onNewSession={handleNewSession}
+          onNewSession={handleNewChatWithToast}
           onDeleteSession={handleDeleteSession}
           onRenameSession={handleRenameSession}
           historySearch={historySearch}
@@ -331,17 +443,35 @@ export default function Research3Page() {
                 <History className="w-3.5 h-3.5" />
                 History
               </button>
-              {currentSessionId && (
-                <CaseSelector
-                  sessionId={currentSessionId}
-                  value={currentCaseId}
-                  onChange={(id) => setCurrentCaseId(id)}
-                  className="w-56"
-                />
-              )}
+              {/* Case dropdown is always visible. Pre-session, CaseSelector
+                  skips its PATCH and the pick lands in pendingCaseId via
+                  handleCaseChange, ready for POST /sessions on first message. */}
+              <CaseSelector
+                sessionId={currentSessionId}
+                value={currentCaseId}
+                onChange={(id, c) => { handleCaseChange(id); if (c) fetchSharedCases(); }}
+                externalCases={sharedCases}
+                onCasesChanged={fetchSharedCases}
+                className="w-56"
+              />
             </div>
-            <div className="max-w-[40%] truncate text-xs font-medium text-[var(--text-muted)]">
-              {currentSessionTitle}
+            <div className="flex items-center gap-2">
+              <div className="max-w-[160px] truncate text-xs font-medium text-[var(--text-muted)]">
+                {currentSessionTitle}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCasesPanel((v) => !v)}
+                aria-label={showCasesPanel ? "Hide Case Hub" : "Show Case Hub"}
+                title="Case Hub"
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors
+                  ${showCasesPanel
+                    ? "border-[var(--accent)]/40 bg-[var(--accent)]/5 text-[var(--accent)]"
+                    : "border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+                  }`}
+              >
+                <Briefcase className="w-3.5 h-3.5" /> Cases
+              </button>
             </div>
           </div>
 
@@ -376,6 +506,7 @@ export default function Research3Page() {
                   onOpenEditor={handleOpenEditor}
                   onOpenWorkflow={handleOpenWorkflow}
                   onQuerySelect={handleQuerySelect}
+                  onSuggestedAnswer={handleSuggestedAnswer}
                   onBuildSessionDraft={buildSessionDraft}
                   mobilePane={mobilePane}
                   onProceedWithDraft={() => { setQuery("yes"); setTimeout(() => handleSubmitRef.current?.(), 50); }}
@@ -383,7 +514,21 @@ export default function Research3Page() {
               ) : (
                 <EmptyState
                   onPickQuickStart={handleQuerySelect}
-                  onUpload={() => fileInputRef.current?.click()}
+                  // "Upload a document" chip → open the in-app DocumentDialog
+                  // instead of the OS file picker.
+                  onUpload={() => setShowDocumentDialog(true)}
+                  onPickDraft={(q) => {
+                    setQueryMode("draft");
+                    setQuery(q);
+                    setTimeout(() => queryTextareaRef.current?.focus(), 0);
+                  }}
+                  // Click the Draft card body → seed "hi" in draft mode and
+                  // auto-submit so the session is born already in draft mode.
+                  onStartDraft={() => {
+                    setQueryMode("draft");
+                    setQuery("hi");
+                    setTimeout(() => handleSubmitRef.current?.(), 50);
+                  }}
                 />
               )}
 
@@ -400,7 +545,32 @@ export default function Research3Page() {
             {/* Citations are rendered next to each AI message bubble inside
                 the chat scroll (see MessageBubble) — no separate side rail. */}
           </div>
+
         </div>
+
+        {/* ── Case Hub — rightmost sibling of the chat area ─── */}
+        <CasesPanel
+          open={showCasesPanel}
+          onToggle={() => setShowCasesPanel((v) => !v)}
+          sessions={filteredSessions}
+          currentSessionId={currentSessionId}
+          currentCaseId={currentCaseId}
+          onSelectSession={handleSelectSession}
+          onNewSession={handleNewChatWithToast}
+          relativeDateLabel={relativeDateLabel}
+          onUploadDocument={() => setShowDocumentDialog(true)}
+          onCaseChange={handleCaseChange}
+          externalCases={sharedCases}
+          onCasesChanged={fetchSharedCases}
+          onAttachDocs={(docs) => {
+            attachCaseDocs(docs.map((d) => ({
+              id: d.caseDocId ?? d.id,
+              name: d.name,
+              size: d.size,
+              mime_type: d.type !== "document" ? d.type : undefined,
+            })));
+          }}
+        />
       </div>
 
       {paywallEnabled && <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} />}
@@ -431,6 +601,7 @@ export default function Research3Page() {
           setShowDocumentDialog(false);
         }}
       />
+
     </ResearchHistoryContext.Provider>
   );
 }

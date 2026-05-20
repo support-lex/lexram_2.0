@@ -38,9 +38,7 @@ export default function InlineAuthorities({ authorities }: InlineAuthoritiesProp
     <div className="space-y-2.5">
       {authorities.map((a, i) => {
         const style = TREATMENT_STYLES[a.treatment];
-        const sourceUrl =
-          a.linkHint ||
-          `https://indiankanoon.org/search/?formInput=${encodeURIComponent(`${a.caseName} ${a.citation}`)}`;
+        const sourceUrl = a.linkHint ?? null;
         return (
           <div
             key={`${a.citation}-${i}`}
@@ -49,7 +47,7 @@ export default function InlineAuthorities({ authorities }: InlineAuthoritiesProp
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-bold text-[var(--text-primary)] inline-flex items-center gap-2 mb-1">
-                  <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 rounded-full bg-[var(--bg-sidebar)] text-white text-[10px] font-bold">
+                  <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 rounded-full bg-[var(--accent)] text-[var(--accent-text,#fff)] text-[10px] font-bold">
                     {i + 1}
                   </span>
                   {a.caseName}
@@ -80,14 +78,16 @@ export default function InlineAuthorities({ authorities }: InlineAuthoritiesProp
               >
                 <Copy className="w-3 h-3" /> Copy
               </button>
-              <a
-                href={sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-2 py-1 rounded hover:bg-[var(--accent)]/10 text-[11px] font-medium text-[var(--accent)] inline-flex items-center gap-1"
-              >
-                Open source <ArrowUpRight className="w-3 h-3" />
-              </a>
+              {sourceUrl && (
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2 py-1 rounded hover:bg-[var(--accent)]/10 text-[11px] font-medium text-[var(--accent)] inline-flex items-center gap-1"
+                >
+                  Open source <ArrowUpRight className="w-3 h-3" />
+                </a>
+              )}
             </div>
           </div>
         );

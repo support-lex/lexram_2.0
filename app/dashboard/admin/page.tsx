@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import {
   Save,
   RotateCcw,
@@ -11,6 +12,7 @@ import {
   CheckCircle,
   AlertCircle,
   Search,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MOCK_ACTS, mockLaw } from '@/lib/lexram/mock';
@@ -416,6 +418,12 @@ export default function AdminPanelPage() {
                     <span className="text-red-400">● Connecting...</span>
                   )}
                 </p>
+                <Link
+                  href="/dashboard/admin/stats"
+                  className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gold-700 hover:bg-gold-600 text-gold-50 transition-colors"
+                >
+                  <BarChart3 className="w-3 h-3" /> Stats dashboard
+                </Link>
               </div>
 
               <div className="px-4 py-3 border-b border-charcoal-800/50">

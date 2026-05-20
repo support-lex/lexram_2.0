@@ -58,6 +58,7 @@ export type ResearchSession = {
   id: string;
   title: string;
   messages: Message[];
+  caseId?: string;
   createdAt: string;
   updatedAt: string;
   matterId?: string;
@@ -120,7 +121,13 @@ export const QUICK_START_QUERIES = [
 export type QuickStartChip = {
   label: string;
   query: string;
-  action?: "upload";
+  /**
+   * Special action that overrides the default "prefill query and let user
+   * hit send" behaviour. `upload` opens the document upload dialog instead
+   * of sending text; `draft` forces queryMode to "draft" and prefills the
+   * template so the Draft pill in ChatInput is visibly active.
+   */
+  action?: "upload" | "draft";
 };
 
 export type QuickStartCategory = {
@@ -160,9 +167,9 @@ export const UNIFIED_QUICK_STARTS: QuickStartCategory[] = [
     subtitle: "Draft legal documents with AI",
     icon: "FileText",
     chips: [
-      { label: "Bail Application", query: "Draft a Bail Application for " },
-      { label: "Legal Notice", query: "Draft a Legal Notice for " },
-      { label: "Writ Petition", query: "Draft a Writ Petition for " },
+      { label: "Bail Application", query: "Draft a Bail Application for ", action: "draft" },
+      { label: "Legal Notice", query: "Draft a Legal Notice for ", action: "draft" },
+      { label: "Writ Petition", query: "Draft a Writ Petition for ", action: "draft" },
     ],
   },
 ];

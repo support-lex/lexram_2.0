@@ -36,6 +36,427 @@
       transform: translateX(-50%);
     }
   }
+
+  /* ─── Editorial luxury palette (Lexis&Co landing page) ─────────────── */
+  --color-charcoal: oklch(0.16 0.012 30);
+  --color-charcoal-deep: oklch(0.10 0.012 30);
+  --color-maroon: oklch(0.32 0.09 25);
+  --color-maroon-deep: oklch(0.22 0.07 25);
+  --color-gold: oklch(0.78 0.12 80);
+  --color-gold-soft: oklch(0.68 0.09 78);
+  --color-ivory: oklch(0.96 0.018 85);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Landing-page palette + utilities (scoped — does NOT leak into the dashboard)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+[data-landing] {
+  /* Luxury legal palette — dark charcoal + maroon + gold + ivory */
+  --charcoal: oklch(0.14 0.012 40);
+  --maroon-deep: oklch(0.27 0.08 20);
+  --maroon: oklch(0.38 0.12 20);
+  --gold: oklch(0.78 0.13 75);
+  --gold-soft: oklch(0.86 0.08 80);
+  --ivory: oklch(0.96 0.018 85);
+
+  --background: oklch(0.12 0.012 40);
+  --foreground: oklch(0.96 0.018 85);
+  /* renamed to --landing-* so they don't shadow the dashboard's tokens
+     (the page wrapper aliases the bare names too via inline style) */
+  --landing-card: oklch(0.17 0.018 30 / 0.6);
+  --landing-popover: oklch(0.17 0.018 30);
+  --landing-muted: oklch(0.72 0.03 80);
+  --landing-border: oklch(0.78 0.13 75 / 0.18);
+  --landing-ring: oklch(0.78 0.13 75 / 0.5);
+
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-landing-sans, "Inter", system-ui, sans-serif);
+}
+
+[data-landing] h1,
+[data-landing] h2,
+[data-landing] h3,
+[data-landing] h4 {
+  font-family: var(--font-landing-display, "Playfair Display", Georgia, serif);
+  letter-spacing: -0.015em;
+}
+
+[data-landing] ::selection {
+  background: oklch(0.78 0.13 75 / 0.35);
+  color: var(--ivory);
+}
+
+/* Utility classes — scoped under [data-landing] to avoid leaking */
+[data-landing] .font-display { font-family: var(--font-landing-display, "Playfair Display", Georgia, serif); }
+[data-landing] .text-gradient-gold {
+  background: linear-gradient(135deg, oklch(0.92 0.08 85) 0%, oklch(0.78 0.13 75) 50%, oklch(0.62 0.14 50) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+[data-landing] .glass {
+  background: linear-gradient(135deg, oklch(1 0 0 / 0.06), oklch(1 0 0 / 0.02));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid oklch(0.78 0.13 75 / 0.18);
+}
+[data-landing] .glass-strong {
+  background: linear-gradient(135deg, oklch(0.17 0.02 30 / 0.85), oklch(0.12 0.012 40 / 0.7));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid oklch(0.78 0.13 75 / 0.25);
+}
+[data-landing] .gold-border-gradient {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--background), var(--background)) padding-box,
+    linear-gradient(135deg, oklch(0.78 0.13 75 / 0.6), oklch(0.38 0.12 20 / 0.2), oklch(0.78 0.13 75 / 0.6)) border-box;
+}
+[data-landing] .cinematic-vignette {
+  background: radial-gradient(ellipse at center, transparent 30%, oklch(0.08 0.01 40 / 0.85) 100%);
+}
+
+/* Landing keyframes (cheap, GPU) */
+@keyframes ken-burns {
+  0%   { transform: scale(1.15) translate3d(0,0,0); }
+  50%  { transform: scale(1.22) translate3d(-1.5%, -1%, 0); }
+  100% { transform: scale(1.15) translate3d(0,0,0); }
+}
+@keyframes drift-x {
+  0%, 100% { transform: translate3d(0,0,0); }
+  50% { transform: translate3d(2%, -1%, 0); }
+}
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+@keyframes marquee-rev {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@keyframes gradient-pan {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+[data-landing] .anim-ken-burns { animation: ken-burns 24s ease-in-out infinite; }
+[data-landing] .anim-drift     { animation: drift-x 18s ease-in-out infinite; }
+[data-landing] .anim-float     { animation: float-y 7s ease-in-out infinite; }
+[data-landing] .anim-marquee   { animation: marquee 40s linear infinite; }
+[data-landing] .anim-marquee-rev { animation: marquee-rev 40s linear infinite; }
+[data-landing] .anim-pulse-glow { animation: pulse-glow 4s ease-in-out infinite; }
+[data-landing] .anim-blink     { animation: blink 1s step-end infinite; }
+[data-landing] .anim-gradient-pan {
+  background-size: 200% 200%;
+  animation: gradient-pan 14s ease infinite;
+}
+
+/* ─── Spark / ember rise (Hero foreground layer) ─────────────────── */
+@keyframes spark-rise {
+  0% {
+    transform: translate3d(0, 110vh, 0) scale(0.6);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--drift, 0%), -10vh, 0) scale(1.2);
+    opacity: 0;
+  }
+}
+
+@keyframes ember-glow-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+[data-landing] .spark-ember {
+  position: absolute;
+  bottom: -10px;
+  border-radius: 9999px;
+  animation-name: spark-rise;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  will-change: transform, opacity;
+}
+
+[data-landing] .spark-ember-glow {
+  animation: ember-glow-pulse 4s ease-in-out infinite;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Driver.js — maroon-themed product-tour popovers
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.driver-popover.lexram-tour,
+.driver-popover {
+  background: #ffffff;
+  color: #1a1010;
+  border-radius: 16px;
+  border: 1px solid #e7d8da;
+  box-shadow:
+    0 24px 60px -16px rgba(122, 31, 43, 0.30),
+    0 0 0 1px rgba(122, 31, 43, 0.06);
+  padding: 22px 22px 18px;
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  max-width: 360px;
+}
+
+.driver-popover-title {
+  color: #7a1f2b;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  font-family: var(--font-serif, Georgia, serif);
+  margin-bottom: 8px;
+}
+
+.driver-popover-description {
+  color: #4a3a3d;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.driver-popover-progress-text {
+  color: #9a8588;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.driver-popover-footer {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.driver-popover-footer .driver-popover-prev-btn,
+.driver-popover-footer .driver-popover-next-btn,
+.driver-popover-footer .driver-popover-close-btn {
+  background: transparent;
+  border: 1px solid #e7d8da;
+  color: #7a1f2b;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  text-shadow: none;
+  transition: all 200ms ease;
+  cursor: pointer;
+}
+.driver-popover-footer .driver-popover-prev-btn:hover,
+.driver-popover-footer .driver-popover-close-btn:hover {
+  background: rgba(122, 31, 43, 0.06);
+  border-color: rgba(122, 31, 43, 0.4);
+}
+
+/* Primary "Next / Finish" — gradient maroon pill */
+.driver-popover-footer .driver-popover-next-btn {
+  background: linear-gradient(135deg, #7a1f2b 0%, #5e1721 100%);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 6px 18px -4px rgba(122, 31, 43, 0.45);
+}
+.driver-popover-footer .driver-popover-next-btn:hover {
+  box-shadow: 0 10px 24px -4px rgba(122, 31, 43, 0.6);
+  transform: translateY(-1px);
+}
+
+/* "Skip" / close (×) icon top-right */
+.driver-popover-close-btn {
+  position: absolute !important;
+  top: 12px !important;
+  right: 14px !important;
+  background: transparent !important;
+  border: none !important;
+  color: #9a8588 !important;
+  font-size: 22px !important;
+  line-height: 1 !important;
+  padding: 4px 8px !important;
+  border-radius: 8px !important;
+  cursor: pointer;
+}
+.driver-popover-close-btn:hover {
+  background: rgba(122, 31, 43, 0.08) !important;
+  color: #7a1f2b !important;
+}
+
+/* Push the progress indicator to the left of the action buttons */
+.driver-popover-footer .driver-popover-progress-text {
+  margin-right: auto;
+}
+
+/* Arrow tint to match the card */
+.driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: #ffffff;
+}
+.driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: #ffffff;
+}
+.driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: #ffffff;
+}
+.driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: #ffffff;
+}
+
+/* Highlighted element — subtle maroon ring instead of the default white */
+.driver-active-element,
+.driver-active-element:focus,
+.driver-active-element:hover {
+  outline: 2px solid rgba(122, 31, 43, 0.55) !important;
+  outline-offset: 4px !important;
+  border-radius: 12px !important;
+}
+
+/* ─── Centered "modal" popovers (welcome / finish) ──────────────────── */
+.driver-popover.lexram-tour-modal {
+  max-width: 460px;
+  padding: 0;
+  border-radius: 24px;
+  overflow: hidden;
+  text-align: center;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    linear-gradient(135deg, rgba(122,31,43,0.55), rgba(122,31,43,0.15), rgba(122,31,43,0.55)) border-box;
+  box-shadow:
+    0 32px 80px -20px rgba(122, 31, 43, 0.40),
+    0 0 0 1px rgba(122, 31, 43, 0.08),
+    inset 0 1px 0 rgba(255,255,255,0.6);
+  animation: lexram-tour-modal-in 480ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes lexram-tour-modal-in {
+  0%   { opacity: 0; transform: translateY(20px) scale(0.94); }
+  100% { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* Decorative gradient header strip + sparkle */
+.driver-popover.lexram-tour-modal::before {
+  content: "";
+  display: block;
+  height: 96px;
+  background:
+    radial-gradient(circle at 30% 60%, rgba(255,228,180,0.55) 0%, transparent 55%),
+    radial-gradient(circle at 70% 40%, rgba(213,160,168,0.45) 0%, transparent 55%),
+    linear-gradient(135deg, #7a1f2b 0%, #5e1721 50%, #4d121b 100%);
+  position: relative;
+}
+
+/* Sparkle "✨" floating in the header */
+.driver-popover.lexram-tour-modal::after {
+  content: "✨";
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 36px;
+  filter: drop-shadow(0 4px 14px rgba(255, 220, 130, 0.6));
+  animation: lexram-tour-sparkle 3s ease-in-out infinite;
+}
+
+@keyframes lexram-tour-sparkle {
+  0%, 100% { transform: translateX(-50%) translateY(0)    scale(1);    }
+  50%      { transform: translateX(-50%) translateY(-4px) scale(1.08); }
+}
+
+/* Title — bigger, serif, sits below the gradient header */
+.driver-popover.lexram-tour-modal .driver-popover-title {
+  font-size: 26px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: #1a1010;
+  font-family: var(--font-serif, "Cormorant Garamond", Georgia, serif);
+  margin: 28px 36px 12px;
+  letter-spacing: -0.015em;
+}
+
+.driver-popover.lexram-tour-modal .driver-popover-description {
+  margin: 0 36px 28px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #5a4a4d;
+}
+
+/* Footer — center the action button(s), drop the "back" on first/last
+   modals visually by shrinking spacing; progress hidden on welcome/finish. */
+.driver-popover.lexram-tour-modal .driver-popover-footer {
+  margin: 0 36px 32px;
+  justify-content: center;
+  gap: 12px;
+}
+
+.driver-popover.lexram-tour-modal .driver-popover-progress-text {
+  display: none;
+}
+
+.driver-popover.lexram-tour-modal .driver-popover-next-btn {
+  padding: 12px 28px;
+  font-size: 14px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+
+.driver-popover.lexram-tour-modal .driver-popover-prev-btn {
+  padding: 12px 22px;
+  font-size: 13px;
+  color: #9a8588;
+  border-color: transparent;
+  background: transparent;
+}
+.driver-popover.lexram-tour-modal .driver-popover-prev-btn:hover {
+  color: #7a1f2b;
+  background: rgba(122,31,43,0.06);
+  border-color: transparent;
+}
+
+/* Close button — sits inside the gradient header, on the white side */
+.driver-popover.lexram-tour-modal .driver-popover-close-btn {
+  top: 14px !important;
+  right: 16px !important;
+  color: rgba(255,255,255,0.85) !important;
+  font-size: 24px !important;
+}
+.driver-popover.lexram-tour-modal .driver-popover-close-btn:hover {
+  background: rgba(255,255,255,0.18) !important;
+  color: #ffffff !important;
+}
+
+/* No arrow for centered modals — driver.js still emits one; hide it */
+.driver-popover.lexram-tour-modal .driver-popover-arrow {
+  display: none !important;
+}
+
+/* Mobile — give the modal a little side margin */
+@media (max-width: 480px) {
+  .driver-popover.lexram-tour-modal {
+    max-width: calc(100vw - 32px);
+    border-radius: 20px;
+  }
+  .driver-popover.lexram-tour-modal .driver-popover-title {
+    font-size: 22px;
+    margin: 24px 24px 10px;
+  }
+  .driver-popover.lexram-tour-modal .driver-popover-description {
+    margin: 0 24px 24px;
+    font-size: 14px;
+  }
+  .driver-popover.lexram-tour-modal .driver-popover-footer {
+    margin: 0 24px 24px;
+  }
 }
 
 @layer base {
@@ -58,6 +479,22 @@
     --accent: #C6A76E;
     --accent-hover: #B49356;
     --accent-text: #FFFFFF;
+
+    /* ── Lexram brand palette (additive, doesn't replace --accent) ──
+       Used by the research-2 redesign (palette-professional reference).
+       Cream backgrounds, maroon primary, rust accent. Kept as plain hex
+       so any consumer (including dynamic style={...}) can use them. */
+    --lex-cream: #FFF0DF;
+    --lex-cream-deep: #F9E4C9;
+    --lex-cream-soft: rgba(255, 240, 223, 0.6);
+    --lex-maroon: #680318;
+    --lex-maroon-soft: rgba(104, 3, 24, 0.08);
+    --lex-rust: #B94826;
+    --lex-rust-soft: rgba(185, 72, 38, 0.12);
+    --lex-ink: #2A1A1C;
+    --lex-shadow-elevated: 0 30px 60px -30px rgba(104, 3, 24, 0.35);
+    --lex-shadow-soft: 0 10px 30px -15px rgba(104, 3, 24, 0.25);
+    --lex-gradient-hero: radial-gradient(ellipse at top, rgba(185, 72, 38, 0.12) 0%, var(--lex-cream) 60%);
     --ring-accent: rgba(198, 167, 110, 0.3);
     --surface-hover: #F5F0E8;
     --surface-glass: rgba(253, 251, 247, 0.88);
@@ -496,6 +933,19 @@ body, aside, header, main {
   outline-offset: 2px;
 }
 
+/* Opt-out hook — elements (or any descendant of one) marked with this
+   attribute, plus inputs/textareas inside our designed input shells, get
+   no global focus outline. The outer card already shows focus state via
+   border-color + shadow, so the inner outline reads as a duplicate "box". */
+[data-no-focus-ring]:focus-visible,
+[data-no-focus-ring] *:focus-visible,
+.lexram-input-shell input:focus-visible,
+.lexram-input-shell textarea:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.2; }
@@ -901,6 +1351,17 @@ body, aside, header, main {
   animation: lexram-msg-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Bottom-sheet rise — used by SuggestionsPopup so the card lifts up from
+   beneath the chat input the way Claude Code's permission dialog does. */
+@keyframes lexram-popup-rise {
+  from { opacity: 0; transform: translateY(56px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);     }
+}
+.lexram-popup-rise {
+  animation: lexram-popup-rise 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: bottom center;
+}
+
 /* Subtle hover glow for interactive elements */
 .lexram-hover-glow {
   transition: box-shadow 0.2s ease;
@@ -914,38 +1375,39 @@ body, aside, header, main {
    hover states. Maps 1:1 to the Stitch Material Design 3 token export.
    Applied via [data-theme="futuristic"]. */
 [data-theme="futuristic"] {
-  --bg-primary: #fbf9f5;
+  /* White + maroon palette */
+  --bg-primary: #ffffff;
   --bg-surface: #ffffff;
-  --bg-sidebar: #fafaf8;
-  --bg-sidebar-hover: #efeeea;
-  --bg-sidebar-active: #eae8e4;
-  --text-primary: #1b1c1a;
-  --text-secondary: #4d463a;
-  --text-muted: #7f7669;
-  --text-on-sidebar: #585f69;
-  --border-default: #d0c5b6;
-  --border-light: #e4e2de;
-  --accent: #735b29;
-  --accent-hover: #5a4314;
+  --bg-sidebar: #fdf8f8;
+  --bg-sidebar-hover: #f7eaec;
+  --bg-sidebar-active: #f1dde0;
+  --text-primary: #1a1010;
+  --text-secondary: #463337;
+  --text-muted: #7a6a6c;
+  --text-on-sidebar: #5a4347;
+  --border-default: #e7d8da;
+  --border-light: #f0e6e8;
+  --accent: #7a1f2b;          /* deep maroon */
+  --accent-hover: #5e1721;     /* darker maroon */
   --accent-text: #ffffff;
-  --ring-accent: rgba(198, 167, 110, 0.3);
-  --surface-hover: #efeeea;
-  --surface-glass: rgba(255, 255, 255, 0.80);
-  --surface-glass-border: rgba(208, 197, 182, 0.3);
-  /* M3 extended tokens */
-  --oracle-primary-container: #c6a76e;
-  --oracle-primary-fixed: #ffdea4;
-  --oracle-primary-fixed-dim: #e3c287;
-  --oracle-surface-container-low: #f5f3ef;
-  --oracle-surface-container: #efeeea;
-  --oracle-surface-container-high: #eae8e4;
-  --oracle-outline-variant: #d0c5b6;
-  --shadow-sm: 0 1px 2px rgba(115, 91, 41, 0.04);
-  --shadow-md: 0 2px 8px rgba(115, 91, 41, 0.06);
-  --shadow-lg: 0 8px 32px rgba(115, 91, 41, 0.08);
-  --shadow-card: 0 2px 12px rgba(115, 91, 41, 0.04), 0 0 0 1px rgba(208,197,182,0.2);
-  --shadow-card-hover: 0 8px 24px rgba(115, 91, 41, 0.08), 0 0 0 1px rgba(198,167,110,0.3);
-  --input-shadow: 0 20px 40px rgba(115, 91, 41, 0.08);
+  --ring-accent: rgba(122, 31, 43, 0.25);
+  --surface-hover: #fbf1f3;
+  --surface-glass: rgba(255, 255, 255, 0.92);
+  --surface-glass-border: rgba(122, 31, 43, 0.12);
+  /* M3 extended tokens — remapped to maroon */
+  --oracle-primary-container: #7a1f2b;
+  --oracle-primary-fixed: #f5d5d9;
+  --oracle-primary-fixed-dim: #e8b4bb;
+  --oracle-surface-container-low: #fbf6f7;
+  --oracle-surface-container: #f7eaec;
+  --oracle-surface-container-high: #f1dde0;
+  --oracle-outline-variant: #e7d8da;
+  --shadow-sm: 0 1px 2px rgba(122, 31, 43, 0.04);
+  --shadow-md: 0 2px 8px rgba(122, 31, 43, 0.06);
+  --shadow-lg: 0 8px 32px rgba(122, 31, 43, 0.08);
+  --shadow-card: 0 2px 12px rgba(122, 31, 43, 0.04), 0 0 0 1px rgba(231,216,218,0.4);
+  --shadow-card-hover: 0 8px 24px rgba(122, 31, 43, 0.10), 0 0 0 1px rgba(122,31,43,0.20);
+  --input-shadow: 0 20px 40px rgba(122, 31, 43, 0.08);
 }
 
 /* Oracle-theme overrides */
@@ -962,11 +1424,11 @@ body, aside, header, main {
   border: 1px solid rgba(208, 197, 182, 0.15);
 }
 
-/* Ambient radial glow behind chat — soft gold warmth */
+/* Ambient radial glow behind chat — very subtle maroon warmth on white */
 [data-theme="futuristic"] .lexram-grid-bg {
   background-image:
-    radial-gradient(ellipse at 50% 0%, rgba(198,167,110,0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(74,97,114,0.04) 0%, transparent 50%);
+    radial-gradient(ellipse at 50% 0%, rgba(122,31,43,0.025) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 100%, rgba(122,31,43,0.015) 0%, transparent 55%);
   background-size: 100% 100%;
 }
 
@@ -1021,4 +1483,60 @@ body, aside, header, main {
 /* Thinking panel — gold left border accent */
 [data-theme="futuristic"] .oracle-thinking {
   border-left: 2px solid rgba(198, 167, 110, 0.2);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Lexram research-2 redesign — palette-professional reference
+   ────────────────────────────────────────────────────────────────────────── */
+@keyframes lex-fade-up    { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes lex-fade-in    { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lex-scale-in   { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes lex-slide-left  { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes lex-slide-right { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes lex-float       { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes lex-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(185, 72, 38, 0.45); }
+  70%  { box-shadow: 0 0 0 14px rgba(185, 72, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(185, 72, 38, 0); }
+}
+.lex-animate-fade-up    { animation: lex-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.lex-animate-fade-in    { animation: lex-fade-in 0.5s ease-out both; }
+.lex-animate-scale-in   { animation: lex-scale-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.lex-animate-slide-left  { animation: lex-slide-left 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.lex-animate-slide-right { animation: lex-slide-right 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.lex-animate-float       { animation: lex-float 4s ease-in-out infinite; }
+.lex-animate-pulse-ring  { animation: lex-pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+/* Subtle hover lift used for case + session list items */
+.lex-hover-lift { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.2s ease; }
+.lex-hover-lift:hover { transform: translateY(-2px); box-shadow: var(--lex-shadow-soft); }
+
+/* Slim maroon-tinted scrollbars inside the rounded cards */
+.lex-scroll::-webkit-scrollbar { width: 6px; }
+.lex-scroll::-webkit-scrollbar-track { background: transparent; }
+.lex-scroll::-webkit-scrollbar-thumb { background: rgba(104, 3, 24, 0.18); border-radius: 999px; }
+.lex-scroll::-webkit-scrollbar-thumb:hover { background: rgba(104, 3, 24, 0.35); }
+
+/* Page shell for the research-2 redesign — cream hero gradient */
+.lex-research-shell {
+  background: var(--lex-gradient-hero);
+}
+
+/* Subtle shimmer for skeleton blocks (HistorySidebar credits + threads
+   while the first fetch is in flight). Cream→white gradient sweeps across
+   the element. Kept generic so any skeleton placeholder can pick it up. */
+@keyframes lex-skeleton-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.lex-skeleton-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: lex-skeleton-shimmer 1.4s ease-in-out infinite;
 }

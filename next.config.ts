@@ -21,6 +21,20 @@ const nextConfig: NextConfig = {
     ],
   },
   devIndicators: false,
+  async redirects() {
+    return [
+      {
+        source: '/dashboard/research-3',
+        destination: '/dashboard/research-2',
+        permanent: false,
+      },
+      {
+        source: '/dashboard/research-3/:path*',
+        destination: '/dashboard/research-2',
+        permanent: false,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {

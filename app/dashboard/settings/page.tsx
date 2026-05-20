@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCurrentUser, getInitials } from '@/hooks/use-current-user';
+import { useNetworkAvatar, notifyProfileUpdated } from '@/hooks/use-network-avatar';
+import { uploadAvatar } from '@/lib/network/profile';
 import { logoutUsecase } from '@/modules/auth/usecase/auth.usecase';
 import { supabase } from '@/lib/supabase/client';
 import { isPaywallEnabled } from '@/lib/billing';
@@ -26,11 +28,37 @@ export default function SettingsPage() {
 
   // ── Profile state, hydrated from the signed-in user ────────────────────────
   const currentUser = useCurrentUser();
+  const avatarUrl = useNetworkAvatar();
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState('');
+
+  const handleAvatarPick = async (file: File) => {
+    const { data: auth } = await supabase().auth.getUser();
+    const userId = auth.user?.id;
+    if (!userId) {
+      toast.error('Sign in again to change your avatar.');
+      return;
+    }
+    if (file.size > 800 * 1024) {
+      toast.error('Image too large. Please pick one under 800 KB.');
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      await uploadAvatar(userId, file);
+      notifyProfileUpdated();
+      toast.success('Avatar updated.');
+    } catch (err) {
+      console.error('[settings] avatar upload failed', err);
+      toast.error('Avatar upload failed. Please try again.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   useEffect(() => {
     if (currentUser) {
@@ -145,13 +173,32 @@ export default function SettingsPage() {
               <h2 className="font-sans text-xl font-bold text-[var(--text-primary)] border-b border-[var(--border-default)] pb-4">Personal Profile</h2>
 
               <div className="flex items-center gap-6">
-                <div className="w-20 h-20 bg-[var(--bg-sidebar)] rounded-full flex items-center justify-center text-[var(--accent)] text-2xl font-bold shadow-sm border-2 border-[var(--bg-sidebar-hover)]">
-                  {getInitials(currentUser)}
-                </div>
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={`${firstName} ${lastName}`.trim() || 'Avatar'}
+                    className="w-20 h-20 rounded-full object-cover shadow-sm border-2 border-[var(--bg-sidebar-hover)]"
+                  />
+                ) : (
+                  <div className="w-20 h-20 bg-[var(--bg-sidebar)] rounded-full flex items-center justify-center text-[var(--accent)] text-2xl font-bold shadow-sm border-2 border-[var(--bg-sidebar-hover)]">
+                    {getInitials(currentUser)}
+                  </div>
+                )}
                 <div>
-                  <button className="bg-[var(--bg-surface)] ring-1 ring-[var(--border-default)] text-[var(--text-primary)] px-4 py-2 rounded-lg text-sm font-bold hover:bg-[var(--surface-hover)] transition-colors shadow-[var(--shadow-card)]">
-                    Change Avatar
-                  </button>
+                  <label className="inline-block bg-[var(--bg-surface)] ring-1 ring-[var(--border-default)] text-[var(--text-primary)] px-4 py-2 rounded-lg text-sm font-bold hover:bg-[var(--surface-hover)] transition-colors shadow-[var(--shadow-card)] cursor-pointer">
+                    {uploadingAvatar ? 'Uploading…' : 'Change Avatar'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp"
+                      className="hidden"
+                      disabled={uploadingAvatar}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleAvatarPick(f);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
                   <p className="text-xs text-[var(--text-secondary)] mt-2">JPG, GIF or PNG. Max size of 800K</p>
                 </div>
               </div>

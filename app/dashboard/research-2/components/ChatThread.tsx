@@ -12,6 +12,8 @@ type ChatThreadProps = {
   isSearching: boolean;
   streamingText: string;
   statusMessage?: string;
+  /** Optional sub-lines that go with the current status headline. */
+  statusDetail?: string[];
   error: string | null;
   userInitials: string;
   expandedWorking: Record<string, boolean>;
@@ -22,6 +24,7 @@ type ChatThreadProps = {
   onOpenEditor: () => void;
   onOpenWorkflow: () => void;
   onQuerySelect: (query: string) => void;
+  onSuggestedAnswer?: (answer: string) => void;
   onBuildSessionDraft: () => void;
   mobilePane: "chat" | "authorities";
   sessionId?: string | null;
@@ -37,6 +40,7 @@ export default function ChatThread({
   isSearching,
   streamingText,
   statusMessage,
+  statusDetail,
   error,
   userInitials,
   expandedWorking,
@@ -47,6 +51,7 @@ export default function ChatThread({
   onOpenEditor,
   onOpenWorkflow,
   onQuerySelect,
+  onSuggestedAnswer,
   // onBuildSessionDraft kept on the interface for backwards compat — the
   // session-level "Build Draft" button has been removed from the UI, so the
   // prop is intentionally not destructured here.
@@ -83,7 +88,7 @@ export default function ChatThread({
       }}
       className={`flex-1 overflow-y-auto custom-scrollbar px-3 sm:px-4 md:px-8 pt-4 sm:pt-6 pb-6 ${mobilePane === "authorities" ? "hidden lg:block" : ""}`}
     >
-      <div className="max-w-[860px] lg:max-w-[1180px] mx-auto space-y-4 sm:space-y-6">
+      <div className="max-w-[760px] mx-auto space-y-4 sm:space-y-6">
         {messages.map((message, index) => {
           const sourceQuery =
             messages.slice(0, index).reverse().find((m) => m.role === "user")?.content ||
@@ -104,6 +109,7 @@ export default function ChatThread({
               onOpenEditor={onOpenEditor}
               onOpenWorkflow={onOpenWorkflow}
               onQuerySelect={onQuerySelect}
+              onSuggestedAnswer={onSuggestedAnswer}
               sessionId={sessionId}
               onRegenerate={onRegenerate}
               onShareSession={onShareSession}
@@ -115,7 +121,7 @@ export default function ChatThread({
         })}
 
         {isSearching && (
-          <StreamingIndicator streamingText={streamingText} statusMessage={statusMessage} />
+          <StreamingIndicator streamingText={streamingText} statusMessage={statusMessage} statusDetail={statusDetail} />
         )}
 
         {error && (

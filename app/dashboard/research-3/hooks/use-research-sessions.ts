@@ -12,6 +12,13 @@ export function useResearchSessions(selectedMatterId: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [historySearch, setHistorySearch] = useState("");
   const [isAuthed, setIsAuthed] = useState(false);
+  const [sessionsReady, setSessionsReady] = useState(false);
+  // Case the user picked from the header CaseSelector *before* the session
+  // row exists. ensureSession() and the debounced auto-save both forward
+  // this to POST /sessions so the row is linked to the case at creation
+  // time. Reset to null when an existing session is selected or a new one
+  // is started (so each fresh chat begins as Unassigned by default).
+  const [pendingCaseId, setPendingCaseId] = useState<string | null>(null);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sessionsRef = useRef<ResearchSession[]>([]);
@@ -26,6 +33,7 @@ export function useResearchSessions(selectedMatterId: string) {
     const list = await chatSessionRepository.list();
     setSessions(list);
     sessionsRef.current = list;
+    setSessionsReady(true);
   }, []);
 
   useEffect(() => {
@@ -57,6 +65,8 @@ export function useResearchSessions(selectedMatterId: string) {
   // just-typed first message or the in-flight AI stream.
 
   // ── Debounced auto-save: persist messages to Supabase ──────────────────────
+  // (depends on `pendingCaseId` so the deps lint is satisfied — the value
+  // is read inside the timeout callback below.)
   useEffect(() => {
     if (!isAuthed) return; // guests can't save
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -97,6 +107,7 @@ export function useResearchSessions(selectedMatterId: string) {
         title: firstUser.slice(0, 60) || "New Conversation",
         messages,
         matter_id: selectedMatterId !== "all" ? selectedMatterId : null,
+        case_id: pendingCaseId,
       });
       creatingSessionRef.current = false;
       if (!created) return;
@@ -104,12 +115,15 @@ export function useResearchSessions(selectedMatterId: string) {
       setCurrentSessionId(created.id);
       setSessions((prev) => [created, ...prev]);
       sessionsRef.current = [created, ...sessionsRef.current];
+      // The pending case has been baked into the row — clear it so it isn't
+      // re-applied if the user later starts a fresh chat without picking again.
+      setPendingCaseId(null);
     }, 600);
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [messages, currentSessionId, selectedMatterId, isAuthed]);
+  }, [messages, currentSessionId, selectedMatterId, isAuthed, pendingCaseId]);
 
   // ── Ensure a session exists, creating one on demand if not ────────────────
   // Returns the session id. If we already have a current session, returns it
@@ -125,6 +139,7 @@ export function useResearchSessions(selectedMatterId: string) {
         title: titleHint.slice(0, 60) || "New Conversation",
         messages: [],
         matter_id: selectedMatterId !== "all" ? selectedMatterId : null,
+        case_id: pendingCaseId,
       });
       creatingSessionRef.current = false;
       if (!created) return null;
@@ -133,9 +148,10 @@ export function useResearchSessions(selectedMatterId: string) {
       sessionsRef.current = [created, ...sessionsRef.current];
       setCurrentSessionId(created.id);
       setSessions((prev) => [created, ...prev]);
+      setPendingCaseId(null);
       return created.id;
     },
-    [currentSessionId, selectedMatterId]
+    [currentSessionId, selectedMatterId, pendingCaseId]
   );
 
   // ── Delete a session ───────────────────────────────────────────────────────
@@ -220,6 +236,9 @@ export function useResearchSessions(selectedMatterId: string) {
   const handleNewSession = () => {
     setCurrentSessionId(null);
     setMessages([]);
+    // Clear any case the user pre-selected for an earlier "New chat" attempt
+    // they never followed through on, so the picker starts fresh.
+    setPendingCaseId(null);
   };
 
   const handleSelectSession = (id: string) => {
@@ -230,6 +249,8 @@ export function useResearchSessions(selectedMatterId: string) {
     const cached = sessionsRef.current.find((s) => s.id === id);
     setMessages(cached?.messages ?? []);
     setCurrentSessionId(id);
+    // Selecting an existing session moots any pending case from the picker.
+    setPendingCaseId(null);
   };
 
   const historyContextValue = {
@@ -248,6 +269,7 @@ export function useResearchSessions(selectedMatterId: string) {
 
   return {
     sessions,
+    sessionsReady,
     currentSessionId,
     setCurrentSessionId,
     messages,
@@ -263,5 +285,7 @@ export function useResearchSessions(selectedMatterId: string) {
     handleRenameSession,
     ensureSession,
     historyContextValue,
+    pendingCaseId,
+    setPendingCaseId,
   };
 }

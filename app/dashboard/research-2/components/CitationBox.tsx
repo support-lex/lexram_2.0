@@ -79,7 +79,7 @@ export default function CitationBox({ citations, defaultOpen = true }: CitationB
               const yearPart = c.year && c.year !== "—" ? ` (${c.year})` : "";
               const inner = (
                 <div className="flex items-start gap-3">
-                  <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 rounded-full bg-[var(--bg-sidebar)] text-white text-[10px] font-bold flex-shrink-0">
+                  <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 rounded-full bg-[var(--accent)] text-[var(--accent-text,#fff)] text-[10px] font-bold flex-shrink-0">
                     {i + 1}
                   </span>
                   <div className="min-w-0 flex-1 relative">

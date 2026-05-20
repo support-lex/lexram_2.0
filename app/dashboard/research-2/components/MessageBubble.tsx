@@ -22,15 +22,22 @@ import {
   ThumbsUp,
   ThumbsDown,
   Pencil,
+  CornerDownLeft,
+  Send,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Message } from "../types";
 import InlineBlock from "./inline/InlineBlock";
 import MermaidDiagram from "./inline/MermaidDiagram";
 import InlineAuthorities from "./inline/InlineAuthorities";
 import InlineDraftEditor from "./inline/InlineDraftEditor";
-import CitationBox from "./CitationBox";
+import InlineQuestionsForm, { parseNumberedQuestions } from "./InlineQuestionsForm";
 import ProceduralTimeline from "./ProceduralTimeline";
+import { ExternalLink } from "lucide-react";
 import { feedbackRepository, type FeedbackRating } from "@/modules/chat/repository/feedback.repository";
+import { useNetworkAvatar } from "@/hooks/use-network-avatar";
 
 type MessageBubbleProps = {
   message: Message;
@@ -41,6 +48,8 @@ type MessageBubbleProps = {
   onToggleWorking: () => void;
   onToggleThinkingTokens: () => void;
   onQuerySelect: (query: string) => void;
+  /** Submit a suggested answer to a clarifying question asked by the assistant. */
+  onSuggestedAnswer?: (answer: string) => void;
   /** Optional: still used by the page-level paywall flow if a fallback panel exists. */
   onOpenAuthorities?: (index: number) => void;
   onOpenEditor?: () => void;
@@ -60,6 +69,60 @@ type MessageBubbleProps = {
   className?: string;
 };
 
+// ── Inline citation superscript with hover popover (ChatGPT-style) ─────────
+function InlineCiteRef({ n, auth }: { n: number; auth?: import("../types").Authority }) {
+  const [open, setOpen] = useState(false);
+  const url = auth?.linkHint ?? null;
+  return (
+    <span
+      className="relative inline-flex align-super"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+    >
+      {url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center justify-center min-w-[1.25rem] h-[1.1rem] rounded-full bg-[var(--accent)]/15 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/30 transition-colors mx-0.5 no-underline"
+        >
+          {n}
+        </a>
+      ) : (
+        <span className="inline-flex items-center justify-center min-w-[1.25rem] h-[1.1rem] rounded-full bg-[var(--accent)]/15 text-[10px] font-bold text-[var(--accent)] mx-0.5 cursor-default">
+          {n}
+        </span>
+      )}
+      {open && auth && (
+        <span
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-50 w-64 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-default)] shadow-[var(--shadow-lg)] p-3 text-left pointer-events-none"
+          role="tooltip"
+        >
+          <span className="block text-[11px] font-semibold text-[var(--accent)] truncate">
+            {auth.caseName}
+          </span>
+          <span className="block text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">
+            {auth.citation}{auth.year && auth.year !== "—" ? ` (${auth.year})` : ""}
+          </span>
+          {auth.proposition && (
+            <span className="block text-[10px] text-[var(--text-muted)] mt-1 line-clamp-2 leading-relaxed">
+              {auth.proposition}
+            </span>
+          )}
+          {url && (
+            <span className="flex items-center gap-1 mt-1.5 text-[10px] text-[var(--accent)]">
+              <ExternalLink className="w-2.5 h-2.5" /> Open source
+            </span>
+          )}
+        </span>
+      )}
+    </span>
+  );
+}
+
 const markdownComponents = {
   h1: ({ children }: any) => (
     <h1 className="font-sans text-[22px] font-semibold mt-5 mb-2 text-[var(--text-primary)]">{children}</h1>
@@ -70,7 +133,7 @@ const markdownComponents = {
   h3: ({ children }: any) => (
     <h3 className="font-sans text-[15px] font-semibold mt-3 mb-1 text-[var(--text-primary)]">{children}</h3>
   ),
-  p: ({ children }: any) => <span className="leading-7">{children}</span>,
+  p: ({ children }: any) => <p className="mb-3 leading-7">{children}</p>,
   ul: ({ children }: any) => (
     <ul className="my-2.5 pl-5 space-y-1 list-disc">{children}</ul>
   ),
@@ -182,6 +245,7 @@ export default function MessageBubble({
   onOpenEditor,
   onOpenWorkflow,
   onQuerySelect,
+  onSuggestedAnswer,
   className,
   sessionId,
   onRegenerate,
@@ -191,7 +255,14 @@ export default function MessageBubble({
   onProceedWithDraft,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
+  const userAvatarUrl = useNetworkAvatar();
   const [vote, setVote] = useState<FeedbackRating | null>(null);
+  // Dislike → opens a small report popover anchored to the thumbs-down
+  // button. The textarea is optional; clicking Send saves the comment to
+  // message_feedback.comment in Supabase alongside the down-vote rating.
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportText, setReportText] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
 
   // Re-sync vote state whenever sessionId becomes available or changes.
   // On first render of a new chat, sessionId is null (session not created yet);
@@ -209,10 +280,54 @@ export default function MessageBubble({
     // Persist if we have a session
     if (sessionId) {
       if (newVote) {
+        // Don't block on the upsert here — the report popover does its own
+        // upsert (with comment) when the user hits Send. This call just
+        // records the vote so the up/down state is captured even if they
+        // close the popover without typing anything.
         feedbackRepository.upsert(sessionId, message.id, newVote);
       } else {
         feedbackRepository.remove(sessionId, message.id);
       }
+    }
+    // Open the report popover only when the down-vote is being SET (not
+    // toggled off). Up-votes never trigger the popover.
+    if (rating === "down" && newVote === "down") {
+      setReportText("");
+      setReportOpen(true);
+    } else if (rating === "down" && newVote === null) {
+      // User un-disliked → also close the popover so a stale draft doesn't
+      // hang around for the next interaction.
+      setReportOpen(false);
+    }
+  };
+
+  const submitReport = async () => {
+    if (!sessionId) {
+      toast.error("Can't send report yet — session is still being created.");
+      return;
+    }
+    const trimmed = reportText.trim();
+    if (!trimmed) {
+      toast.error("Please describe what was wrong with the answer.");
+      return;
+    }
+    setReportSubmitting(true);
+    const result = await feedbackRepository.upsert(
+      sessionId,
+      message.id,
+      "down",
+      trimmed
+    );
+    setReportSubmitting(false);
+    if (result.ok) {
+      toast.success("Thanks — report sent.");
+      setReportOpen(false);
+      setReportText("");
+    } else {
+      // Surface the actual cause so schema/RLS issues are visible instead of
+      // hiding behind a generic "try again" toast — pasting a 400 into chat
+      // support is faster than scrolling DevTools.
+      toast.error("Couldn't send report", { description: result.error });
     }
   };
 
@@ -254,9 +369,17 @@ export default function MessageBubble({
           </div>
         </div>
         {/* Avatar */}
-        <div className="w-7 h-7 rounded-full bg-[var(--accent)] text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0 mb-5">
-          {userInitials}
-        </div>
+        {userAvatarUrl ? (
+          <img
+            src={userAvatarUrl}
+            alt="You"
+            className="w-7 h-7 rounded-full object-cover flex-shrink-0 mb-5"
+          />
+        ) : (
+          <div className="w-7 h-7 rounded-full bg-[var(--accent)] text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0 mb-5">
+            {userInitials}
+          </div>
+        )}
       </div>
     );
   }
@@ -273,10 +396,7 @@ export default function MessageBubble({
     return response.authorities ?? [];
   })();
 
-  // Custom <cite>N</cite> renderer for LexRam responses. The backend ships
-  // markers like `<cite>1</cite>` or `<cite>2,3,4,5</cite>` in the prose; we
-  // turn each number into a clickable superscript pill that scrolls to the
-  // matching authority card in the right-side panel.
+  // Custom <cite>N</cite> renderer — inline superscript with hover popover (ChatGPT-style).
   const renderCite = (props: any) => {
     const inner = Array.isArray(props.children) ? props.children.join("") : String(props.children ?? "");
     const nums = inner
@@ -287,26 +407,8 @@ export default function MessageBubble({
     return (
       <span className="inline-flex gap-0.5 align-super">
         {nums.map((n: number) => {
-          const idx = n - 1;
-          const auth = inlineAuthorities[idx];
-          const url = auth?.linkHint
-            || (auth ? `https://indiankanoon.org/search/?formInput=${encodeURIComponent(`${auth.caseName} ${auth.citation}`)}` : null);
-          return (
-            <a
-              key={`cite-${n}`}
-              href={url || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!url) e.preventDefault();
-              }}
-              className="inline-flex items-center justify-center min-w-[1.3rem] h-[1.1rem] rounded-full bg-[var(--oracle-primary-fixed,#ffdea4)] text-[10px] font-bold text-[#261900] hover:bg-[var(--oracle-primary-fixed-dim,#e3c287)] hover:scale-110 transition-all duration-150 cursor-pointer mx-0.5 no-underline"
-              title={auth ? `${n}. ${auth.caseName} — click to open source` : `Source ${n}`}
-            >
-              {n}
-            </a>
-          );
+          const auth = inlineAuthorities[n - 1];
+          return <InlineCiteRef key={`cite-${n}`} n={n} auth={auth} />;
         })}
       </span>
     );
@@ -340,41 +442,20 @@ export default function MessageBubble({
 
   const renderContentWithCitations = (content: string, _citationStart = 0): ReactNode => {
     void _citationStart;
-    // Fence-aware split: blank lines inside fenced code blocks (e.g. mermaid)
-    // must NOT cause a paragraph break — a naive /\n\s*\n/ split fragments them.
-    const blocks: string[] = [];
-    {
-      let current: string[] = [];
-      let inFence = false;
-      for (const line of content.split("\n")) {
-        if (/^\s*```/.test(line)) inFence = !inFence;
-        if (!inFence && line.trim() === "") {
-          if (current.length > 0) {
-            const b = current.join("\n").trim();
-            if (b) blocks.push(b);
-            current = [];
-          }
-        } else {
-          current.push(line);
-        }
-      }
-      if (current.length > 0) {
-        const b = current.join("\n").trim();
-        if (b) blocks.push(b);
-      }
-    }
-
-    return blocks.map((block, bi) => (
-      <div key={`${message.id}-b${bi}`} className="mb-3.5 leading-7 text-[var(--text-primary)]">
+    // Render as a single ReactMarkdown instance — no paragraph splitting.
+    // Splitting on \n\n was fragmenting fenced mermaid blocks that have blank
+    // lines between their sections (nodes / edges / classDef).
+    return (
+      <div className="text-[var(--text-primary)]">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={hasInlineCites ? [rehypeRaw] : undefined}
           components={liveMarkdownComponents}
         >
-          {block}
+          {content}
         </ReactMarkdown>
       </div>
-    ));
+    );
   };
 
   const streamParagraphCount = contentText
@@ -497,8 +578,7 @@ export default function MessageBubble({
             the left, dark Authorities card pinned on the right. The whole row
             scrolls together inside ChatThread — no separate scroll panel. On
             screens narrower than lg, the right column stacks below the bubble. */}
-        <div className="flex flex-col lg:flex-row gap-3 lg:items-start">
-        <div className="flex-1 min-w-0 lg:max-w-[calc(100%-340px)]">
+        <div className="flex-1 min-w-0">
 
         {/* Main content bubble */}
         <div className="px-1 py-2 text-[15px]">
@@ -608,6 +688,130 @@ export default function MessageBubble({
           )}
         </div>
 
+        {/* Inline questions form — rendered when the AI's prose contains a
+            consecutive numbered list of questions (drafting flow's "TRACK 1
+            — Essential Facts" pattern). Each question gets its own text
+            input; Proceed bundles the answers into "1. ans\n2. ans\n…"
+            and pushes them through onSuggestedAnswer just like a chip
+            click would. Parser returns [] when the pattern isn't there,
+            so this is a no-op for ordinary AI prose. */}
+        {(() => {
+          const parsed = parseNumberedQuestions(contentText);
+          if (parsed.length < 2 || !onSuggestedAnswer) return null;
+          return (
+            <InlineQuestionsForm
+              questions={parsed}
+              onProceed={(formatted) => onSuggestedAnswer(formatted)}
+            />
+          );
+        })()}
+
+        {/* Suggested answers — quick-reply chips shown when the assistant
+            is asking the user a clarifying question. Clicking auto-submits
+            the chip text as the user's next message. Visually distinct from
+            "nextQuestions" (those are follow-up prompts, not replies).
+            The `popup` variant is intentionally NOT rendered here — it's
+            painted as a floating bar above the chat input by the page. */}
+        {response.suggestedAnswers && response.suggestedAnswers.length > 0 &&
+          response.suggestedAnswersVariant !== "popup" && (() => {
+          const variant = response.suggestedAnswersVariant ?? "inline";
+          const heading = response.suggestedAnswersHeading ?? "Suggested answers";
+          const splitOption = (a: string): { title: string; detail?: string } => {
+            const idx = a.indexOf(" — ");
+            if (idx > 0) return { title: a.slice(0, idx), detail: a.slice(idx + 3) };
+            return { title: a };
+          };
+
+          if (variant === "list") {
+            return (
+              <div className="mt-3 px-1" role="group" aria-label="Suggested answers">
+                <p className="mb-2 text-[10px] font-semibold tracking-widest uppercase text-[var(--text-muted)]">
+                  {heading}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {response.suggestedAnswers!.map((a, i) => {
+                    const { title, detail } = splitOption(a);
+                    return (
+                      <button
+                        key={`${i}-${a}`}
+                        type="button"
+                        onClick={() => onSuggestedAnswer?.(a)}
+                        title={a}
+                        className="group flex items-start gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] px-4 py-3 text-left hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 hover:shadow-sm transition-all"
+                      >
+                        <CornerDownLeft className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-[var(--accent)]" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] font-semibold text-[var(--text-primary)] leading-snug">
+                            {title}
+                          </div>
+                          {detail && (
+                            <div className="text-[12px] text-[var(--text-secondary)] mt-0.5 leading-snug">
+                              {detail}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
+
+          if (variant === "buttons") {
+            return (
+              <div className="mt-3 px-1" role="group" aria-label="Suggested answers">
+                <p className="mb-2 text-[10px] font-semibold tracking-widest uppercase text-[var(--text-muted)]">
+                  {heading}
+                </p>
+                <div className="flex flex-wrap gap-2.5">
+                  {response.suggestedAnswers!.map((a, i) => {
+                    const isPrimary = i === 0;
+                    return (
+                      <button
+                        key={`${i}-${a}`}
+                        type="button"
+                        onClick={() => onSuggestedAnswer?.(a)}
+                        title={a}
+                        className={
+                          isPrimary
+                            ? "inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] text-white px-5 py-2.5 text-[13px] font-semibold hover:bg-[var(--accent-hover)] transition-colors shadow-sm min-w-[140px]"
+                            : "inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] px-5 py-2.5 text-[13px] font-semibold hover:bg-[var(--surface-hover)] hover:border-[var(--accent)]/50 transition-colors min-w-[140px]"
+                        }
+                      >
+                        <span>{a}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
+
+          // Default: inline pill chips
+          return (
+            <div className="mt-3 px-1" role="group" aria-label="Suggested answers">
+              <p className="mb-2 text-[10px] font-semibold tracking-widest uppercase text-[var(--text-muted)]">
+                {heading}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {response.suggestedAnswers!.map((a, i) => (
+                  <button
+                    key={`${i}-${a}`}
+                    type="button"
+                    onClick={() => onSuggestedAnswer?.(a)}
+                    title={a}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3.5 py-1.5 text-[12px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 hover:border-[var(--accent)]/60 hover:shadow-sm transition-all text-left"
+                  >
+                    <CornerDownLeft className="w-3 h-3 flex-shrink-0" />
+                    <span>{a}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Procedural timeline — cream card with gold connector line. Renders
             when the answer has structured workflow steps (procedural flow). */}
         {response.workflowSteps && response.workflowSteps.length > 0 && (
@@ -664,13 +868,90 @@ export default function MessageBubble({
           >
             <ThumbsUp className="w-3 h-3" />
           </button>
-          <button
-            onClick={() => handleVote("down")}
-            className={`inline-flex items-center rounded-lg p-1 transition-colors ${vote === "down" ? "text-red-500 bg-red-50" : "text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50"}`}
-            title="Bad answer"
+          <Popover
+            open={reportOpen}
+            onOpenChange={(o) => {
+              if (!reportSubmitting) setReportOpen(o);
+            }}
           >
-            <ThumbsDown className="w-3 h-3" />
-          </button>
+            <PopoverTrigger
+              onClick={() => handleVote("down")}
+              className={`inline-flex items-center rounded-lg p-1 transition-colors ${vote === "down" ? "text-red-500 bg-red-50" : "text-[var(--text-muted)] hover:text-red-500 hover:bg-red-50"}`}
+              title="Bad answer"
+            >
+              <ThumbsDown className="w-3 h-3" />
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              side="top"
+              sideOffset={8}
+              className="w-[300px] p-0 overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-[var(--shadow-lg)]"
+            >
+              <div className="px-3.5 py-2.5 border-b border-[var(--border-light)] bg-gradient-to-b from-red-50/40 to-transparent flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <ThumbsDown className="w-3.5 h-3.5 text-red-500" />
+                  <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+                    What was wrong?
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !reportSubmitting && setReportOpen(false)}
+                  className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+                  aria-label="Close report"
+                  disabled={reportSubmitting}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="p-3 space-y-2.5">
+                <textarea
+                  autoFocus
+                  value={reportText}
+                  onChange={(e) => setReportText(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Cmd/Ctrl+Enter sends — matches the chat-input shortcut.
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                      e.preventDefault();
+                      submitReport();
+                    }
+                  }}
+                  placeholder="Tell us what's wrong — inaccurate citation, missed key issue, off-topic..."
+                  rows={3}
+                  disabled={reportSubmitting}
+                  className="w-full resize-none rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] px-2.5 py-2 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/70 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500/40 transition-all disabled:opacity-60"
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-[var(--text-muted)]">
+                    ⌘/Ctrl + Enter to send
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => !reportSubmitting && setReportOpen(false)}
+                      disabled={reportSubmitting}
+                      className="px-2.5 py-1 rounded-md text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={submitReport}
+                      disabled={reportSubmitting || !reportText.trim()}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {reportSubmitting ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Send className="w-3 h-3" />
+                      )}
+                      Send
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Follow-up suggestions: plain-text heading (when present) above
@@ -694,22 +975,46 @@ export default function MessageBubble({
                   type="button"
                   onClick={() => onQuerySelect(q)}
                   title={q}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface)] px-3.5 py-1.5 text-[12px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--text-primary)] hover:shadow-sm transition-all max-w-[300px] lexram-hover-glow"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface)] px-3.5 py-1.5 text-[12px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--text-primary)] hover:shadow-sm transition-all lexram-hover-glow text-left"
                 >
                   <Lightbulb className="w-3 h-3 text-[var(--accent)] flex-shrink-0" />
-                  <span className="truncate">{q}</span>
+                  <span>{q}</span>
                 </button>
               ))}
             </div>
           </div>
         )}
-        </div>
-        {/* ── Right column: dark "AUTHORITIES / N CITED" card pinned next to
-            this AI message. Rendered only when this message has authorities
-            so the chat column doesn't shift around for citationless answers. */}
+
+        {/* ── Inline Sources footnote (ChatGPT-style) ── */}
         {inlineAuthorities.length > 0 && (
-          <div className="lg:w-[320px] lg:flex-shrink-0 -mt-1">
-            <CitationBox citations={inlineAuthorities} />
+          <div className="mt-4 pt-3 border-t border-[var(--border-light)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] mb-2">
+              Sources
+            </p>
+            <ol className="space-y-1.5">
+              {inlineAuthorities.map((a, i) => (
+                <li key={i} className="flex items-start gap-2 text-[12px]">
+                  <span className="min-w-[1.25rem] h-[1.1rem] mt-0.5 rounded-full bg-[var(--accent)]/15 text-[10px] font-bold text-[var(--accent)] flex items-center justify-center flex-shrink-0">
+                    {i + 1}
+                  </span>
+                  {a.linkHint ? (
+                    <a
+                      href={a.linkHint}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[var(--text-secondary)] hover:text-[var(--accent)] hover:underline inline-flex items-center gap-1 leading-snug"
+                    >
+                      <span>{a.caseName || a.citation}{a.year && a.year !== "—" ? ` (${a.year})` : ""}</span>
+                      <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 opacity-60" />
+                    </a>
+                  ) : (
+                    <span className="text-[var(--text-secondary)] leading-snug">
+                      {a.caseName || a.citation}{a.year && a.year !== "—" ? ` (${a.year})` : ""}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ol>
           </div>
         )}
         </div>

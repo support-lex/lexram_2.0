@@ -262,7 +262,7 @@ export default function ChatInput({
 
       {/* Width + padding MUST match ChatThread so the bubbles and input column
           line up at every viewport, regardless of whether the history rail is open. */}
-      <div className={`max-w-[860px] mx-auto ${hasThread ? "px-3 sm:px-4 md:px-8 py-3" : "px-3 sm:px-4 md:px-8 pb-4 sm:pb-6"}`}>
+      <div className={`max-w-[760px] mx-auto ${hasThread ? "px-3 sm:px-4 md:px-8 py-3" : "px-3 sm:px-4 md:px-8 pb-4 sm:pb-6"}`}>
         {/* Attached files */}
         {attachedFiles.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2.5">
@@ -329,49 +329,25 @@ export default function ChatInput({
               )}
             </button>
 
-            {/* Instant / Deep query mode toggle (LexRam backend) */}
-            <div
-              className="ml-1 inline-flex items-center rounded-lg bg-[var(--surface-hover)] p-0.5 border border-[var(--border-default)]"
-              role="group"
-              aria-label="Query depth"
+            {/* Draft mode toggle */}
+            <button
+              type="button"
+              onClick={() => setQueryMode(queryMode === "draft" ? "deep" : "draft")}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
+                queryMode === "draft"
+                  ? "bg-[var(--accent)] text-white"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+              }`}
+              title="Draft a legal document"
             >
-              <button
-                type="button"
-                onClick={() => setQueryMode("instant")}
-                title="Instant — fast answer"
-                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
-                  queryMode === "instant"
-                    ? "bg-white text-[var(--text-primary)] shadow-sm"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                Instant
-              </button>
-              <button
-                type="button"
-                onClick={() => setQueryMode("deep")}
-                title="Deep — slower, more thorough analysis"
-                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
-                  queryMode === "deep"
-                    ? "bg-white text-[var(--text-primary)] shadow-sm"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                Deep
-              </button>
-              <button
-                type="button"
-                onClick={() => setQueryMode("draft")}
-                title="Draft a legal document using this session's research"
-                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
-                  queryMode === "draft"
-                    ? "bg-white text-[var(--text-primary)] shadow-sm"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                Draft
-              </button>
-            </div>
+              Draft
+              <span className={`text-[7px] font-bold tracking-wider px-1 py-0.5 rounded ${
+                queryMode === "draft" ? "bg-white/25 text-white" : "bg-amber-100 text-amber-600"
+              }`}>
+                BETA
+              </span>
+            </button>
+
           </div>
 
           {/* Textarea */}
@@ -390,138 +366,6 @@ export default function ChatInput({
 
           {/* Right actions */}
           <div className="flex items-center gap-1.5 flex-shrink-0 pb-0.5 order-3 ml-auto sm:ml-0">
-            {/* Settings popover */}
-            <Popover>
-              <PopoverTrigger
-                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
-                title="Settings"
-              >
-                <Settings2 className="w-4 h-4" />
-              </PopoverTrigger>
-              <PopoverContent
-                side="top"
-                align="end"
-                className="w-64 p-3 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl shadow-lg"
-              >
-                {/* Mode */}
-                <div className="mb-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                    Mode
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {MODES.map((m) => (
-                      <button
-                        key={m.value}
-                        onClick={() => setMode(m.value)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                          mode === m.value
-                            ? "bg-[var(--accent)] text-white"
-                            : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-[var(--border-default)]"
-                        }`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <Separator className="my-2.5 bg-[var(--border-default)]" />
-
-                {/* Output format */}
-                <div className="mb-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                    Output
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {FORMAT_OPTIONS.map((o) => (
-                      <button
-                        key={o.value}
-                        onClick={() => setOutputFormat(o.value)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                          outputFormat === o.value
-                            ? "bg-[var(--accent)] text-white"
-                            : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-[var(--border-default)]"
-                        }`}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Depth */}
-                <div className="mb-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                    Depth
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {DEPTH_OPTIONS.map((o) => (
-                      <button
-                        key={o.value}
-                        onClick={() => setAnalysisDepth(o.value)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                          analysisDepth === o.value
-                            ? "bg-[var(--accent)] text-white"
-                            : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-[var(--border-default)]"
-                        }`}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Writing style */}
-                <div className="mb-3">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                    Style
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {STYLE_OPTIONS.map((o) => (
-                      <button
-                        key={o.value}
-                        onClick={() => setWritingStyle(o.value)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                          writingStyle === o.value
-                            ? "bg-[var(--accent)] text-white"
-                            : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-[var(--border-default)]"
-                        }`}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <Separator className="my-2.5 bg-[var(--border-default)]" />
-
-                {/* Prompt preset */}
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
-                    Preset
-                  </div>
-                  <div className="space-y-1">
-                    {PROMPT_PRESETS.map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() =>
-                          setSelectedPromptPreset(
-                            selectedPromptPreset === p.id ? null : p.id
-                          )
-                        }
-                        className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-                          selectedPromptPreset === p.id
-                            ? "bg-[var(--accent)] text-white"
-                            : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-[var(--border-default)]"
-                        }`}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
 
             {/* Mode pill */}
             {mode !== "normal" && (

@@ -6,15 +6,13 @@ import CommandPalette from '@/components/CommandPalette';
 import ShortcutsModal from '@/app/dashboard/research-3/components/ShortcutsModal';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { MatterProvider, useMatterContext } from '@/lib/matter-context';
-import { AppSidebar } from '@/components/app-sidebar';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { AppTopBar } from '@/components/app-topbar';
+import { TourProvider } from '@/components/tour/TourProvider';
 import AuthBottomSheet from '@/components/auth/AuthBottomSheet';
 import BackendHealthBadge from '@/components/BackendHealthBadge';
 import { DashboardAuthContext, type DashboardAuthContextValue } from '@/lib/dashboard-auth-context';
 import { supabase } from '@/lib/supabase/client';
-
-// Pages that can be accessed without authentication
-const PUBLIC_DASHBOARD_PATHS = ['/dashboard/research-3', '/dashboard/research-2'];
+import { isPublicDashboardPath } from '@/lib/public-dashboard-paths';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -38,7 +36,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   // already; this just toggles the in-page UI (sidebar / bottom sheet).
   useEffect(() => {
     const sb = supabase();
-    const isPublicPage = PUBLIC_DASHBOARD_PATHS.some(p => pathname.startsWith(p));
+    const isPublicPage = isPublicDashboardPath(pathname);
 
     sb.auth.getUser().then(async ({ data }) => {
       const signedIn = !!data.user;
@@ -70,8 +68,8 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   useKeyboardShortcuts({
     'cmd+k':       () => setIsCommandPaletteOpen(true),
     'ctrl+k':      () => setIsCommandPaletteOpen(true),
-    'cmd+shift+r': () => router.push('/dashboard/research-3'),
-    'cmd+shift+d': () => router.push('/dashboard/research-3'),
+    'cmd+shift+r': () => router.push('/dashboard/research-2'),
+    'cmd+shift+d': () => router.push('/dashboard/research-2'),
     'cmd+shift+b': () => router.push('/dashboard/matters'),
     'cmd+shift+m': () => router.push('/dashboard/matters'),
     '?':           () => setShowShortcuts(true),
@@ -96,31 +94,21 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <DashboardAuthContext.Provider value={authContextValue}>
-      <SidebarProvider
-        defaultOpen={false}
-        style={{ "--sidebar-width": "13rem", "--sidebar-width-icon": "3.25rem" } as React.CSSProperties}
-      >
-        {isAuthenticated && <AppSidebar />}
+      <TourProvider>
+        <div className="flex flex-col h-screen bg-[var(--bg-primary)]">
+          <AppTopBar />
+          <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            {children}
+          </main>
 
-        {/* Mobile-only floating menu button — opens the sidebar drawer.
-            The desktop sidebar uses hover-expand which doesn't work on touch. */}
-        {isAuthenticated && (
-          <SidebarTrigger className="md:hidden fixed top-3 left-3 z-50 h-9 w-9 rounded-full bg-[var(--bg-surface)] border border-[var(--border-default)] shadow-md text-[var(--text-primary)]" />
-        )}
+          <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
+          <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+        </div>
+      </TourProvider>
 
-        <SidebarInset
-          className="dashboard-main-inset"
-          style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "var(--bg-primary)", minHeight: "100svh" }}
-        >
-          {children}
-        </SidebarInset>
-
-        <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
-        <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
-      </SidebarProvider>
-
-      {/* Persistent auth bar for unauthenticated users — cannot be closed */}
-      {!isAuthenticated && (
+      {/* Sign-up nudge only on research-2 (1-message guest cap surface).
+          Resources / legislation / analytics pages stay fully public. */}
+      {!isAuthenticated && pathname.startsWith('/dashboard/research-2') && (
         <AuthBottomSheet onAuthenticated={handleAuthenticated} />
       )}
 

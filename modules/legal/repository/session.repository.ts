@@ -61,11 +61,20 @@ export const lexramSessionRepository = {
    *   the title we asked for actually lands on the row before the caller
    *   ever sees it. The PATCH failure is non-fatal — we still return the
    *   created session even if rename errors out.
+   *
+   * When `opts.case_id` is provided, it's included in the POST body so the
+   * backend links the session to that case at creation time — saving the
+   * follow-up PATCH /sessions/{id}/case that's otherwise needed for reassign.
    */
-  async create(title: string = "New Chat"): Promise<LexramSession> {
+  async create(
+    title: string = "New Chat",
+    opts: { case_id?: string | null } = {}
+  ): Promise<LexramSession> {
+    const body: { title: string; case_id?: string } = { title };
+    if (opts.case_id) body.case_id = opts.case_id;
     const created = await lexramRequest<LexramSession>("/sessions", {
       method: "POST",
-      body: { title },
+      body,
     });
 
     const id = lexramSessionId(created);

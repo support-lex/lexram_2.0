@@ -22,6 +22,7 @@ type ChatThreadProps = {
   onOpenEditor: () => void;
   onOpenWorkflow: () => void;
   onQuerySelect: (query: string) => void;
+  onSuggestedAnswer?: (answer: string) => void;
   onBuildSessionDraft: () => void;
   mobilePane: "chat" | "authorities";
   onProceedWithDraft?: () => void;
@@ -42,6 +43,7 @@ export default function ChatThread({
   onOpenEditor,
   onOpenWorkflow,
   onQuerySelect,
+  onSuggestedAnswer,
   onBuildSessionDraft,
   mobilePane,
   onProceedWithDraft,
@@ -73,7 +75,7 @@ export default function ChatThread({
       }}
       className={`flex-1 overflow-y-auto custom-scrollbar px-3 sm:px-4 md:px-8 pt-4 sm:pt-6 pb-6 ${mobilePane === "authorities" ? "hidden lg:block" : ""}`}
     >
-      <div className="max-w-[860px] lg:max-w-[1180px] mx-auto space-y-4 sm:space-y-6">
+      <div className="max-w-[760px] mx-auto space-y-4 sm:space-y-6">
         {messages.map((message, index) => {
           const sourceQuery =
             messages.slice(0, index).reverse().find((m) => m.role === "user")?.content ||
@@ -94,6 +96,7 @@ export default function ChatThread({
               onOpenEditor={onOpenEditor}
               onOpenWorkflow={onOpenWorkflow}
               onQuerySelect={onQuerySelect}
+              onSuggestedAnswer={onSuggestedAnswer}
               onProceedWithDraft={onProceedWithDraft}
             />
           );

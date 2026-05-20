@@ -344,3 +344,88 @@ export function unwrap<T>(res: Paginated<T> | T[]): T[] {
   if (Array.isArray(res)) return res;
   return res?.data ?? [];
 }
+
+// ─── Legal Intelligence Platform v2 API (https://139.59.74.49/api/v2) ─────────
+// Proxied via /api/lexram/v2/... → the catch-all proxy adds /api/ prefix automatically.
+
+export interface ActV2 {
+  id: string;
+  name?: string | null;
+  title?: string | null;
+  short_title?: string | null;
+  year?: number | null;
+  act_type?: string | null;
+  ministry?: string | null;
+  department?: string | null;
+  jurisdiction?: string | null;
+  domain?: string | null;
+  category?: string | null;
+  status?: string | null;
+  enactment_date?: string | null;
+  description?: string | null;
+  state_code?: string | null;
+  [k: string]: unknown;
+}
+
+export interface PaginatedActsV2 {
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  data: ActV2[];
+}
+
+export interface SuggestItemV2 {
+  id: string;
+  title?: string | null;
+  short_title?: string | null;
+  year?: number | null;
+  score?: number | null;
+}
+
+export interface FilterValuesV2 {
+  ministries: string[];
+  departments: string[];
+  domains: string[];
+  categories: string[];
+  jurisdictions: string[];
+  act_types: string[];
+  statuses: string[];
+  years: number[];
+}
+
+export interface ActsV2Params {
+  page?: number;
+  limit?: number;
+  sort_by?: string;
+  order?: 'asc' | 'desc';
+  q?: string;
+  id?: string;
+  title?: string;
+  year?: number;
+  act_type?: string;
+  ministry?: string;
+  department?: string;
+  state_code?: string;
+  jurisdiction?: string;
+  category?: string;
+  domain?: string;
+  status?: string;
+  enactment_date_from?: string;
+  enactment_date_to?: string;
+  fields?: string;
+}
+
+export const LexramV2 = {
+  acts: (params?: ActsV2Params) =>
+    apiGet<PaginatedActsV2>('v2/acts', params as Record<string, string | number | undefined>),
+
+  suggest: (q: string) =>
+    apiGet<SuggestItemV2[]>('v2/acts/suggest', { q }),
+
+  filters: () =>
+    apiGet<FilterValuesV2>('v2/acts/filters'),
+
+  act: (id: string) =>
+    apiGet<ActV2>(`v2/acts/${id}`),
+};

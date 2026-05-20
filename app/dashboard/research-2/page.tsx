@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { History, Share, MoreHorizontal, Users, Pin, PinOff, Archive, Trash2, Check, Link2 } from "lucide-react";
+import { History, Share, MoreHorizontal, Users, Pin, PinOff, Archive, Trash2, Check, Link2, Briefcase, ArrowUp, Plus, Bookmark, BookmarkCheck, Share2, PenLine, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   pinnedSessionRepository,
@@ -10,26 +10,41 @@ import {
 } from "@/modules/chat/repository/feedback.repository";
 import { useMatterContext } from "@/lib/matter-context";
 import { ResearchHistoryContext } from "@/lib/research-history-context";
+import { getStoredData, setStoredData, STORAGE_KEYS } from "@/lib/storage";
 import { useDashboardAuth } from "@/lib/dashboard-auth-context";
+import { supabase } from "@/lib/supabase/client";
 
 import { useResearchSessions } from "./hooks/use-research-sessions";
 import { useResearchChat } from "./hooks/use-research-chat";
 import { useResearchUI } from "./hooks/use-research-ui";
+import { useUserRole } from "@/lib/auth-guard";
+import { buildResearchSourceForBlog, BLOG_SOURCE_STORAGE_KEY } from "@/lib/blog/research-source";
 
 import HistorySidebar from "./components/HistorySidebar";
+import CasesPanel from "./components/CasesPanel";
 import EmptyState from "./components/EmptyState";
+import ApiProgressBar from "./components/ApiProgressBar";
 import ChatThread from "./components/ChatThread";
 import ChatInput from "./components/ChatInput";
 import AuthoritiesPanel from "./components/AuthoritiesPanel";
 import ShortcutsModal from "./components/ShortcutsModal";
 import DocumentDialog from "./components/DocumentDialog";
-import CaseSelector from "@/components/CaseSelector";
+import SuggestionsPopup from "./components/SuggestionsPopup";
+import demoConversation from "./demo-conversation.json";
+import type { Message } from "./types";
+import CaseSelector, { type Case as CaseItem } from "@/components/CaseSelector";
+import ProfileCompletionModal from "@/components/ProfileCompletionModal";
 import PaywallModal from "@/components/PaywallModal";
+import api from "@/services/legal-api";
 import { useCredits } from "@/hooks/use-credits";
 import type { BillingMode } from "@/lib/billing";
 import { isPaywallEnabled } from "@/lib/billing";
 
 const PENDING_QUERY_KEY = "lexram_pending_query";
+// After this many user messages, prompt for profile details (name + email)
+// if the user_metadata is incomplete. The popup is one-shot per session —
+// dismissing it stops nagging until the next page load.
+const PROFILE_PROMPT_AFTER_USER_MESSAGES = 5;
 
 export default function Research2Page() {
   const { selectedMatterId } = useMatterContext();
@@ -38,15 +53,21 @@ export default function Research2Page() {
   const pathname = usePathname();
   const pendingQueryHandled = useRef(false);
   const [showDocumentDialog, setShowDocumentDialog] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  // Sticky one-shot flag: once the modal has been shown (whether dismissed
+  // or saved) in this page load, don't re-trigger on every subsequent user
+  // message. A new tab / refresh resets it so a still-incomplete profile
+  // gets re-prompted the next time the user crosses the threshold.
+  const profileAskedRef = useRef(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallEnabled, setPaywallEnabled] = useState(true);
   useEffect(() => { setPaywallEnabled(isPaywallEnabled()); }, []);
 
-  const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
-  const { balance, ceiling, deductForResponse } = useCredits();
+  const { balance, ceiling, ready: creditsReady, deductForResponse } = useCredits();
   const wasSearchingRef = useRef(false);
   const [selectedSourceMessageId, setSelectedSourceMessageId] = useState<string | null>(null);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [showCasesPanel, setShowCasesPanel] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [isCurrentPinned, setIsCurrentPinned] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -68,11 +89,102 @@ export default function Research2Page() {
   const [showShareDialog, setShowShareDialog] = useState(false);
 
   const {
-    sessions, messages, setMessages, currentSessionId,
+    sessions, sessionsReady, messages, setMessages, currentSessionId,
     historySearch, setHistorySearch, filteredSessions, groupedSessions,
     relativeDateLabel, handleNewSession, handleSelectSession,
     handleDeleteSession, handleRenameSession, ensureSession, historyContextValue,
+    pendingCaseId, setPendingCaseId, refreshSessions,
   } = useResearchSessions(selectedMatterId);
+
+  // ── Per-session case selection ─────────────────────────────────────────
+  const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentSessionId || currentSessionId.startsWith('temp_')) {
+      // Mirror the pre-session case the user picked in the dialog (if any)
+      // so the chat header + File Hub immediately reflect that case even
+      // before the row is POSTed. Falls back to null on a vanilla new chat.
+      setCurrentCaseId(pendingCaseId);
+      return;
+    }
+    const map = getStoredData<Record<string, string>>(STORAGE_KEYS.SESSION_CASES, {});
+    setCurrentCaseId(map[currentSessionId] ?? null);
+  }, [currentSessionId, pendingCaseId]);
+
+  // Shared cases list — fetched once, passed to CasesPanel + read by the
+  // isolation guard in handleCaseChange. MUST be declared before
+  // handleCaseChange uses it (TDZ would otherwise crash the render).
+  const [sharedCases, setSharedCases] = useState<CaseItem[]>([]);
+  const fetchSharedCases = useCallback(async () => {
+    try {
+      const res = await api.get<{ cases: CaseItem[] } | CaseItem[]>("/cases");
+      const list = Array.isArray(res.data) ? res.data : res.data?.cases ?? [];
+      setSharedCases(list);
+    } catch { /* silently ignore — components fall back to their own fetch */ }
+  }, []);
+  useEffect(() => { fetchSharedCases(); }, [fetchSharedCases]);
+
+  const handleCaseChange = useCallback((id: string | null) => {
+    // Belt-and-suspenders isolation guard. Every "Unassigned" case is
+    // private to ONE session — they exist purely to keep documents
+    // scoped to that session. Picking one in the Case Hub dropdown is
+    // therefore a DISPLAY-ONLY operation (it switches the Sessions /
+    // Drafts tabs to the consolidated Unassigned view); it must NOT
+    // overwrite the active session's real case_id (in pendingCaseId
+    // for new chats, or in SESSION_CASES for existing chats) — that
+    // would cross-contaminate documents between sessions.
+    const pickedCase = id ? sharedCases.find((c) => c.id === id) : null;
+    const isUnassignedPick = pickedCase?.title === "Unassigned";
+
+    // Always update the UI state — the dropdown + chip + tab filters
+    // all read from currentCaseId.
+    setCurrentCaseId(id);
+
+    if (!currentSessionId || currentSessionId.startsWith('temp_')) {
+      // New chat: only NAMED cases propagate to pendingCaseId. An
+      // Unassigned pick keeps pendingCaseId null so the backend
+      // auto-creates a fresh private Unassigned on first message.
+      setPendingCaseId(isUnassignedPick ? null : id);
+      return;
+    }
+
+    // Existing session: Unassigned picks are view-only, never persisted.
+    // Named picks update the SESSION_CASES quick-lookup cache (the real
+    // PATCH /sessions/{id}/case lives in CasesPanel.handleSelectCase).
+    if (isUnassignedPick) return;
+    const map = getStoredData<Record<string, string>>(STORAGE_KEYS.SESSION_CASES, {});
+    if (id) { map[currentSessionId] = id; } else { delete map[currentSessionId]; }
+    setStoredData(STORAGE_KEYS.SESSION_CASES, map);
+  }, [currentSessionId, setPendingCaseId, sharedCases]);
+
+  // ── New chat → toast nudging the user to pick a case ──────────────────
+  // The case dropdown in the header stays visible so the user can pick (or
+  // leave it as Unassigned, which is the default pre-selection set by the
+  // effect below once /cases has loaded).
+  const handleNewChatWithToast = useCallback(() => {
+    handleNewSession();
+    toast.message("Select a case for this chat", {
+      icon: <ArrowUp className="w-4 h-4 text-[var(--accent)]" />,
+      description: "Use the case dropdown above. Defaults to Unassigned.",
+      duration: 5000,
+      // top-center keeps the toast from overlapping the collapsed left rail
+      // icons (which `top-left` was covering) while staying close enough to
+      // the case dropdown that the ArrowUp icon still reads as "look above".
+      position: "top-center",
+    });
+  }, [handleNewSession]);
+
+  // (sharedCases hoisted above handleCaseChange — see top of component.)
+
+  // Pre-session case defaulting — DELETED per the per-session-isolated-case
+  // change: the backend now creates a private "Unassigned" case automatically
+  // for every new session (at session-creation time). With multiple
+  // "Unassigned" cases in /cases (one per existing session), picking the
+  // first one would assign the new chat into a *different* session's private
+  // bucket, defeating the isolation. Leaving `currentCaseId` null is the
+  // correct pre-session state — the header falls back to "Unassigned" as a
+  // visual hint, and the real private case_id is read off the session row
+  // once it's created.
 
   // Keep `isCurrentPinned` synced — refreshed on session change AND on
   // menu-open so the label flips correctly after the user pins/unpins
@@ -109,7 +221,7 @@ export default function Research2Page() {
 
   const {
     query, setQuery, mode, setMode, queryMode, setQueryMode,
-    statusMessage, isSearching, error, streamingText,
+    statusMessage, statusDetail, isSearching, error, streamingText,
     attachedFiles, removeFile, isDragActive, dropHandlers,
     fileInputRef, queryTextareaRef, handleSubmitRef, resizeTextarea,
     webSearchEnabled, setWebSearchEnabled, outputFormat, setOutputFormat,
@@ -117,7 +229,7 @@ export default function Research2Page() {
     selectedPromptPreset, setSelectedPromptPreset,
     liveEditorContent, activeRunMode, handleSubmit, stopGeneration,
     addFiles, attachCaseDocs, buildSessionDraft,
-  } = useResearchChat(messages, setMessages, { ensureSession });
+  } = useResearchChat(messages, setMessages, { ensureSession, refreshSessions });
 
   const lastAi = [...messages].reverse().find((m) => m.role === "ai");
   useEffect(() => { setSelectedSourceMessageId(null); }, [lastAi?.id]);
@@ -157,17 +269,30 @@ export default function Research2Page() {
     }
   }, [query, handleSubmitRef]);
 
-  // ── Load session from ?session= URL param (shared links) ───────────────
+  // ── Load session from ?session= URL param — fires once when sessions load ──
   const searchParams = useSearchParams();
   const sessionFromUrl = useRef(false);
   useEffect(() => {
-    if (sessionFromUrl.current) return;
+    if (sessionFromUrl.current || !sessionsReady) return;
+    sessionFromUrl.current = true;
     const sid = searchParams.get("session");
-    if (sid && sessions.length > 0) {
-      sessionFromUrl.current = true;
-      handleSelectSession(sid);
+    if (sid) handleSelectSession(sid);
+    // intentionally omit searchParams/handleSelectSession — one-shot on load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionsReady]);
+
+  // ── Keep URL in sync with active session so refresh restores the same chat ─
+  useEffect(() => {
+    if (!sessionsReady) return;
+    const current = searchParams.get("session");
+    if (!currentSessionId || currentSessionId.startsWith("temp_")) {
+      if (current) router.replace(pathname, { scroll: false });
+      return;
     }
-  }, [searchParams, sessions, handleSelectSession]);
+    if (current !== currentSessionId) {
+      router.replace(`${pathname}?session=${currentSessionId}`, { scroll: false });
+    }
+  }, [currentSessionId, sessionsReady, pathname, router, searchParams]);
 
   const goToSignUp = useCallback(() => {
     const trimmed = query.trim();
@@ -177,6 +302,28 @@ export default function Research2Page() {
     params.set("intent", "signup");
     router.push(`/sign-in?${params.toString()}`);
   }, [query, router, pathname]);
+
+  // ── Profile completion prompt ───────────────────────────────────────────
+  // After the user has sent N messages, gently nudge them to fill in their
+  // name + email if user_metadata is missing those fields. One-shot per page
+  // load (profileAskedRef) so we don't pester them on every subsequent send.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (profileAskedRef.current) return;
+    const userMsgCount = messages.filter((m) => m.role === "user").length;
+    if (userMsgCount < PROFILE_PROMPT_AFTER_USER_MESSAGES) return;
+    // Mark asked immediately so a rapid second message doesn't fire the
+    // getUser() round-trip twice while the first is in flight.
+    profileAskedRef.current = true;
+    supabase().auth.getUser().then(({ data }) => {
+      const m = (data.user?.user_metadata ?? {}) as Record<string, string>;
+      const hasName = !!(m.first_name && m.last_name);
+      const hasEmail = !!(data.user?.email || m.email);
+      // If the profile is already complete, just stay marked-as-asked and
+      // never bother them. If it's missing, open the modal.
+      if (!hasName || !hasEmail) setShowProfileModal(true);
+    });
+  }, [messages, isAuthenticated]);
 
   // Deduct credits when a response finishes streaming, then show paywall if exhausted.
   useEffect(() => {
@@ -209,6 +356,7 @@ export default function Research2Page() {
 
 
   const hasThread = messages.length > 0;
+  const hasAiAnswer = messages.some((m) => m.role === "ai");
   const lastAiResponse = sourceMessage?.response;
   const sourceMessageIndex = sourceMessage ? messages.findIndex((m) => m.id === sourceMessage.id) : -1;
   const lastUserMessage = sourceMessageIndex > 0
@@ -216,6 +364,34 @@ export default function Research2Page() {
     : [...messages].reverse().find((m) => m.role === "user");
   const userInitials = "U";
   const currentSessionTitle = sessions.find((s) => s.id === currentSessionId)?.title ?? "New Conversation";
+
+  // ── "Make Blog" — pipe this research thread into the blog editor ──────
+  // Admin-only, since the /api/ai/blog endpoint is admin-gated. Bundles the
+  // user's questions, AI prose, authorities, mermaid diagrams, and any saved
+  // drafts into sessionStorage, then navigates to /dashboard/blog/create
+  // where the page auto-calls the AI to produce a polished post.
+  const { role: userRole } = useUserRole();
+  const isAdmin = userRole === "admin";
+  const [makingBlog, setMakingBlog] = useState(false);
+  const handleMakeBlog = useCallback(() => {
+    if (!hasAiAnswer) {
+      toast.error("Ask a question first — the blog needs research findings to work from.");
+      return;
+    }
+    setMakingBlog(true);
+    try {
+      const src = buildResearchSourceForBlog(messages, currentSessionTitle);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(
+          BLOG_SOURCE_STORAGE_KEY,
+          JSON.stringify(src),
+        );
+      }
+      router.push("/dashboard/blog/create?source=research");
+    } finally {
+      setMakingBlog(false);
+    }
+  }, [messages, currentSessionTitle, hasAiAnswer, router]);
 
   const shareUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/dashboard/research-2?session=${currentSessionId ?? ""}`;
   const handleCopyShareLink = () => {
@@ -239,128 +415,122 @@ export default function Research2Page() {
     setTimeout(() => queryTextareaRef.current?.focus(), 0);
   };
 
-  const loadDemoMessages = () => {
-    const now = new Date().toISOString();
-    const demoMessages: import("./types").Message[] = [
-      {
-        id: "demo-user-1",
-        role: "user",
-        content: "Draft a legal notice for breach of contract and show the litigation timeline with relevant authorities.",
-        timestamp: now,
-      },
-      {
-        id: "demo-ai-1",
+  // ─── Live-playback demo state ──────────────────────────────────────────────
+  // The demo is a scripted conversation loaded from demo-conversation.json. It
+  // alternates user → ai turns; AI messages with `suggestedAnswers` pause
+  // playback until the user clicks a chip, which then resumes the script.
+  const demoIndexRef = useRef(0);
+  const [demoTyping, setDemoTyping] = useState(false);
+  const demoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  type DemoMessage = {
+    role: "user" | "ai";
+    content?: string;
+    response?: import("./types").LegalAnswer;
+  };
+  const demoScript = (demoConversation.messages as DemoMessage[]);
+
+  const makeMessageFromScript = useCallback(
+    (entry: DemoMessage, contentOverride?: string): Message => {
+      const id = `demo-${entry.role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const timestamp = new Date().toISOString();
+      if (entry.role === "user") {
+        return {
+          id,
+          role: "user",
+          content: contentOverride ?? entry.content ?? "",
+          timestamp,
+        };
+      }
+      return {
+        id,
         role: "ai",
         content: "",
-        timestamp: new Date(Date.now() + 1000).toISOString(),
-        response: {
-          streamText: `## Breach of Contract — Legal Notice & Litigation Overview
+        timestamp,
+        response: entry.response,
+      };
+    },
+    [],
+  );
 
-Under Indian contract law, a breach of contract occurs when a party fails to perform their obligations under a valid agreement without lawful excuse. The Indian Contract Act, 1872 <cite>1</cite> provides the foundational framework, while recent Supreme Court rulings <cite>2</cite> have refined the standards for establishing material breach.
-
-### Key Elements to Establish
-1. **Existence of a valid contract** — offer, acceptance, consideration, and lawful object
-2. **Performance obligation** — the defaulting party had a clear, enforceable duty
-3. **Breach** — failure to perform, defective performance, or anticipatory repudiation
-4. **Damages** — quantifiable loss flowing from the breach <cite>3</cite>
-
-The notice below demands compliance within 15 days, failing which civil proceedings will be initiated under **Order VII Rule 1 of the CPC** <cite>4</cite>.`,
-          shortAnswer: "Legal notice for breach of contract with litigation timeline",
-          reasoning: "",
-          authorityStrength: "Strong",
-          divergenceStatus: "Aligned",
-          authorities: [
-            { caseName: "Indian Contract Act, 1872", citation: "Sections 73, 74, 75", court: "Statute", year: "1872", proposition: "Foundational statute governing breach and damages in India.", treatment: "followed" as const, linkHint: "https://indiankanoon.org/doc/171398/" },
-            { caseName: "M/s Hind Construction v. State of Maharashtra", citation: "(1979) 2 SCC 70", court: "Supreme Court of India", year: "1979", proposition: "Established that time is not of the essence unless expressly stipulated in the contract.", treatment: "followed" as const, linkHint: "https://indiankanoon.org/doc/1248423/" },
-            { caseName: "Kailash Nath Associates v. DDA", citation: "(2015) 4 SCC 136", court: "Supreme Court of India", year: "2015", proposition: "Clarified the scope of Section 74 — reasonable compensation for breach, not penalty.", treatment: "followed" as const, linkHint: "https://indiankanoon.org/doc/47685041/" },
-            { caseName: "Code of Civil Procedure, 1908", citation: "Order VII Rule 1", court: "Statute", year: "1908", proposition: "Prescribes the requirements for filing a civil suit — plaint format, jurisdiction, and cause of action.", treatment: "uncertain" as const },
-          ],
-          workflowSteps: [
-            { title: "Legal Notice Issued", detail: "Day 0: Notice dispatched via registered post / courier with acknowledgment." },
-            { title: "Compliance Period", detail: "Day 1–15: Recipient has 15 days to cure the breach or respond with justification." },
-            { title: "Filing of Civil Suit", detail: "Day 16: If no response, file suit under Order VII Rule 1, CPC in appropriate court." },
-            { title: "Written Statement", detail: "Day 46: Defendant files written statement within 30 days of summons (extendable to 90)." },
-            { title: "Framing of Issues", detail: "Day 60–90: Court frames issues for trial based on pleadings." },
-            { title: "Trial & Arguments", detail: "Day 120+: Evidence, cross-examination, and final arguments." },
-          ],
-          nextQuestions: [
-            "What are the grounds for claiming liquidated damages under Section 74?",
-            "How to calculate damages for anticipatory breach?",
-            "Draft the plaint for this case",
-          ],
-          draftReady: `# LEGAL NOTICE
-
-**TO:**
-M/s XYZ Enterprises Pvt. Ltd.
-123 Commercial Avenue, Sector 18
-Gurugram, Haryana – 122015
-
-**FROM:**
-Office of [Your Name], Advocate
-[Your Address]
-
-**DATE:** ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}
-
-**SUBJECT:** Notice for Breach of Contract dated [Date of Contract]
-
----
-
-Dear Sir/Madam,
-
-Under instructions from and on behalf of my client, **M/s ABC Industries Ltd.** (hereinafter "my Client"), I address this notice as follows:
-
-## FACTS
-
-1. My Client and your company entered into a **Supply Agreement** dated [Date] for the supply of [goods/services], with a total contract value of ₹[Amount].
-
-2. As per Clause [X] of the Agreement, you were obligated to deliver [specific obligation] by [Due Date].
-
-3. Despite repeated reminders dated [dates], you have **failed to perform** your contractual obligations, constituting a **material breach** of the Agreement.
-
-## LEGAL POSITION
-
-4. Under **Section 73 of the Indian Contract Act, 1872**, my Client is entitled to compensation for any loss or damage caused by the breach.
-
-5. The Hon'ble Supreme Court in **Kailash Nath Associates v. DDA (2015) 4 SCC 136** has held that reasonable compensation is awardable even in the absence of a liquidated damages clause.
-
-## DEMAND
-
-6. You are hereby called upon to:
-   - **(a)** Fulfill your pending obligations under the Agreement within **15 (fifteen) days** from receipt of this notice; **OR**
-   - **(b)** Pay compensation amounting to **₹[Amount]** towards damages suffered by my Client.
-
-7. Failure to comply within the stipulated period will leave my Client with no alternative but to initiate **civil proceedings** before the competent court, at your risk and cost.
-
-This notice is issued without prejudice to any other rights and remedies available to my Client under law.
-
-**[Your Name]**
-Advocate, Bar Council of [State]
-Enrolment No.: [Number]`,
-          uiBlocks: [
-            {
-              type: "mindmap" as const,
-              data: `graph TD
-  A["Breach of Contract"] --> B["Legal Notice\\nDay 0"]
-  A --> C["Key Statutes"]
-  B --> D["15-Day Compliance\\nPeriod"]
-  D --> E["File Civil Suit\\nDay 16"]
-  E --> F["Written Statement\\nDay 46"]
-  F --> G["Framing Issues\\nDay 60-90"]
-  G --> H["Trial & Judgment\\nDay 120+"]
-  C --> I["Indian Contract Act\\nSections 73, 74, 75"]
-  C --> J["CPC Order VII\\nRule 1"]
-  C --> K["Limitation Act\\nArticle 55 — 3 years"]`,
-            },
-            {
-              type: "draft" as const,
-              data: "See the full legal notice above.",
-            },
-          ],
-        },
-      },
-    ];
-    setMessages(demoMessages);
+  const clearDemoTimer = () => {
+    if (demoTimerRef.current) {
+      clearTimeout(demoTimerRef.current);
+      demoTimerRef.current = null;
+    }
   };
+
+  // Advance the demo script starting from `startIdx`. Appends each message
+  // sequentially with typing delays. Pauses (returns) when it lands on an AI
+  // message that has `suggestedAnswers` — the user must click a chip to
+  // continue (handled by handleSuggestedAnswer).
+  const advanceDemo = useCallback(
+    (startIdx: number, lastUserChipText?: string) => {
+      clearDemoTimer();
+      if (startIdx >= demoScript.length) return;
+      const entry = demoScript[startIdx];
+
+      if (entry.role === "user") {
+        const useChip = entry.content === "<<chip>>" && lastUserChipText !== undefined;
+        const userMsg = makeMessageFromScript(entry, useChip ? lastUserChipText : undefined);
+        setMessages((prev) => [...prev, userMsg]);
+        demoIndexRef.current = startIdx + 1;
+        demoTimerRef.current = setTimeout(() => {
+          setDemoTyping(true);
+          demoTimerRef.current = setTimeout(() => {
+            setDemoTyping(false);
+            advanceDemo(startIdx + 1);
+          }, 1400);
+        }, 600);
+        return;
+      }
+
+      // AI turn — append the bubble.
+      const aiMsg = makeMessageFromScript(entry);
+      setMessages((prev) => [...prev, aiMsg]);
+      demoIndexRef.current = startIdx + 1;
+      // If the AI message has suggested answers, pause — wait for chip click.
+      if (entry.response?.suggestedAnswers?.length) return;
+      // Otherwise, continue after a short beat.
+      demoTimerRef.current = setTimeout(() => {
+        advanceDemo(startIdx + 1);
+      }, 800);
+    },
+    [demoScript, makeMessageFromScript, setMessages],
+  );
+
+  const loadDemoMessages = () => {
+    clearDemoTimer();
+    setDemoTyping(false);
+    setMessages([]);
+    demoIndexRef.current = 0;
+    // Kick off after a tick so React commits the empty state first.
+    demoTimerRef.current = setTimeout(() => advanceDemo(0), 60);
+  };
+
+  // Clean up any pending demo timer on unmount.
+  useEffect(() => () => clearDemoTimer(), []);
+
+  // Clicking a suggested-answer chip:
+  //  • In demo mode: substitutes the chip text into the next scripted user
+  //    message and resumes playback.
+  //  • Otherwise: submits the chip as the user's next real query.
+  const handleSuggestedAnswer = (answer: string) => {
+    const isDemoThread = messages.some((m) => m.id.startsWith("demo-"));
+    if (isDemoThread && demoIndexRef.current < demoScript.length) {
+      advanceDemo(demoIndexRef.current, answer);
+      return;
+    }
+    setQuery(answer);
+    setTimeout(() => handleSubmitRef.current?.(), 50);
+  };
+
+  // The last AI message — used to decide whether to render the floating
+  // suggestions popup above the chat input.
+  const lastAiMessage = [...messages].reverse().find((m) => m.role === "ai");
+  const showSuggestionsPopup =
+    !!lastAiMessage?.response?.suggestedAnswers?.length &&
+    lastAiMessage.response.suggestedAnswersVariant === "popup";
 
   const chatInputProps = {
     query, setQuery, mode, setMode, queryMode, setQueryMode,
@@ -378,112 +548,189 @@ Enrolment No.: [Number]`,
      RENDER — futuristic theme wrapper
      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   return (
-    <div data-theme="futuristic">
+    <div data-theme="futuristic" className="flex-1 min-h-0 flex flex-col">
     <ResearchHistoryContext.Provider value={historyContextValue}>
       <input ref={fileInputRef} type="file" multiple accept=".pdf,.txt,.md,.doc,.docx" className="sr-only" onChange={(e) => addFiles(e.target.files)} />
 
       <div
         ref={containerRef}
-        className="flex h-[100svh] max-h-[100svh] overflow-hidden bg-[var(--bg-primary)] lexram-grid-bg relative"
+        className="lex-research-shell flex flex-col h-full max-h-full min-h-0 flex-1 overflow-hidden relative px-2 pt-2 pb-0.5 md:px-4 md:pt-4 md:pb-1"
       >
+      {/* Inner row holds the 3 column cards. The disclaimer below lives
+          OUTSIDE this row so it sits beneath the chat card, on the cream
+          gradient — not inside the rounded card itself. */}
+      <div className="flex flex-1 min-h-0 gap-2 md:gap-4">
         {/* ── History Sidebar ────────────────────────────────────────── */}
         <HistorySidebar
           open={showHistory} onToggle={() => setShowHistory((v) => !v)}
           groupedSessions={groupedSessions} filteredSessions={filteredSessions}
           currentSessionId={currentSessionId} onSelectSession={handleSelectSession}
-          onNewSession={handleNewSession} onDeleteSession={handleDeleteSession}
+          onNewSession={handleNewChatWithToast} onDeleteSession={handleDeleteSession}
           onRenameSession={handleRenameSession} historySearch={historySearch}
           setHistorySearch={setHistorySearch} relativeDateLabel={relativeDateLabel}
           creditBalance={paywallEnabled ? balance : undefined} creditCeiling={ceiling}
+          // Loading flags drive skeleton placeholders so users don't see a
+          // "0 / 0" or "No threads yet" flash on every page mount.
+          creditsLoading={paywallEnabled && !creditsReady}
+          sessionsLoading={!sessionsReady}
           onUpgrade={paywallEnabled ? () => setShowPaywall(true) : undefined}
         />
 
-        {/* ── Chat Area ─────────────────────────────────────────────── */}
-        <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
-          {/* Header — clean title only when no chat; Share + ··· when thread active */}
-          <header className="flex items-center justify-between px-6 h-14 border-b border-[var(--oracle-outline-variant,#d0c5b6)]/10 bg-white/80 backdrop-blur-xl z-20 relative">
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                type="button"
-                onClick={() => setShowHistory((v) => !v)}
-                aria-label={showHistory ? "Hide history" : "Show history"}
-                aria-pressed={showHistory}
-                title={showHistory ? "Hide history" : "Show history"}
-                className={`p-2 rounded-lg transition-colors ${
-                  showHistory
-                    ? "bg-[var(--accent)]/10 text-[var(--accent)]"
-                    : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                <History className="w-4 h-4" />
-              </button>
-              <span className="text-base oracle-serif italic text-[var(--text-primary)]">LexRam</span>
-              {currentSessionId && (
-                <CaseSelector
-                  sessionId={currentSessionId}
-                  value={currentCaseId}
-                  onChange={(id) => setCurrentCaseId(id)}
-                  className="w-56"
-                />
-              )}
-            </div>
-
-            {/* Right controls — only visible when a chat thread exists */}
-            {hasThread && (
-              <div className="flex items-center gap-2 relative">
-                <button
-                  onClick={() => setShowShareDialog(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
-                >
-                  <Share className="w-4 h-4" /> Share
-                </button>
-
-                <div className="relative" ref={menuRef}>
+        {/* ── Chat Area — rounded card matching the reference layout ── */}
+        <div className="relative flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-2xl border border-[var(--border-default)] bg-white shadow-[var(--lex-shadow-elevated)] lex-animate-fade-up">
+          {/* Modern top-edge progress bar — slides while any API call is
+              in flight (axios + lexramRequest fetch wrappers increment the
+              global counter). Sits above the header border. */}
+          <ApiProgressBar />
+          {/* Header — three-zone layout matching the design spec.
+              LEFT: "Threads" label + new chat (+) button (also toggles history sidebar)
+              CENTER: small case name (italic gray) over bold serif chat title
+              RIGHT: case-context chip, bookmark (pin), share, Case hub toggle */}
+          {(() => {
+            const activeCase = sharedCases.find((c) => c.id === currentCaseId) ?? null;
+            const caseLabel = activeCase?.title ?? "Unassigned";
+            return (
+              <header className="flex items-stretch h-12 md:h-14 border-b border-[var(--border-light)] bg-[var(--lex-cream-soft)] backdrop-blur-sm z-20 relative">
+                {/* ── LEFT: history toggle — cream-deep pill with Clock icon
+                       matching the palette-professional reference. When the
+                       sidebar is closed, hovering this column reveals a
+                       floating "+" button so users can start a new chat
+                       without opening the sidebar first. ──────────────── */}
+                <div className="relative group/history flex">
                   <button
-                    onClick={() => setShowHeaderMenu((v) => !v)}
-                    className="p-2 rounded-full hover:bg-[var(--surface-hover)] transition-colors"
-                    title="More options"
+                    type="button"
+                    data-tour="research-history"
+                    onClick={() => setShowHistory((v) => !v)}
+                    aria-label={showHistory ? "Hide threads" : "Show threads"}
+                    aria-pressed={showHistory}
+                    title={showHistory ? "Hide threads" : "Show threads"}
+                    className={`flex items-center justify-center w-12 md:w-14 border-r border-[var(--border-light)] transition-colors ${
+                      showHistory
+                        ? "bg-[var(--lex-cream-deep)] text-[var(--lex-maroon)]"
+                        : "text-[var(--text-muted)] hover:bg-[var(--lex-cream-deep)] hover:text-[var(--lex-maroon)]"
+                    }`}
                   >
-                    <MoreHorizontal className="w-5 h-5 text-[var(--text-primary)]" />
+                    <History className="w-5 h-5" strokeWidth={1.75} />
                   </button>
-
-                  {showHeaderMenu && (
-                    <div className="absolute right-0 top-full mt-2 w-56 rounded-xl bg-white shadow-[var(--shadow-lg)] border border-[var(--border-light)] py-1.5 z-50">
-                      <button onClick={() => setShowHeaderMenu(false)} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors">
-                        <Users className="w-4 h-4 text-[var(--text-muted)]" /> Start a group chat
-                      </button>
-                      <button
-                        onClick={handleTogglePin}
-                        disabled={!currentSessionId}
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {isCurrentPinned ? (
-                          <>
-                            <PinOff className="w-4 h-4 text-[var(--text-muted)]" /> Unpin chat
-                          </>
-                        ) : (
-                          <>
-                            <Pin className="w-4 h-4 text-[var(--text-muted)]" /> Pin chat
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={handleArchiveCurrent}
-                        disabled={!currentSessionId}
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <Archive className="w-4 h-4 text-[var(--text-muted)]" /> Archive
-                      </button>
-                      <div className="h-px bg-[var(--border-light)] my-1" />
-                      <button onClick={() => { if (currentSessionId) handleDeleteSession(currentSessionId); setShowHeaderMenu(false); }} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
-                        <Trash2 className="w-4 h-4" /> Delete
-                      </button>
-                    </div>
+                  {!showHistory && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleNewChatWithToast(); }}
+                      aria-label="New chat"
+                      title="New chat"
+                      className="absolute left-1/2 -translate-x-1/2 top-full mt-0 grid place-items-center size-9 rounded-full bg-[var(--lex-maroon)] text-[var(--lex-cream)] shadow-[var(--lex-shadow-soft)] opacity-0 scale-50 group-hover/history:opacity-100 group-hover/history:scale-100 hover:opacity-100 hover:scale-100 hover:bg-[var(--lex-maroon)]/90 transition-all duration-200 ease-out z-30 focus-visible:opacity-100 focus-visible:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lex-maroon)]/40"
+                    >
+                      <Plus className="w-4 h-4" strokeWidth={2.25} />
+                    </button>
                   )}
                 </div>
-              </div>
-            )}
-          </header>
+
+                {/* ── CENTER: case name (clickable → opens Case Hub) + chat
+                       title. The case-name caption replaces the filter chip
+                       that used to live on the right; clicking it pops the
+                       Case Hub panel so users still have a one-click path
+                       to the case context. */}
+                <div data-tour="research-title" className="flex-1 min-w-0 flex flex-col justify-center px-3 md:px-5">
+                  <button
+                    type="button"
+                    onClick={() => setShowCasesPanel(true)}
+                    aria-label={`Open Case Hub — current case: ${caseLabel}`}
+                    title="Open Case Hub"
+                    className="self-start text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)] hover:text-[var(--lex-maroon)] truncate leading-tight max-w-full transition-colors cursor-pointer"
+                  >
+                    {caseLabel}
+                  </button>
+                  <div className="text-[14px] md:text-[17px] font-bold font-serif text-[var(--text-primary)] truncate leading-tight">
+                    {currentSessionTitle}
+                  </div>
+                </div>
+
+                {/* ── RIGHT: bookmark, share, Make blog, Case hub ────
+                       The old Filter case-context chip moved to the
+                       clickable case-name caption above the session title. */}
+                <div className="flex items-center gap-1 md:gap-2 px-2 md:px-4">
+                  <button
+                    type="button"
+                    data-tour="research-bookmark"
+                    onClick={handleTogglePin}
+                    disabled={!currentSessionId}
+                    aria-label={isCurrentPinned ? "Unpin chat" : "Pin chat"}
+                    title={isCurrentPinned ? "Unpin chat" : "Pin chat"}
+                    className="grid place-items-center size-9 rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isCurrentPinned ? (
+                      <BookmarkCheck className="w-4 h-4 text-[var(--accent)]" strokeWidth={2} />
+                    ) : (
+                      <Bookmark className="w-4 h-4" strokeWidth={2} />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    data-tour="research-share"
+                    onClick={() => setShowShareDialog(true)}
+                    disabled={!hasThread}
+                    aria-label="Share chat"
+                    title="Share chat"
+                    className="grid place-items-center size-9 rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Share2 className="w-4 h-4" strokeWidth={2} />
+                  </button>
+
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      data-tour="research-make-blog"
+                      onClick={handleMakeBlog}
+                      disabled={!hasAiAnswer || makingBlog}
+                      aria-label="Turn this research into a blog post"
+                      title="Make blog from this research"
+                      className="inline-flex items-center gap-1.5 px-2.5 md:px-4 h-9 rounded-full text-[13px] font-medium border border-[var(--border-default)] bg-white text-[var(--text-secondary)] hover:border-[var(--lex-rust)] hover:text-[var(--lex-rust)] hover:bg-[var(--lex-rust-soft)] disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-colors"
+                    >
+                      {makingBlog ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <PenLine className="w-3.5 h-3.5" strokeWidth={2} />
+                      )}
+                      <span className="hidden md:inline">Make blog</span>
+                    </button>
+                  )}
+
+                  {/* Hidden 3-dot menu container kept for the menuRef closure */}
+                  <div className="relative hidden" ref={menuRef}>
+                    {showHeaderMenu && (
+                      <div className="absolute right-0 top-full mt-2 w-56 rounded-xl bg-white shadow-[var(--shadow-lg)] border border-[var(--border-light)] py-1.5 z-50">
+                        <button onClick={handleArchiveCurrent} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors">
+                          <Archive className="w-4 h-4 text-[var(--text-muted)]" /> Archive
+                        </button>
+                        <button onClick={() => { if (currentSessionId) handleDeleteSession(currentSessionId); setShowHeaderMenu(false); }} className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                          <Trash2 className="w-4 h-4" /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── RIGHTMOST: Case hub button — cream-deep pill ──── */}
+                <button
+                  type="button"
+                  data-tour="research-case-hub"
+                  onClick={() => setShowCasesPanel((v) => !v)}
+                  aria-label={showCasesPanel ? "Hide Case Hub" : "Show Case Hub"}
+                  aria-pressed={showCasesPanel}
+                  title="Case Hub"
+                  className={`flex items-center gap-2 px-3 md:px-5 border-l border-[var(--border-light)] text-[14px] font-semibold transition-colors ${
+                    showCasesPanel
+                      ? "bg-[var(--lex-cream-deep)] text-[var(--lex-maroon)]"
+                      : "text-[var(--text-primary)] hover:bg-[var(--lex-cream-deep)] hover:text-[var(--lex-maroon)]"
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4 text-[var(--lex-maroon)]" strokeWidth={2} />
+                  <span className="hidden sm:inline">Case hub</span>
+                </button>
+              </header>
+            );
+          })()}
 
           {/* Gold streaming progress bar */}
           {isSearching && <div className="lexram-progress-bar flex-shrink-0" />}
@@ -493,12 +740,13 @@ Enrolment No.: [Number]`,
             <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden relative" {...dropHandlers}>
               {hasThread ? (
                 <ChatThread
-                  messages={messages} isSearching={isSearching} streamingText={streamingText}
-                  statusMessage={statusMessage} error={error} userInitials={userInitials}
+                  messages={messages} isSearching={isSearching || demoTyping} streamingText={streamingText}
+                  statusMessage={statusMessage} statusDetail={statusDetail} error={error} userInitials={userInitials}
                   expandedWorking={expandedWorking} expandedThinkingTokens={expandedThinkingTokens}
                   toggleWorking={toggleWorking} toggleThinkingTokens={toggleThinkingTokens}
                   onOpenAuthorities={handleOpenAuthorities} onOpenEditor={handleOpenEditor}
                   onOpenWorkflow={handleOpenWorkflow} onQuerySelect={handleQuerySelect}
+                  onSuggestedAnswer={handleSuggestedAnswer}
                   onBuildSessionDraft={buildSessionDraft} mobilePane={mobilePane}
                   sessionId={currentSessionId}
                   onRegenerate={(userQuery) => { setQuery(userQuery); setTimeout(() => handleSubmitRef.current?.(), 50); }}
@@ -508,33 +756,130 @@ Enrolment No.: [Number]`,
                   onProceedWithDraft={() => { setQuery("yes"); setTimeout(() => handleSubmitRef.current?.(), 50); }}
                 />
               ) : (
-                <EmptyState onPickQuickStart={handleQuerySelect} onUpload={() => fileInputRef.current?.click()} />
+                <EmptyState
+                  onPickQuickStart={handleQuerySelect}
+                  // "Upload a document" chip → open the in-app DocumentDialog
+                  // (list + upload UI) instead of the OS file picker.
+                  onUpload={() => setShowDocumentDialog(true)}
+                  onPickDraft={(q) => {
+                    setQueryMode("draft");
+                    setQuery(q);
+                    setTimeout(() => queryTextareaRef.current?.focus(), 0);
+                  }}
+                  onStartDraft={() => {
+                    setQueryMode("draft");
+                    setQuery("hi");
+                    setTimeout(() => handleSubmitRef.current?.(), 50);
+                  }}
+                  // Hero input — same query state + submit handler as the
+                  // bottom ChatInput. Bottom input is hidden in empty state
+                  // so the hero is the only entry point.
+                  query={query}
+                  setQuery={setQuery}
+                  onSubmit={gatedSubmit}
+                  isGenerating={isSearching}
+                  isAuthenticated={isAuthenticated}
+                  onSignUp={goToSignUp}
+                  isDraftMode={queryMode === "draft"}
+                  onToggleDraftMode={() =>
+                    setQueryMode(queryMode === "draft" ? "deep" : "draft")
+                  }
+                />
               )}
 
-              {/* Oracle input — no wrapper card, ChatInput itself is the pill */}
-              <div className="px-8 pb-3">
-                <ChatInput {...chatInputProps} hasThread={hasThread} />
-              </div>
-              <div className="flex-shrink-0 text-center py-1.5 text-[10px] text-[var(--text-muted)] font-medium tracking-wide uppercase">
-                Lexram can make mistakes. Verify legal data.
-              </div>
+              {/* Floating suggestions popup (Claude/ChatGPT style) — appears
+                  above the input when the last AI message uses the "popup"
+                  variant for its suggested answers. */}
+              {showSuggestionsPopup && lastAiMessage?.response && (
+                <SuggestionsPopup
+                  heading={lastAiMessage.response.suggestedAnswersHeading}
+                  suggestions={lastAiMessage.response.suggestedAnswers!}
+                  onPick={handleSuggestedAnswer}
+                />
+              )}
+
+              {/* Bottom ChatInput — hidden in empty state since the hero
+                  EmptyState renders its own large center input. Once a
+                  thread is started, this returns as the persistent input.
+                  The "Lexram can make mistakes" disclaimer now lives
+                  OUTSIDE the rounded chat card (below the inner row). */}
+              {hasThread && (
+                <div className="px-3 md:px-6 pb-2">
+                  <ChatInput {...chatInputProps} hasThread={hasThread} />
+                </div>
+              )}
             </div>
           </div>
+
         </div>
+
+        {/* ── Case Hub — rightmost sibling of the chat area ─── */}
+        <CasesPanel
+          open={showCasesPanel}
+          onToggle={() => setShowCasesPanel((v) => !v)}
+          sessions={filteredSessions}
+          currentSessionId={currentSessionId}
+          currentCaseId={currentCaseId}
+          onSelectSession={handleSelectSession}
+          onNewSession={handleNewChatWithToast}
+          relativeDateLabel={relativeDateLabel}
+          onUploadDocument={() => setShowDocumentDialog(true)}
+          onCaseChange={handleCaseChange}
+          externalCases={sharedCases}
+          onCasesChanged={fetchSharedCases}
+          onAttachDocs={(docs) => {
+            // attachCaseDocs expects { id, name, mime_type? } — map from CasesPanel's CaseDoc format
+            attachCaseDocs(docs.map((d) => ({
+              id: d.caseDocId ?? d.id,
+              name: d.name,
+              size: d.size,
+              mime_type: d.type !== "document" ? d.type : undefined,
+            })));
+          }}
+        />
+      </div>
+
+      {/* Disclaimer — lives on the cream gradient, BELOW the three column
+          cards. Centered under the chat card; tight top/bottom padding so
+          it doesn't open up dead space between the input pill and the
+          bottom of the viewport. */}
+      <div className="flex-shrink-0 text-center pt-1.5 pb-0 text-[10px] text-[var(--text-muted)] font-medium tracking-wide uppercase leading-none">
+        Lexram can make mistakes. Verify legal data.
+      </div>
       </div>
 
       {paywallEnabled && <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} />}
+
+      <ProfileCompletionModal
+        open={showProfileModal}
+        onSaved={() => setShowProfileModal(false)}
+        onDismiss={() => setShowProfileModal(false)}
+      />
 
       <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
       <DocumentDialog
         open={showDocumentDialog}
         onOpenChange={setShowDocumentDialog}
         caseId={currentCaseId}
+        // No case picked + no session yet → create the session on demand so
+        // the backend auto-creates its private Unassigned case. Then read
+        // case_id from the SESSION_CASES localStorage cache (chatSession
+        // repository writes it synchronously after create, before this
+        // promise resolves) so the dialog can proceed with the upload
+        // immediately, even though React state hasn't re-rendered yet.
+        ensureCaseId={async () => {
+          if (currentCaseId) return currentCaseId;
+          const sid = await ensureSession("New chat");
+          if (!sid) return null;
+          const map = getStoredData<Record<string, string>>(STORAGE_KEYS.SESSION_CASES, {});
+          return map[sid] ?? null;
+        }}
         onAttach={(docs) => {
           attachCaseDocs(docs);
           setShowDocumentDialog(false);
         }}
       />
+
 
       {/* ── Share Dialog ──────────────────────────────────────────────── */}
       {showShareDialog && (

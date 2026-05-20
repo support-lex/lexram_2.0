@@ -12,6 +12,19 @@ const CATEGORY_ICONS = {
 interface EmptyStateProps {
   onPickQuickStart: (query: string) => void;
   onUpload: () => void;
+  /**
+   * Fired when the user clicks a chip with `action: "draft"`. The page is
+   * responsible for flipping queryMode to "draft" and prefilling the input
+   * so the Draft pill in ChatInput visibly activates.
+   */
+  onPickDraft: (query: string) => void;
+  /**
+   * Fired when the user clicks the Draft *card* itself (outside any chip).
+   * The page should flip queryMode to "draft" and auto-submit a seed
+   * message ("hi") so the chat session is created in draft mode without
+   * the user having to type anything first.
+   */
+  onStartDraft: () => void;
 }
 
 /**
@@ -20,7 +33,7 @@ interface EmptyStateProps {
  * input is hoisted up to page.tsx so it stays at a fixed position when
  * transitioning from "no messages" to "has messages".
  */
-export default function EmptyState({ onPickQuickStart, onUpload }: EmptyStateProps) {
+export default function EmptyState({ onPickQuickStart, onUpload, onPickDraft, onStartDraft }: EmptyStateProps) {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-[radial-gradient(ellipse_at_top,_var(--surface-glass),_transparent_60%)]">
       <div className="min-h-full flex flex-col items-center justify-center px-4 sm:px-6 gap-6 sm:gap-8 py-8">
@@ -39,10 +52,26 @@ export default function EmptyState({ onPickQuickStart, onUpload }: EmptyStatePro
           {UNIFIED_QUICK_STARTS.map((category) => {
             const Icon =
               CATEGORY_ICONS[category.icon as keyof typeof CATEGORY_ICONS] ?? Search;
+            const isClickable = category.id === "draft";
             return (
               <div
                 key={category.id}
-                className="rounded-xl ring-1 ring-[var(--border-default)] bg-[var(--bg-surface)] hover:ring-[var(--accent)]/40 hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)] transition-all duration-300 p-4"
+                role={isClickable ? "button" : undefined}
+                tabIndex={isClickable ? 0 : undefined}
+                onClick={isClickable ? () => onStartDraft() : undefined}
+                onKeyDown={
+                  isClickable
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onStartDraft();
+                        }
+                      }
+                    : undefined
+                }
+                className={`rounded-xl ring-1 ring-[var(--border-default)] bg-[var(--bg-surface)] hover:ring-[var(--accent)]/40 hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)] transition-all duration-300 p-4 ${
+                  isClickable ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40" : ""
+                }`}
               >
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-7 h-7 rounded-lg bg-[var(--surface-hover)] flex items-center justify-center">
@@ -61,9 +90,15 @@ export default function EmptyState({ onPickQuickStart, onUpload }: EmptyStatePro
                   {category.chips.map((chip) => (
                     <button
                       key={chip.label}
-                      onClick={() => {
+                      onClick={(e) => {
+                        // Stop the bubble so a chip click doesn't *also* fire
+                        // the Draft card's onClick (which would send "hi"
+                        // instead of prefilling the chosen template).
+                        e.stopPropagation();
                         if (chip.action === "upload") {
                           onUpload();
+                        } else if (chip.action === "draft" && chip.query) {
+                          onPickDraft(chip.query);
                         } else if (chip.query) {
                           onPickQuickStart(chip.query);
                         }

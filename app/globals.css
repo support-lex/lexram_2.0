@@ -45,6 +45,12 @@
   --color-gold: oklch(0.78 0.12 80);
   --color-gold-soft: oklch(0.68 0.09 78);
   --color-ivory: oklch(0.96 0.018 85);
+
+  /* ─── Insights landing v2 (cream / maroon / rust / ink) ─────────────── */
+  --color-rust: #b94826;
+  --color-cream: #fff0df;
+  --color-cream-card: #fffaf0;
+  --color-ink: oklch(0.18 0.02 25);
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -85,6 +91,99 @@
 [data-landing] ::selection {
   background: oklch(0.78 0.13 75 / 0.35);
   color: var(--ivory);
+}
+
+/* ─── Brand landing (cream background + maroon/rust text) ─────────── */
+[data-landing-light] {
+  font-family: var(--font-landing-sans, "Inter", system-ui, sans-serif);
+  color: #680318;
+  background-color: #fff0df;
+}
+[data-landing-light] h1,
+[data-landing-light] h2,
+[data-landing-light] h3,
+[data-landing-light] h4,
+[data-landing-light] .font-display {
+  font-family: var(--font-landing-display, "Playfair Display", Georgia, serif);
+  letter-spacing: -0.015em;
+}
+[data-landing-light] ::selection {
+  background: rgba(185, 72, 38, 0.30);
+  color: #680318;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Insights landing v2 — Playfair, parallax, fade-up, marquee
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+[data-landing-v2] {
+  font-family: var(--font-landing-sans, "Inter", system-ui, sans-serif);
+  color: oklch(0.18 0.02 25);
+  background-color: #fff0df;
+  scroll-behavior: smooth;
+}
+[data-landing-v2] h1,
+[data-landing-v2] h2,
+[data-landing-v2] h3,
+[data-landing-v2] h4,
+[data-landing-v2] .font-serif {
+  font-family: var(--font-landing-display, "Playfair Display", Georgia, serif);
+  letter-spacing: -0.02em;
+}
+[data-landing-v2] ::selection {
+  background: rgba(185, 72, 38, 0.35);
+  color: #fff0df;
+}
+
+[data-landing-v2] .text-balance { text-wrap: balance; }
+
+[data-landing-v2] .bg-gradient-warm {
+  background: linear-gradient(135deg, #680318, #b94826);
+}
+[data-landing-v2] .shadow-soft {
+  box-shadow: 0 10px 30px -10px rgba(104, 3, 24, 0.18);
+}
+[data-landing-v2] .shadow-elegant {
+  box-shadow: 0 30px 60px -30px rgba(104, 3, 24, 0.35);
+}
+
+[data-landing-v2] .parallax-bg {
+  background-attachment: fixed;
+  background-size: cover;
+  background-position: center;
+}
+@media (max-width: 768px) {
+  [data-landing-v2] .parallax-bg { background-attachment: scroll; }
+}
+
+[data-landing-v2] .fade-up {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.9s ease, transform 0.9s ease;
+}
+[data-landing-v2] .fade-up.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+[data-landing-v2] .marquee {
+  animation: marquee 40s linear infinite;
+}
+
+/* Decorative dotted-grain overlay used by parallax bands */
+[data-landing-v2] .grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(104, 3, 24, 0.08) 1px, transparent 1px);
+  background-size: 4px 4px;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+[data-landing-light] .anim-marquee {
+  animation: marquee 40s linear infinite;
+}
+[data-landing-light] .anim-blink {
+  animation: blink 1s step-end infinite;
 }
 
 /* Utility classes — scoped under [data-landing] to avoid leaking */

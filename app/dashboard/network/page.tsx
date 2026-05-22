@@ -32,6 +32,14 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   FileText,
+  Sparkles,
+  TrendingUp,
+  Eye,
+  EyeOff,
+  Flag,
+  BarChart3,
+  Calendar,
+  Check,
 } from "lucide-react";
 import { useCurrentUser, getDisplayName } from "@/hooks/use-current-user";
 import { supabase } from "@/lib/supabase/client";
@@ -65,9 +73,12 @@ import {
 import { useNetworkAvatar, notifyProfileUpdated } from "@/hooks/use-network-avatar";
 import {
   listIncomingInvitations,
+  listOutgoingInvitations,
+  listAcceptedConnections,
   sendInvitation,
   acceptInvitation as acceptInvitationApi,
   ignoreInvitation as ignoreInvitationApi,
+  removeConnection as removeConnectionApi,
   type ConnectionWithProfile,
 } from "@/lib/network/connections";
 import {
@@ -83,6 +94,7 @@ import {
   sendMessage as sendMessageApi,
   markThreadRead,
   subscribeToThread,
+  getOrCreateDirectThread,
 } from "@/lib/network/messaging";
 import {
   listNotifications,
@@ -176,8 +188,11 @@ function Avatar({
       <img
         src={avatarUrl}
         alt={name}
+        // object-position 50% 20% — biases the crop toward the upper-center,
+        // which is where faces sit in most portrait uploads. Without it,
+        // tall photos centre on the chest/torso and chop the head off.
         className={`object-cover shrink-0 ${square ? "rounded-md" : "rounded-full"}`}
-        style={{ width: size, height: size }}
+        style={{ width: size, height: size, objectPosition: "50% 20%" }}
       />
     );
   }
@@ -318,6 +333,8 @@ export default function NetworkPage() {
   const [pendingInvites, setPendingInvites] = React.useState<Set<string>>(new Set());
   const [dismissedSuggestions, setDismissedSuggestions] = React.useState<Set<string>>(new Set());
   const [liveInvitations, setLiveInvitations] = React.useState<ConnectionWithProfile[]>([]);
+  const [liveOutgoing, setLiveOutgoing] = React.useState<ConnectionWithProfile[]>([]);
+  const [liveConnections, setLiveConnections] = React.useState<ConnectionWithProfile[]>([]);
   const [networkLoading, setNetworkLoading] = React.useState(true);
 
   /* home feed (live) */
@@ -378,20 +395,32 @@ export default function NetworkPage() {
     };
   }, [userId]);
 
-  // Load incoming invitations for the My Network tab.
+  // Load all three connection lists in parallel for the My Network tab.
+  // We need outgoing pending so the "Connect" button shows "Pending" across
+  // page reloads, and accepted so the Connections section + Message button
+  // have something to render.
   React.useEffect(() => {
     if (!userId) {
       setLiveInvitations([]);
+      setLiveOutgoing([]);
+      setLiveConnections([]);
       setNetworkLoading(false);
       return;
     }
     let cancelled = false;
     setNetworkLoading(true);
-    listIncomingInvitations(userId)
-      .then((rows) => {
-        if (!cancelled) setLiveInvitations(rows);
+    Promise.all([
+      listIncomingInvitations(userId),
+      listOutgoingInvitations(userId),
+      listAcceptedConnections(userId),
+    ])
+      .then(([incoming, outgoing, accepted]) => {
+        if (cancelled) return;
+        setLiveInvitations(incoming);
+        setLiveOutgoing(outgoing);
+        setLiveConnections(accepted);
       })
-      .catch((e) => console.error("[network] listIncomingInvitations failed", e))
+      .catch((e) => console.error("[network] connection lists failed", e))
       .finally(() => {
         if (!cancelled) setNetworkLoading(false);
       });
@@ -589,29 +618,103 @@ export default function NetworkPage() {
       });
     }
   };
+  // The set of addressee IDs the current user has already invited. Sourced
+  // from the live outgoing list so the "Pending" badge persists across page
+  // reloads. We also OR in `pendingInvites` so an in-flight send shows
+  // instantly without waiting for a refetch.
+  const sentInvitationIds = React.useMemo(
+    () =>
+      new Set<string>([
+        ...liveOutgoing.map((o) => o.other?.id).filter((id): id is string => Boolean(id)),
+        ...pendingInvites,
+      ]),
+    [liveOutgoing, pendingInvites],
+  );
+
   const toggleInvite = async (id: string) => {
     if (!userId) return;
-    // Toggle is one-shot for now: clicking "Connect" sends an invitation; the
-    // UI flips to "Invited" and stays there for the session. We don't support
-    // un-sending a pending invitation yet.
-    if (pendingInvites.has(id)) return;
+    // One-shot Connect: once invited, the UI stays on "Pending" until the
+    // recipient accepts or ignores. We don't support un-sending yet.
+    if (sentInvitationIds.has(id)) return;
     setPendingInvites((s) => new Set(s).add(id));
     try {
-      await sendInvitation(userId, id);
+      const created = await sendInvitation(userId, id);
+      // Append to outgoing so it shows up in the My Network "Sent" section
+      // immediately (and survives a refresh because the row is in the DB).
+      const profile = liveSuggestions.find((p) => p.id === id);
+      const newOutgoing: ConnectionWithProfile = {
+        ...created,
+        other: profile
+          ? {
+              id: profile.id,
+              display_name: profile.display_name,
+              headline: profile.headline,
+              avatar_url: profile.avatar_url,
+            }
+          : null,
+      };
+      setLiveOutgoing((arr) => [newOutgoing, ...arr]);
     } catch (e) {
-      console.error("[network] sendInvitation failed", e);
+      const err = e as { code?: string; message?: string; details?: string; hint?: string };
+      // Surface the actual PostgREST error verbatim so RLS / FK / etc. is
+      // diagnosable from devtools without expanding the error object.
+      console.error(
+        "[network] sendInvitation failed:",
+        `code=${err?.code ?? "?"}`,
+        `message=${err?.message ?? "?"}`,
+        `details=${err?.details ?? "?"}`,
+        `hint=${err?.hint ?? "?"}`,
+      );
+      // 23505 = unique-violation. Happens when there's already a row between
+      // these two users (a stale tab, a race, or an old invitation that was
+      // ignored). Refetch the outgoing list so the UI reflects reality and
+      // leave the "Pending" badge in place.
+      if (err?.code === "23505") {
+        listOutgoingInvitations(userId)
+          .then((rows) => setLiveOutgoing(rows))
+          .catch(() => {});
+        return;
+      }
+      // Anything else — roll back the optimistic "Pending" and tell the user.
       setPendingInvites((s) => {
         const n = new Set(s);
         n.delete(id);
         return n;
       });
+      // 42501 = insufficient_privilege (RLS rejection). 401 / PGRST301 = auth.
+      if (err?.code === "42501" || err?.message?.toLowerCase().includes("row-level")) {
+        alert(
+          "Couldn't send the invitation — the database rejected the request " +
+            "(likely missing RLS policy). Re-apply 20260520_resync_network_rls.sql " +
+            "in the Supabase SQL Editor.",
+        );
+      } else if (err?.code === "PGRST301" || err?.message?.includes("permission")) {
+        alert(
+          "Couldn't send the invitation — your session may have expired. " +
+            "Try signing out and back in.",
+        );
+      } else {
+        alert(
+          `Couldn't send the invitation. ${err?.message ?? "Please try again."}`,
+        );
+      }
     }
   };
   const dismissSuggestion = (id: string) => setDismissedSuggestions((s) => new Set(s).add(id));
   const acceptInvitation = async (connectionId: string) => {
+    const invitation = liveInvitations.find((i) => i.id === connectionId);
     try {
       await acceptInvitationApi(connectionId);
       setLiveInvitations((arr) => arr.filter((i) => i.id !== connectionId));
+      if (invitation) {
+        setLiveConnections((arr) => [{ ...invitation, status: "accepted" }, ...arr]);
+        // Pre-create the direct thread so the Message button on the new
+        // connection lights up instantly — no extra round-trip needed when
+        // the user clicks Message.
+        if (userId && invitation.other) {
+          getOrCreateDirectThread(userId, invitation.other.id).catch(() => {});
+        }
+      }
     } catch (e) {
       console.error("[network] acceptInvitation failed", e);
     }
@@ -622,6 +725,28 @@ export default function NetworkPage() {
       setLiveInvitations((arr) => arr.filter((i) => i.id !== connectionId));
     } catch (e) {
       console.error("[network] ignoreInvitation failed", e);
+    }
+  };
+  const removeConnection = async (connectionId: string) => {
+    if (!confirm("Remove this connection?")) return;
+    try {
+      await removeConnectionApi(connectionId);
+      setLiveConnections((arr) => arr.filter((c) => c.id !== connectionId));
+    } catch (e) {
+      console.error("[network] removeConnection failed", e);
+    }
+  };
+  const messageUser = async (otherUserId: string) => {
+    if (!userId) return;
+    try {
+      const threadId = await getOrCreateDirectThread(userId, otherUserId);
+      // Refresh threads so the new conversation appears in the Messaging tab.
+      const fresh = await listThreads(userId);
+      setThreads(fresh);
+      setActiveThreadId(threadId);
+      setActiveTab("messaging");
+    } catch (e) {
+      console.error("[network] messageUser failed", e);
     }
   };
 
@@ -774,6 +899,13 @@ export default function NetworkPage() {
     } catch (e) {
       console.error("[network] deletePost failed", e);
     }
+  };
+
+  // Session-only hide. We just drop the post from local feed state; no
+  // backend table for "hidden posts" exists yet. The post will reappear on
+  // next refresh — that's a known limitation, not a bug.
+  const hidePost = (id: string) => {
+    setFeed((arr) => arr.filter((p) => p.id !== id));
   };
 
   const updatePostBody = async (id: string, body: string) => {
@@ -1011,8 +1143,10 @@ export default function NetworkPage() {
       <div className="max-w-6xl mx-auto px-6 py-6">
         {activeTab === "home" ? (
           <HomeView
+            userId={userId}
             userName={userName}
             userAvatarUrl={myAvatarUrl}
+            onOpenProfile={() => setActiveTab("profile")}
             feed={feed}
             feedLoading={feedLoading}
             likedPosts={likedPosts}
@@ -1026,6 +1160,7 @@ export default function NetworkPage() {
             addComment={addComment}
             deleteComment={deleteComment}
             deletePost={deletePost}
+            hidePost={hidePost}
             updatePostBody={updatePostBody}
             composerOpen={composerOpen}
             setComposerOpen={setComposerOpen}
@@ -1055,7 +1190,7 @@ export default function NetworkPage() {
                   : (p.location || ""),
                 mutual: 0,
               }))}
-            pendingInvites={pendingInvites}
+            pendingInvites={sentInvitationIds}
             toggleInvite={toggleInvite}
             dismissSuggestion={dismissSuggestion}
           />
@@ -1063,12 +1198,16 @@ export default function NetworkPage() {
           <NetworkView
             loading={networkLoading}
             invitations={liveInvitations}
+            outgoing={liveOutgoing}
+            connections={liveConnections}
             suggestions={liveSuggestions.filter((s) => !dismissedSuggestions.has(s.id))}
-            pendingInvites={pendingInvites}
+            sentInvitationIds={sentInvitationIds}
             toggleInvite={toggleInvite}
             dismissSuggestion={dismissSuggestion}
             acceptInvitation={acceptInvitation}
             ignoreInvitation={ignoreInvitation}
+            removeConnection={removeConnection}
+            messageUser={messageUser}
           />
         ) : activeTab === "jobs" ? (
           <JobsView
@@ -1131,8 +1270,10 @@ export default function NetworkPage() {
 type ComposerMedia = { file: File; previewUrl: string; kind: "image" | "video" };
 
 function HomeView(props: {
+  userId: string | null;
   userName: string;
   userAvatarUrl: string | null;
+  onOpenProfile: () => void;
   feed: FeedPost[];
   feedLoading: boolean;
   likedPosts: Set<string>;
@@ -1146,6 +1287,7 @@ function HomeView(props: {
   addComment: (postId: string, body: string) => void;
   deleteComment: (postId: string, commentId: string) => void;
   deletePost: (id: string) => void;
+  hidePost: (id: string) => void;
   updatePostBody: (id: string, body: string) => void;
   composerOpen: boolean;
   setComposerOpen: (b: boolean) => void;
@@ -1169,8 +1311,20 @@ function HomeView(props: {
   dismissSuggestion: (id: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-      <div className="space-y-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_300px] gap-6">
+      {/* LEFT — profile rail */}
+      <aside className="space-y-4 lg:sticky lg:top-4 self-start order-1 lg:order-none">
+        <ProfileMiniCard
+          userId={props.userId}
+          userName={props.userName}
+          userAvatarUrl={props.userAvatarUrl}
+          onOpenProfile={props.onOpenProfile}
+        />
+        <ProfileShortcuts />
+      </aside>
+
+      {/* CENTER — composer + feed */}
+      <div className="space-y-3 order-2 lg:order-none">
         {/* COMPOSER */}
         <Composer
           userName={props.userName}
@@ -1193,22 +1347,31 @@ function HomeView(props: {
           publish={props.publishPost}
         />
 
+        {/* Sort header — LinkedIn-style separator above the feed */}
+        {!props.feedLoading && props.feed.length > 0 && (
+          <div className="flex items-center gap-2 px-1">
+            <div className="flex-1 h-px" style={{ background: "#ecdfd6" }} />
+            <span className="text-[11px] text-neutral-500">
+              Sort by: <span className="font-semibold text-neutral-700">Recent</span>
+            </span>
+          </div>
+        )}
+
         {/* FEED */}
         {props.feedLoading ? (
-          <div className="bg-white border rounded-lg p-8 text-center text-sm text-neutral-500" style={{ borderColor: "#ecdfd6" }}>
+          <div className="bg-white border rounded-xl p-8 text-center text-sm text-neutral-500 shadow-sm" style={{ borderColor: "#ecdfd6" }}>
             <Loader2 className="size-4 mx-auto mb-2 animate-spin" style={{ color: MAROON }} />
             Loading feed…
           </div>
         ) : props.feed.length === 0 ? (
-          <div className="bg-white border rounded-lg p-8 text-center text-sm text-neutral-500" style={{ borderColor: "#ecdfd6" }}>
-            No posts yet — be the first to share something.
-          </div>
+          <EmptyFeedState onCompose={() => props.setComposerOpen(true)} />
         ) : (
           props.feed.map((p) => (
             <FeedPostCard
               key={p.id}
               post={p}
               userName={props.userName}
+              userAvatarUrl={props.userAvatarUrl}
               liked={props.likedPosts.has(p.id)}
               reposted={props.repostedPosts.has(p.id)}
               commentsOpen={props.openComments.has(p.id)}
@@ -1221,6 +1384,7 @@ function HomeView(props: {
               onAddComment={(body) => props.addComment(p.id, body)}
               onDeleteComment={(cid) => props.deleteComment(p.id, cid)}
               onDelete={() => props.deletePost(p.id)}
+              onHide={() => props.hidePost(p.id)}
               onSaveEdit={(body) => {
                 props.updatePostBody(p.id, body);
                 props.setEditingPostId(null);
@@ -1230,41 +1394,305 @@ function HomeView(props: {
         )}
       </div>
 
-      <aside className="space-y-4">
-        <div className="bg-white border rounded-lg p-4" style={{ borderColor: "#ecdfd6" }}>
-          <h3 className="text-sm font-semibold mb-3">People you may know</h3>
-          <div className="space-y-3">
-            {props.suggestions.map((s) => {
-              const invited = props.pendingInvites.has(s.id);
-              return (
-                <div key={s.id} className="flex gap-3 items-start">
-                  <Avatar name={s.name} size={36} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{s.name}</div>
-                    <div className="text-xs text-neutral-500 truncate">{s.title} · {s.firm}</div>
-                    <div className="text-[11px] text-neutral-400">{s.mutual} mutual</div>
-                    <div className="mt-1 flex gap-1">
-                      <button
-                        onClick={() => props.toggleInvite(s.id)}
-                        className="text-xs px-2.5 py-1 rounded-full border inline-flex items-center gap-1"
-                        style={{ borderColor: "#e8d8cd", color: MAROON }}
-                      >
-                        <UserPlus className="size-3" /> {invited ? "Invited" : "Connect"}
-                      </button>
-                      <button
-                        onClick={() => props.dismissSuggestion(s.id)}
-                        className="text-xs px-2 py-1 rounded-full hover:bg-neutral-100 text-neutral-400"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+      {/* RIGHT — suggestions + trending */}
+      <aside className="space-y-4 lg:sticky lg:top-4 self-start order-3 lg:order-none">
+        <PeopleYouMayKnow
+          suggestions={props.suggestions}
+          pendingInvites={props.pendingInvites}
+          toggleInvite={props.toggleInvite}
+          dismissSuggestion={props.dismissSuggestion}
+        />
+        <LexramPulse />
+      </aside>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   HOME — sidebar sub-components and empty state
+   ───────────────────────────────────────────────────────────────────────── */
+
+function EmptyFeedState({ onCompose }: { onCompose: () => void }) {
+  return (
+    <div
+      className="bg-white border rounded-xl p-10 text-center shadow-sm"
+      style={{ borderColor: "#ecdfd6" }}
+    >
+      <div
+        className="size-12 mx-auto rounded-full grid place-items-center mb-3"
+        style={{ background: "#fdf2f3" }}
+      >
+        <Sparkles className="size-5" style={{ color: MAROON }} />
+      </div>
+      <h3 className="text-base font-semibold" style={{ color: MAROON_DEEP }}>
+        Welcome to your feed
+      </h3>
+      <p className="text-sm text-neutral-500 mt-1.5 max-w-md mx-auto">
+        Be the first to share a thought, a case win, or a hiring update with peers.
+      </p>
+      <button
+        onClick={onCompose}
+        className="mt-4 text-xs font-medium text-white px-4 py-2 rounded-full inline-flex items-center gap-1.5 hover:opacity-95 transition-opacity"
+        style={{ background: MAROON_GRAD }}
+      >
+        <Plus className="size-3.5" /> Share something
+      </button>
+    </div>
+  );
+}
+
+function ProfileMiniCard({
+  userId,
+  userName,
+  userAvatarUrl,
+  onOpenProfile,
+}: {
+  userId: string | null;
+  userName: string;
+  userAvatarUrl: string | null;
+  onOpenProfile: () => void;
+}) {
+  const [profile, setProfile] = React.useState<NetworkProfile | null>(null);
+  React.useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    getProfile(userId)
+      .then((p) => {
+        if (!cancelled) setProfile(p);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  return (
+    <div
+      className="bg-white border rounded-xl overflow-hidden shadow-sm"
+      style={{ borderColor: "#ecdfd6" }}
+    >
+      {/* Banner + absolutely-positioned avatar — wrapped in one relative
+          container so the avatar can hang over the banner edge without
+          fighting overflow:hidden on the outer card. */}
+      <div className="relative">
+        <div className="h-20" style={{ background: MAROON_GRAD }}>
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(circle at 30% 50%, rgba(255,255,255,0.35), transparent 65%)",
+            }}
+          />
+        </div>
+        <div className="absolute left-1/2 -translate-x-1/2 -bottom-9">
+          <div className="rounded-full ring-[3px] ring-white shadow-sm bg-white">
+            <Avatar name={userName} avatarUrl={userAvatarUrl} size={72} />
           </div>
         </div>
-      </aside>
+      </div>
+
+      {/* Identity block — extra top padding to clear the overhanging avatar */}
+      <button
+        onClick={onOpenProfile}
+        className="block w-full px-4 pt-12 pb-3 text-center"
+      >
+        <h3 className="text-[15px] font-semibold text-neutral-800 truncate hover:underline">
+          {userName}
+        </h3>
+        <p className="text-xs text-neutral-600 mt-1 line-clamp-2">
+          {profile?.headline || "Lexram member"}
+        </p>
+        {profile?.location && (
+          <p className="text-[11px] text-neutral-400 mt-1 truncate">
+            {profile.location}
+          </p>
+        )}
+      </button>
+
+      {/* Stats row — LinkedIn "Profile viewers / Post impressions" */}
+      <div className="border-t" style={{ borderColor: "#f0e3d8" }}>
+        <button
+          onClick={onOpenProfile}
+          className="w-full px-4 py-2 flex items-center justify-between text-left hover:bg-neutral-50 transition-colors"
+        >
+          <span className="text-xs text-neutral-600">Profile viewers</span>
+          <span
+            className="text-xs font-semibold"
+            style={{ color: MAROON_DEEP }}
+          >
+            {profile?.profile_views ?? 0}
+          </span>
+        </button>
+        <div className="h-px" style={{ background: "#f0e3d8" }} />
+        <button
+          onClick={onOpenProfile}
+          className="w-full px-4 py-2 flex items-center justify-between text-left hover:bg-neutral-50 transition-colors"
+        >
+          <span className="text-xs text-neutral-600">Skills</span>
+          <span
+            className="text-xs font-semibold"
+            style={{ color: MAROON_DEEP }}
+          >
+            {profile?.skills?.length ?? 0}
+          </span>
+        </button>
+      </div>
+
+      {/* Promo strip — LinkedIn-style upsell, but for the Network feature itself */}
+      <button
+        onClick={onOpenProfile}
+        className="w-full px-4 py-2.5 border-t flex items-center gap-2 hover:bg-neutral-50 transition-colors text-left"
+        style={{ borderColor: "#f0e3d8" }}
+      >
+        <Sparkles className="size-3.5 shrink-0" style={{ color: MAROON }} />
+        <span className="text-[11px] font-semibold text-neutral-700">
+          Complete your profile
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function ProfileShortcuts() {
+  const items = [
+    { icon: <Bookmark className="size-4" />, label: "Saved posts" },
+    { icon: <Users className="size-4" />, label: "Connections" },
+    { icon: <BarChart3 className="size-4" />, label: "My posts & activity" },
+    { icon: <Calendar className="size-4" />, label: "Events" },
+  ];
+  return (
+    <div
+      className="bg-white border rounded-xl overflow-hidden shadow-sm"
+      style={{ borderColor: "#ecdfd6" }}
+    >
+      {items.map((it, i) => (
+        <button
+          key={it.label}
+          className={`w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-neutral-50 transition-colors ${
+            i > 0 ? "border-t" : ""
+          }`}
+          style={i > 0 ? { borderColor: "#f0e3d8" } : undefined}
+        >
+          <span style={{ color: MAROON }}>{it.icon}</span>
+          <span className="text-[13px] font-medium text-neutral-700">
+            {it.label}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PeopleYouMayKnow(props: {
+  suggestions: Suggestion[];
+  pendingInvites: Set<string>;
+  toggleInvite: (id: string) => void;
+  dismissSuggestion: (id: string) => void;
+}) {
+  return (
+    <div
+      className="bg-white border rounded-xl p-4 shadow-sm"
+      style={{ borderColor: "#ecdfd6" }}
+    >
+      <h3 className="text-sm font-semibold mb-3 inline-flex items-center gap-1.5">
+        <Users className="size-3.5" style={{ color: MAROON }} /> People you may
+        know
+      </h3>
+      {props.suggestions.length === 0 ? (
+        <div className="text-xs text-neutral-400">
+          No suggestions right now. Check back soon.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {props.suggestions.map((s) => {
+            const invited = props.pendingInvites.has(s.id);
+            return (
+              <div key={s.id} className="flex gap-3 items-start">
+                <Avatar name={s.name} size={36} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{s.name}</div>
+                  <div className="text-xs text-neutral-500 truncate">
+                    {s.title}
+                    {s.firm ? ` · ${s.firm}` : ""}
+                  </div>
+                  {s.mutual > 0 && (
+                    <div className="text-[11px] text-neutral-400">
+                      {s.mutual} mutual
+                    </div>
+                  )}
+                  <div className="mt-1 flex gap-1">
+                    <button
+                      onClick={() => props.toggleInvite(s.id)}
+                      disabled={invited}
+                      className="text-xs px-2.5 py-1 rounded-full border inline-flex items-center gap-1 hover:bg-neutral-50 disabled:opacity-60"
+                      style={{ borderColor: "#e8d8cd", color: MAROON }}
+                    >
+                      <UserPlus className="size-3" />{" "}
+                      {invited ? "Invited" : "Connect"}
+                    </button>
+                    <button
+                      onClick={() => props.dismissSuggestion(s.id)}
+                      className="text-xs px-2 py-1 rounded-full hover:bg-neutral-100 text-neutral-400"
+                      aria-label="Dismiss"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Static seed for now — replace with a popular-hashtag query once posts grow. */
+const PULSE_TOPICS: Array<{ tag: string; count: string }> = [
+  { tag: "#DPDPAct", count: "3,420 discussions" },
+  { tag: "#ConstitutionalLaw", count: "2,180 discussions" },
+  { tag: "#Arbitration", count: "1,890 discussions" },
+  { tag: "#IPLitigation", count: "1,540 discussions" },
+  { tag: "#TaxLaw", count: "1,210 discussions" },
+];
+
+function LexramPulse() {
+  return (
+    <div
+      className="bg-white border rounded-xl p-4 shadow-sm"
+      style={{ borderColor: "#ecdfd6" }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold inline-flex items-center gap-1.5">
+          <TrendingUp className="size-3.5" style={{ color: MAROON }} /> Lexram
+          Pulse
+        </h3>
+        <span className="text-[10px] text-neutral-400 uppercase tracking-wide">
+          Trending
+        </span>
+      </div>
+      <ul className="space-y-1">
+        {PULSE_TOPICS.map((t, i) => (
+          <li
+            key={t.tag}
+            className="flex items-start gap-2 group cursor-pointer hover:bg-neutral-50 rounded-md -mx-2 px-2 py-1.5 transition-colors"
+          >
+            <span className="text-xs font-semibold text-neutral-400 mt-0.5 w-3">
+              {i + 1}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div
+                className="text-sm font-medium truncate"
+                style={{ color: MAROON_DEEP }}
+              >
+                {t.tag}
+              </div>
+              <div className="text-[11px] text-neutral-500">{t.count}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -1302,7 +1730,10 @@ function Composer(props: {
     !!props.media;
 
   return (
-    <div className="bg-white border rounded-lg p-4" style={{ borderColor: "#ecdfd6" }}>
+    <div
+      className="bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+      style={{ borderColor: "#ecdfd6" }}
+    >
       {/* Collapsed row: avatar + pill input */}
       <div className="flex gap-3 items-center">
         <Avatar name={props.userName} avatarUrl={props.userAvatarUrl} />
@@ -1381,16 +1812,36 @@ function Composer(props: {
       />
 
       {props.open && (
-        <div className="mt-3 space-y-2 border-t pt-3" style={{ borderColor: "#f0e3d8" }}>
+        <div
+          className="mt-3 space-y-3 border-t pt-3"
+          style={{ borderColor: "#f0e3d8" }}
+        >
           {props.mode === "article" && (
-            <input
-              autoFocus
-              value={props.title}
-              onChange={(e) => props.setTitle(e.target.value)}
-              placeholder="Article title…"
-              className="w-full border rounded-md px-3 py-2 text-sm font-semibold outline-none"
-              style={{ borderColor: "#e8d8cd", color: MAROON_DEEP }}
-            />
+            <>
+              {/* Article-mode header — visually distinct so the user knows
+                  they're in long-form mode */}
+              <div
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border"
+                style={{
+                  borderColor: "#f0e3d8",
+                  background: "#fdf6f0",
+                  color: MAROON_DEEP,
+                }}
+              >
+                <FileText className="size-3" /> Writing an article
+              </div>
+              <input
+                autoFocus
+                value={props.title}
+                onChange={(e) => props.setTitle(e.target.value)}
+                placeholder="Article title"
+                className="w-full border-b-2 px-0 py-2 text-lg font-semibold outline-none bg-transparent"
+                style={{
+                  borderColor: "#e8d8cd",
+                  color: MAROON_DEEP,
+                }}
+              />
+            </>
           )}
           <textarea
             autoFocus={props.mode !== "article"}
@@ -1398,37 +1849,63 @@ function Composer(props: {
             onChange={(e) => props.setText(e.target.value)}
             placeholder={
               props.mode === "article"
-                ? "Write your article…"
+                ? "Write your article — share insights, case analysis, or thoughts on a recent ruling…"
                 : "What's on your mind?"
             }
-            rows={props.mode === "article" ? 8 : 4}
-            className="w-full border rounded-md px-3 py-2 text-sm outline-none"
-            style={{ borderColor: "#e8d8cd" }}
+            rows={props.mode === "article" ? 10 : 4}
+            className="w-full border rounded-md px-3 py-2 text-sm outline-none resize-y leading-relaxed"
+            style={{
+              borderColor: "#e8d8cd",
+              minHeight: props.mode === "article" ? "16rem" : undefined,
+            }}
           />
 
-          {/* Media preview */}
+          {/* Media preview — LinkedIn-style: framed card with overlay actions */}
           {props.media && (
-            <div className="relative">
+            <div
+              className="relative rounded-lg overflow-hidden border bg-neutral-50"
+              style={{ borderColor: "#e8d8cd" }}
+            >
               {props.media.kind === "image" ? (
                 <img
                   src={props.media.previewUrl}
                   alt="attachment"
-                  className="rounded-md max-h-64 w-auto"
+                  className="block w-full max-h-[420px] object-contain"
                 />
               ) : (
                 <video
                   src={props.media.previewUrl}
                   controls
-                  className="rounded-md max-h-64 w-auto"
+                  className="block w-full max-h-[420px]"
                 />
               )}
-              <button
-                onClick={props.clearMedia}
-                className="absolute top-2 right-2 size-6 grid place-items-center rounded-full bg-black/60 text-white hover:bg-black/80"
-                aria-label="Remove media"
+              {/* Top-right action cluster — Remove */}
+              <div className="absolute top-2 right-2 flex gap-1.5">
+                <button
+                  onClick={props.clearMedia}
+                  className="size-8 grid place-items-center rounded-full bg-black/70 text-white hover:bg-black/85 backdrop-blur-sm transition-colors"
+                  aria-label="Remove media"
+                  title="Remove"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+              {/* Bottom-left badge — file kind + name */}
+              <div
+                className="absolute bottom-2 left-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium bg-black/70 text-white backdrop-blur-sm"
               >
-                <X className="size-3" />
-              </button>
+                {props.media.kind === "image" ? (
+                  <ImageIcon className="size-3" />
+                ) : (
+                  <VideoIcon className="size-3" />
+                )}
+                <span className="max-w-[160px] truncate">
+                  {props.media.file.name}
+                </span>
+                <span className="text-white/70">
+                  · {(props.media.file.size / (1024 * 1024)).toFixed(1)} MB
+                </span>
+              </div>
             </div>
           )}
 
@@ -1472,6 +1949,7 @@ function Composer(props: {
 function FeedPostCard(props: {
   post: FeedPost;
   userName: string;
+  userAvatarUrl: string | null;
   liked: boolean;
   reposted: boolean;
   commentsOpen: boolean;
@@ -1484,12 +1962,14 @@ function FeedPostCard(props: {
   onAddComment: (body: string) => void;
   onDeleteComment: (commentId: string) => void;
   onDelete: () => void;
+  onHide: () => void;
   onSaveEdit: (body: string) => void;
 }) {
   const { post: p } = props;
   const [editText, setEditText] = React.useState(p.body);
   const [draft, setDraft] = React.useState("");
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [copiedLink, setCopiedLink] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -1511,7 +1991,10 @@ function FeedPostCard(props: {
   }
 
   return (
-    <article className="bg-white border rounded-lg p-4" style={{ borderColor: "#ecdfd6" }}>
+    <article
+      className="bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+      style={{ borderColor: "#ecdfd6" }}
+    >
       <div className="flex gap-3">
         <Avatar name={p.author} avatarUrl={p.avatarUrl} />
         <div className="flex-1 min-w-0">
@@ -1534,40 +2017,105 @@ function FeedPostCard(props: {
                 {p.visibility === "connections" && <span>· 🤝 Connections</span>}
               </div>
             </div>
-            {p.isMine && (
-              <div ref={menuRef} className="relative">
-                <button
-                  onClick={() => setMenuOpen((o) => !o)}
-                  className="p-1 rounded-md hover:bg-neutral-100 text-neutral-500"
-                  aria-label="Post options"
+            <div ref={menuRef} className="relative">
+              <button
+                onClick={() => setMenuOpen((o) => !o)}
+                className="p-1 rounded-md hover:bg-neutral-100 text-neutral-500"
+                aria-label="Post options"
+              >
+                <span className="text-lg leading-none">⋯</span>
+              </button>
+              {menuOpen && (
+                <div
+                  className="absolute right-0 top-7 z-10 bg-white border rounded-md shadow-lg min-w-[200px] py-1"
+                  style={{ borderColor: "#ecdfd6" }}
                 >
-                  <span className="text-lg leading-none">⋯</span>
-                </button>
-                {menuOpen && (
-                  <div className="absolute right-0 top-7 z-10 bg-white border rounded-md shadow-lg min-w-[140px]" style={{ borderColor: "#ecdfd6" }}>
-                    <button
-                      onClick={() => {
-                        setMenuOpen(false);
-                        props.startEdit();
-                      }}
-                      className="w-full text-left text-xs px-3 py-2 hover:bg-neutral-50 inline-flex items-center gap-2"
-                    >
-                      <Pencil className="size-3" /> Edit post
-                    </button>
-                    <button
-                      onClick={() => {
-                        setMenuOpen(false);
-                        props.onDelete();
-                      }}
-                      className="w-full text-left text-xs px-3 py-2 hover:bg-neutral-50 inline-flex items-center gap-2 text-red-600"
-                    >
-                      <Trash2 className="size-3" /> Delete post
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+                  {/* Copy link — available on every post */}
+                  <button
+                    onClick={async () => {
+                      setMenuOpen(false);
+                      const url =
+                        typeof window !== "undefined"
+                          ? `${window.location.origin}/dashboard/network?post=${p.id}`
+                          : "";
+                      try {
+                        await navigator.clipboard.writeText(url);
+                        setCopiedLink(true);
+                        setTimeout(() => setCopiedLink(false), 1800);
+                      } catch {
+                        // Clipboard can fail in non-secure contexts; fall back
+                        // to a prompt so the user can copy manually.
+                        prompt("Copy this link:", url);
+                      }
+                    }}
+                    className="w-full text-left text-xs px-3 py-2 hover:bg-neutral-50 inline-flex items-center gap-2"
+                  >
+                    <Link2 className="size-3.5" /> Copy link to post
+                  </button>
+                  {p.isMine ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          props.startEdit();
+                        }}
+                        className="w-full text-left text-xs px-3 py-2 hover:bg-neutral-50 inline-flex items-center gap-2"
+                      >
+                        <Pencil className="size-3.5" /> Edit post
+                      </button>
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          props.onDelete();
+                        }}
+                        className="w-full text-left text-xs px-3 py-2 hover:bg-neutral-50 inline-flex items-center gap-2 text-red-600"
+                      >
+                        <Trash2 className="size-3.5" /> Delete post
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          props.onHide();
+                        }}
+                        className="w-full text-left text-xs px-3 py-2 hover:bg-neutral-50 inline-flex items-center gap-2"
+                      >
+                        <EyeOff className="size-3.5" /> Hide this post
+                      </button>
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          props.onHide();
+                        }}
+                        className="w-full text-left text-xs px-3 py-2 hover:bg-neutral-50 inline-flex items-center gap-2"
+                      >
+                        <X className="size-3.5" /> Not interested
+                      </button>
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          alert("Thanks — we'll review this post.");
+                        }}
+                        className="w-full text-left text-xs px-3 py-2 hover:bg-neutral-50 inline-flex items-center gap-2 text-red-600"
+                      >
+                        <Flag className="size-3.5" /> Report post
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+          {copiedLink && (
+            <div
+              className="mt-1 text-[11px] inline-flex items-center gap-1"
+              style={{ color: MAROON }}
+            >
+              <Check className="size-3" /> Link copied
+            </div>
+          )}
 
           {props.isEditing ? (
             <div className="mt-2 space-y-2">
@@ -1711,7 +2259,7 @@ function FeedPostCard(props: {
                 ))
               )}
               <div className="flex gap-2 items-center pt-1">
-                <Avatar name={props.userName} size={28} />
+                <Avatar name={props.userName} avatarUrl={props.userAvatarUrl} size={28} />
                 <input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
@@ -1749,16 +2297,20 @@ function FeedPostCard(props: {
 function NetworkView(props: {
   loading: boolean;
   invitations: ConnectionWithProfile[];
+  outgoing: ConnectionWithProfile[];
+  connections: ConnectionWithProfile[];
   suggestions: NetworkProfile[];
-  pendingInvites: Set<string>;
+  sentInvitationIds: Set<string>;
   toggleInvite: (id: string) => void;
   dismissSuggestion: (id: string) => void;
   acceptInvitation: (connectionId: string) => void;
   ignoreInvitation: (connectionId: string) => void;
+  removeConnection: (connectionId: string) => void;
+  messageUser: (otherUserId: string) => void;
 }) {
   if (props.loading) {
     return (
-      <div className="bg-white border rounded-lg p-8 text-center text-sm text-neutral-500" style={{ borderColor: "#ecdfd6" }}>
+      <div className="bg-white border rounded-xl p-8 text-center text-sm text-neutral-500 shadow-sm" style={{ borderColor: "#ecdfd6" }}>
         <Loader2 className="size-4 mx-auto mb-2 animate-spin" style={{ color: MAROON }} />
         Loading your network…
       </div>
@@ -1766,8 +2318,13 @@ function NetworkView(props: {
   }
   return (
     <div className="space-y-6">
-      <div className="bg-white border rounded-lg p-4" style={{ borderColor: "#ecdfd6" }}>
-        <h2 className="text-sm font-semibold mb-3">Invitations ({props.invitations.length})</h2>
+      {/* Section 1: Incoming invitations */}
+      <section className="bg-white border rounded-xl p-4 shadow-sm" style={{ borderColor: "#ecdfd6" }}>
+        <h2 className="text-sm font-semibold mb-3 inline-flex items-center gap-1.5">
+          <UserPlus className="size-3.5" style={{ color: MAROON }} />
+          Invitations
+          <span className="text-[11px] text-neutral-400 font-normal">({props.invitations.length})</span>
+        </h2>
         {props.invitations.length === 0 ? (
           <div className="text-sm text-neutral-500">No pending invitations.</div>
         ) : (
@@ -1782,12 +2339,15 @@ function NetworkView(props: {
                     <div className="text-sm font-medium truncate">{name}</div>
                     <div className="text-xs text-neutral-500 truncate">{headline}</div>
                   </div>
-                  <button onClick={() => props.ignoreInvitation(i.id)} className="text-xs px-3 py-1.5 rounded-full hover:bg-neutral-100">
+                  <button
+                    onClick={() => props.ignoreInvitation(i.id)}
+                    className="text-xs px-3 py-1.5 rounded-full hover:bg-neutral-100"
+                  >
                     Ignore
                   </button>
                   <button
                     onClick={() => props.acceptInvitation(i.id)}
-                    className="text-xs px-3 py-1.5 rounded-full text-white"
+                    className="text-xs px-3 py-1.5 rounded-full text-white font-medium"
                     style={{ background: MAROON_GRAD }}
                   >
                     Accept
@@ -1797,33 +2357,159 @@ function NetworkView(props: {
             })}
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="bg-white border rounded-lg p-4" style={{ borderColor: "#ecdfd6" }}>
-        <h2 className="text-sm font-semibold mb-3">People you may know</h2>
+      {/* Section 2: Sent (outgoing pending) */}
+      {props.outgoing.length > 0 && (
+        <section className="bg-white border rounded-xl p-4 shadow-sm" style={{ borderColor: "#ecdfd6" }}>
+          <h2 className="text-sm font-semibold mb-3 inline-flex items-center gap-1.5">
+            <Send className="size-3.5" style={{ color: MAROON }} />
+            Sent
+            <span className="text-[11px] text-neutral-400 font-normal">
+              ({props.outgoing.length} awaiting response)
+            </span>
+          </h2>
+          <div className="space-y-3">
+            {props.outgoing.map((o) => {
+              const name = o.other?.display_name || "Lexram member";
+              const headline = o.other?.headline || "";
+              return (
+                <div key={o.id} className="flex items-center gap-3">
+                  <Avatar name={name} avatarUrl={o.other?.avatar_url} size={36} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{name}</div>
+                    <div className="text-xs text-neutral-500 truncate">{headline}</div>
+                  </div>
+                  <span
+                    className="text-[11px] px-2.5 py-1 rounded-full border inline-flex items-center gap-1"
+                    style={{
+                      borderColor: "#e8d8cd",
+                      color: MAROON,
+                      background: "#fdf6f0",
+                    }}
+                  >
+                    <Loader2 className="size-3" /> Pending
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Section 3: Connections (accepted) */}
+      <section className="bg-white border rounded-xl p-4 shadow-sm" style={{ borderColor: "#ecdfd6" }}>
+        <h2 className="text-sm font-semibold mb-3 inline-flex items-center gap-1.5">
+          <Users className="size-3.5" style={{ color: MAROON }} />
+          Connections
+          <span className="text-[11px] text-neutral-400 font-normal">
+            ({props.connections.length})
+          </span>
+        </h2>
+        {props.connections.length === 0 ? (
+          <div className="text-sm text-neutral-500">
+            No connections yet — accept an invitation or invite peers below to get started.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {props.connections.map((c) => {
+              const name = c.other?.display_name || "Lexram member";
+              const headline = c.other?.headline || "";
+              return (
+                <div
+                  key={c.id}
+                  className="border rounded-lg p-3 flex gap-3 items-start"
+                  style={{ borderColor: "#ecdfd6" }}
+                >
+                  <Avatar name={name} avatarUrl={c.other?.avatar_url} size={40} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{name}</div>
+                    <div className="text-xs text-neutral-500 truncate line-clamp-2">{headline}</div>
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <button
+                        onClick={() => c.other && props.messageUser(c.other.id)}
+                        disabled={!c.other}
+                        className="text-xs px-3 py-1 rounded-full text-white font-medium inline-flex items-center gap-1 disabled:opacity-50"
+                        style={{ background: MAROON_GRAD }}
+                      >
+                        <MessageSquare className="size-3" /> Message
+                      </button>
+                      <button
+                        onClick={() => props.removeConnection(c.id)}
+                        className="text-xs px-2.5 py-1 rounded-full border text-neutral-500 hover:bg-neutral-50"
+                        style={{ borderColor: "#e8d8cd" }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Section 4: People you may know */}
+      <section className="bg-white border rounded-xl p-4 shadow-sm" style={{ borderColor: "#ecdfd6" }}>
+        <h2 className="text-sm font-semibold mb-3 inline-flex items-center gap-1.5">
+          <Sparkles className="size-3.5" style={{ color: MAROON }} />
+          People you may know
+        </h2>
         {props.suggestions.length === 0 ? (
-          <div className="text-sm text-neutral-500">No suggestions yet — invite peers to grow your network.</div>
+          <div className="text-sm text-neutral-500">
+            No suggestions yet — invite peers to grow your network.
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {props.suggestions.map((s) => {
-              const invited = props.pendingInvites.has(s.id);
+              const invited = props.sentInvitationIds.has(s.id);
               return (
-                <div key={s.id} className="border rounded-lg p-3 flex gap-3 items-start" style={{ borderColor: "#ecdfd6" }}>
-                  <Avatar name={s.display_name || "Lexram member"} avatarUrl={s.avatar_url} />
+                <div
+                  key={s.id}
+                  className="border rounded-lg p-3 flex gap-3 items-start"
+                  style={{ borderColor: "#ecdfd6" }}
+                >
+                  <Avatar
+                    name={s.display_name || "Lexram member"}
+                    avatarUrl={s.avatar_url}
+                  />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{s.display_name || "Lexram member"}</div>
-                    <div className="text-xs text-neutral-500 truncate">{s.headline || ""}</div>
-                    <div className="text-[11px] text-neutral-400">{s.location || ""}</div>
+                    <div className="text-sm font-medium truncate">
+                      {s.display_name || "Lexram member"}
+                    </div>
+                    <div className="text-xs text-neutral-500 truncate">
+                      {s.headline || ""}
+                    </div>
+                    <div className="text-[11px] text-neutral-400">
+                      {s.location || ""}
+                    </div>
                     <button
                       onClick={() => props.toggleInvite(s.id)}
                       disabled={invited}
-                      className="mt-2 text-xs px-3 py-1 rounded-full border inline-flex items-center gap-1 disabled:opacity-50"
-                      style={{ borderColor: "#e8d8cd", color: MAROON }}
+                      className="mt-2 text-xs px-3 py-1 rounded-full border inline-flex items-center gap-1 disabled:opacity-60"
+                      style={{
+                        borderColor: invited ? MAROON : "#e8d8cd",
+                        color: MAROON,
+                        background: invited ? "#fdf6f0" : undefined,
+                      }}
                     >
-                      <UserPlus className="size-3" /> {invited ? "Invited" : "Connect"}
+                      {invited ? (
+                        <>
+                          <Loader2 className="size-3" /> Pending
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="size-3" /> Connect
+                        </>
+                      )}
                     </button>
                   </div>
-                  <button onClick={() => props.dismissSuggestion(s.id)} className="text-neutral-400 hover:text-red-500">
+                  <button
+                    onClick={() => props.dismissSuggestion(s.id)}
+                    className="text-neutral-400 hover:text-red-500"
+                    aria-label="Dismiss"
+                  >
                     <X className="size-4" />
                   </button>
                 </div>
@@ -1831,7 +2517,7 @@ function NetworkView(props: {
             })}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

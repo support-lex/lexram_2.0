@@ -2,6 +2,10 @@
 
 import { supabase } from "@/lib/supabase/client";
 import type { NetworkMessage, NetworkProfile, Thread } from "@/types/network";
+import {
+  isRealtimeUnavailable,
+  markRealtimeUnavailable,
+} from "@/lib/network/realtime-state";
 
 type ThreadRow = {
   id: string;
@@ -173,6 +177,7 @@ export function subscribeToThread(
   threadId: string,
   onMessage: (msg: NetworkMessage) => void,
 ): () => void {
+  if (isRealtimeUnavailable()) return () => {};
   const sb = supabase();
   const channel = sb
     .channel(`thread:${threadId}`)
@@ -186,7 +191,22 @@ export function subscribeToThread(
       },
       (payload) => onMessage(payload.new as NetworkMessage),
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (
+        status === "CHANNEL_ERROR" ||
+        status === "TIMED_OUT" ||
+        status === "CLOSED"
+      ) {
+        markRealtimeUnavailable(status);
+        // Tear down the underlying socket so the supabase-js Realtime client
+        // stops the endless WebSocket reconnect loop.
+        try {
+          sb.realtime.disconnect();
+        } catch {
+          /* ignore */
+        }
+      }
+    });
   return () => {
     sb.removeChannel(channel);
   };
@@ -196,6 +216,7 @@ export function subscribeToInbox(
   userId: string,
   onAnyMessage: (msg: NetworkMessage) => void,
 ): () => void {
+  if (isRealtimeUnavailable()) return () => {};
   const sb = supabase();
   const channel = sb
     .channel(`inbox:${userId}`)
@@ -207,7 +228,20 @@ export function subscribeToInbox(
         if (msg.sender_id !== userId) onAnyMessage(msg);
       },
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (
+        status === "CHANNEL_ERROR" ||
+        status === "TIMED_OUT" ||
+        status === "CLOSED"
+      ) {
+        markRealtimeUnavailable(status);
+        try {
+          sb.realtime.disconnect();
+        } catch {
+          /* ignore */
+        }
+      }
+    });
   return () => {
     sb.removeChannel(channel);
   };

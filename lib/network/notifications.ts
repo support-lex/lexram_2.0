@@ -2,6 +2,10 @@
 
 import { supabase } from "@/lib/supabase/client";
 import type { NetworkNotification } from "@/types/network";
+import {
+  isRealtimeUnavailable,
+  markRealtimeUnavailable,
+} from "@/lib/network/realtime-state";
 
 export async function listNotifications(
   userId: string,
@@ -63,6 +67,7 @@ export function subscribeToNotifications(
   userId: string,
   onNew: (n: NetworkNotification) => void,
 ): () => void {
+  if (isRealtimeUnavailable()) return () => {};
   const sb = supabase();
   const channel = sb
     .channel(`notifs:${userId}`)
@@ -76,7 +81,20 @@ export function subscribeToNotifications(
       },
       (payload) => onNew(payload.new as NetworkNotification),
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (
+        status === "CHANNEL_ERROR" ||
+        status === "TIMED_OUT" ||
+        status === "CLOSED"
+      ) {
+        markRealtimeUnavailable(status);
+        try {
+          sb.realtime.disconnect();
+        } catch {
+          /* ignore */
+        }
+      }
+    });
   return () => {
     sb.removeChannel(channel);
   };

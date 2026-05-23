@@ -139,33 +139,73 @@ interface CaseItem {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
-// sessionStorage cache — stores the last-known value of each data source
-// keyed by name. Reads are best-effort (returns the fallback on any parse
-// error); writes are fire-and-forget so quota issues never break the page.
-// Repeat dashboard visits paint cached counts on the very first frame and
-// then fade in fresh data once the network catches up — no full-page
-// "Loading…" blink while sessions/blog/network re-fetch.
+// localStorage cache — stores the last-known value of each data source
+// keyed by name, alongside the timestamp of the write. Reads are best-
+// effort (returns the fallback on any parse error); writes are fire-and-
+// forget so quota issues never break the page.
+//
+// We moved up from sessionStorage to localStorage so the cache survives
+// tab closes / browser restarts. Combined with stale-while-revalidate
+// fetch logic below, every dashboard visit after the first paints
+// immediately with last-known data and then silently refreshes.
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_PREFIX = 'lexram_dashboard_v2:';
+const CACHE_PREFIX = 'lexram_dashboard_v3:';
+
+interface CacheEnvelope<T> {
+  v: T;
+  t: number; // ms epoch when this entry was saved
+}
 
 function loadCached<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
   try {
-    const raw = window.sessionStorage.getItem(CACHE_PREFIX + key);
+    const raw = window.localStorage.getItem(CACHE_PREFIX + key);
     if (!raw) return fallback;
-    return JSON.parse(raw) as T;
+    const parsed = JSON.parse(raw);
+    // Tolerate both the legacy "raw value" shape and the new envelope so
+    // a stored sessionStorage cache from the previous build still hydrates
+    // the page on first paint rather than forcing a cold load.
+    if (parsed && typeof parsed === 'object' && 'v' in parsed) {
+      return (parsed as CacheEnvelope<T>).v;
+    }
+    return parsed as T;
   } catch {
     return fallback;
+  }
+}
+
+function hasCached(key: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(CACHE_PREFIX + key) !== null;
+  } catch {
+    return false;
   }
 }
 
 function saveCached<T>(key: string, value: T): void {
   if (typeof window === 'undefined') return;
   try {
-    window.sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify(value));
+    const envelope: CacheEnvelope<T> = { v: value, t: Date.now() };
+    window.localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(envelope));
   } catch {
     /* quota / disabled storage — swallow */
   }
+}
+
+/** Extracts a usable message from any error shape we encounter — Supabase
+ *  PostgrestError objects, axios errors, native Error instances, or plain
+ *  strings — so the dashboard banner reads "Row level security policy …"
+ *  instead of a bare "Failed to load". */
+function describeError(err: unknown): string {
+  if (!err) return 'Failed to load';
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'object') {
+    const e = err as { message?: string; error_description?: string; details?: string; hint?: string; code?: string };
+    return e.message || e.error_description || e.details || e.hint || e.code || 'Failed to load';
+  }
+  return 'Failed to load';
 }
 
 export default function DashboardPage() {
@@ -188,8 +228,8 @@ export default function DashboardPage() {
   const [blogPosts, setBlogPosts]             = useState<BlogPost[]>(() => loadCached<BlogPost[]>('blogPosts', []));
   const [blogLoading, setBlogLoading]         = useState(() => loadCached<BlogPost[]>('blogPosts', []).length === 0);
 
-  const [connectionCount, setConnectionCount] = useState(() => loadCached<number>('connectionCount', 0));
-  const [networkLoading, setNetworkLoading]   = useState(() => loadCached<number>('connectionCount', 0) === 0);
+  const [connectionCount, setConnectionCount] = useState(() => loadCached<number>('network', 0));
+  const [networkLoading, setNetworkLoading]   = useState(() => loadCached<number>('network', 0) === 0);
 
   // Aggregate error banner — keyed by source so per-source failures are
   // visible without nuking the whole page.
@@ -205,14 +245,35 @@ export default function DashboardPage() {
 
   const [reloadNonce, setReloadNonce] = useState(0);
 
-  // First error we collected — surfaced in a single banner so the user
-  // sees "something failed" without losing the rest of the dashboard.
-  // Individual rails / tiles use their own per-source flags so they each
-  // hydrate independently.
-  const liveError = Object.values(sourceErrors)[0] ?? null;
+  // Map each error source to a human label so the banner reads
+  // "Research, TSR failed to load: <message>" instead of the bare
+  // "Failed to load" the previous build was showing. recordError() only
+  // populates sourceErrors when the source has NO cached data, so the
+  // banner truly indicates a hard miss, not just a transient refresh
+  // hiccup with cached data still on screen.
+  const ERROR_LABELS: Record<string, string> = {
+    sessions:  'Research',
+    cases:     'Cases',
+    blogPosts: 'Blog',
+    tsrCases:  'TSR',
+    network:   'Network',
+  };
+  const erroredSources = Object.keys(sourceErrors);
+  const erroredLabels = erroredSources.map((k) => ERROR_LABELS[k] ?? k).join(', ');
+  const firstErrorMessage = Object.values(sourceErrors)[0] ?? null;
+  const liveError = erroredSources.length
+    ? `${erroredLabels} — ${firstErrorMessage}`
+    : null;
 
+  // Record a per-source error. When we already have cached data for that
+  // source we DON'T surface the error in the banner — it's a stale-while-
+  // revalidate flow: the user sees their cached numbers, the refresh quietly
+  // failed in the background, no point alarming them. We still keep the
+  // error in console for debugging via this log.
   const recordError = useCallback((source: string, err: unknown) => {
-    const message = err instanceof Error ? err.message : 'Failed to load';
+    const message = describeError(err);
+    console.warn(`[dashboard] ${source} fetch failed:`, message, err);
+    if (hasCached(source)) return; // stale data is good enough
     setSourceErrors((prev) => ({ ...prev, [source]: message }));
   }, []);
 
@@ -316,7 +377,7 @@ export default function DashboardPage() {
         if (cancelled) return;
         const count = Array.isArray(list) ? list.length : 0;
         setConnectionCount(count);
-        saveCached('connectionCount', count);
+        saveCached('network', count);
         clearError('network');
       })
       .catch((e) => !cancelled && recordError('network', e))
@@ -354,7 +415,13 @@ export default function DashboardPage() {
       })
       .catch((e) => {
         if (cancelled) return;
-        setCorpusError(e instanceof Error ? e.message : 'Failed to load corpus');
+        const message = describeError(e);
+        console.warn('[dashboard] corpus fetch failed:', message, e);
+        // Stale-while-revalidate: if we already have cached corpus stats,
+        // keep showing them and skip the error banner. Only surface when
+        // there's nothing cached for the user to see.
+        if (hasCached('corpusStats')) return;
+        setCorpusError(message);
       })
       .finally(() => !cancelled && setCorpusLoading(false));
     return () => {

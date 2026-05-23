@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { History, Share, MoreHorizontal, Users, Pin, PinOff, Archive, Trash2, Check, Link2, Briefcase, ArrowUp, Plus, Bookmark, BookmarkCheck, Share2, PenLine, Loader2 } from "lucide-react";
+import { History, Share, MoreHorizontal, Users, Pin, PinOff, Archive, Trash2, Check, Link2, Briefcase, Plus, Bookmark, BookmarkCheck, Share2, PenLine, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   pinnedSessionRepository,
@@ -68,6 +68,10 @@ export default function Research2Page() {
   const [selectedSourceMessageId, setSelectedSourceMessageId] = useState<string | null>(null);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [showCasesPanel, setShowCasesPanel] = useState(false);
+  // Bumped after any DocumentDialog upload completes — passed into CasesPanel
+  // so its local docs cache refetches immediately. Without this signal the
+  // newly-uploaded file only appears after the user switches cases / reloads.
+  const [documentsRefreshKey, setDocumentsRefreshKey] = useState(0);
   const [shareCopied, setShareCopied] = useState(false);
   const [isCurrentPinned, setIsCurrentPinned] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -157,22 +161,12 @@ export default function Research2Page() {
     setStoredData(STORAGE_KEYS.SESSION_CASES, map);
   }, [currentSessionId, setPendingCaseId, sharedCases]);
 
-  // ── New chat → toast nudging the user to pick a case ──────────────────
-  // The case dropdown in the header stays visible so the user can pick (or
-  // leave it as Unassigned, which is the default pre-selection set by the
-  // effect below once /cases has loaded).
-  const handleNewChatWithToast = useCallback(() => {
-    handleNewSession();
-    toast.message("Select a case for this chat", {
-      icon: <ArrowUp className="w-4 h-4 text-[var(--accent)]" />,
-      description: "Use the case dropdown above. Defaults to Unassigned.",
-      duration: 5000,
-      // top-center keeps the toast from overlapping the collapsed left rail
-      // icons (which `top-left` was covering) while staying close enough to
-      // the case dropdown that the ArrowUp icon still reads as "look above".
-      position: "top-center",
-    });
-  }, [handleNewSession]);
+  // ── New chat ──────────────────────────────────────────────────────────
+  // The case dropdown in the header defaults to "Unassigned" automatically,
+  // so we just clear the thread state. (We used to fire a "Select a case"
+  // toast that hung off the top bar with an upward-arrow icon — it was
+  // visually noisy and redundant with the dropdown's built-in default.)
+  const handleNewChatWithToast = handleNewSession;
 
   // (sharedCases hoisted above handleCaseChange — see top of component.)
 
@@ -827,6 +821,7 @@ export default function Research2Page() {
           onCaseChange={handleCaseChange}
           externalCases={sharedCases}
           onCasesChanged={fetchSharedCases}
+          documentsRefreshKey={documentsRefreshKey}
           onAttachDocs={(docs) => {
             // attachCaseDocs expects { id, name, mime_type? } — map from CasesPanel's CaseDoc format
             attachCaseDocs(docs.map((d) => ({
@@ -878,6 +873,7 @@ export default function Research2Page() {
           attachCaseDocs(docs);
           setShowDocumentDialog(false);
         }}
+        onUploaded={() => setDocumentsRefreshKey((k) => k + 1)}
       />
 
 

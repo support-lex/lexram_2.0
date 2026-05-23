@@ -216,8 +216,8 @@ function SidebarContent({
   // IntersectionObserver sentinel at the bottom of the list comes into
   // view. Pinned + the search filter are NOT sliced (those lists are
   // intentional/short).
-  const INITIAL_VISIBLE = 30;
-  const VISIBLE_PAGE = 30;
+  const INITIAL_VISIBLE = 15;
+  const VISIBLE_PAGE = 20;
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   // Reset the slice whenever the search query changes (otherwise a new
   // filter would still show the previous count).
@@ -242,7 +242,11 @@ function SidebarContent({
 
   // Sentinel observer — when the loader row scrolls into the viewport,
   // grow the slice by another page. Cheap and matches Notion / ChatGPT.
+  // rootMargin extends the BOTTOM of the scroll root by 300px so the next
+  // page is fetched *before* the user actually hits the sentinel, giving
+  // a continuous "loads as you scroll" feel instead of a stutter at the end.
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const scrollRootRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!hasMoreUnpinned) return;
     const node = loadMoreRef.current;
@@ -253,7 +257,10 @@ function SidebarContent({
           setVisibleCount((n) => n + VISIBLE_PAGE);
         }
       },
-      { rootMargin: "200px 0px 0px 0px" },
+      {
+        root: scrollRootRef.current,
+        rootMargin: "0px 0px 300px 0px",
+      },
     );
     observer.observe(node);
     return () => observer.disconnect();
@@ -297,7 +304,7 @@ function SidebarContent({
       </div>
 
       {/* Session list with Pinned section */}
-      <div className="flex-1 overflow-y-auto px-2 pb-3 custom-scrollbar">
+      <div ref={scrollRootRef} className="flex-1 overflow-y-auto px-2 pb-3 custom-scrollbar">
         {sessionsLoading && filteredSessions.length === 0 ? (
           // Skeleton rows while the first /sessions fetch is in flight.
           // Avoids the empty-state flash that misled users into thinking

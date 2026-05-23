@@ -53,9 +53,16 @@ create table if not exists public.tsr_clients (
   progress          int  not null default 0,
   status_message    text,
 
+  -- Gemini token accounting (written by routers/cases_ai.py after each run)
+  token_usage       jsonb,
+
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
+
+-- If the table already existed (user ran an older copy of this file), make
+-- sure token_usage is present.
+alter table public.tsr_clients add column if not exists token_usage jsonb;
 
 create index if not exists tsr_clients_user_id_idx    on public.tsr_clients (user_id);
 create index if not exists tsr_clients_created_at_idx on public.tsr_clients (created_at desc);

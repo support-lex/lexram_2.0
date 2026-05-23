@@ -212,7 +212,7 @@ export default function CaseWorkspacePage() {
     const load  = async () => {
       setPageLoading(true)
       const { data, error } = await supabase
-        .from('cases')
+        .from('tsr_clients')
         .select('id, case_name, case_no, bank_name, status, scrutiny_report, final_report')
         .eq('id', id)
         .single()
@@ -231,7 +231,7 @@ export default function CaseWorkspacePage() {
       .channel(`tsr-case-workspace-${id}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'cases', filter: `id=eq.${id}` },
+        { event: 'UPDATE', schema: 'public', table: 'tsr_clients', filter: `id=eq.${id}` },
         (payload) => {
           setCaseData(prev => prev ? { ...prev, ...(payload.new as Partial<CaseData>) } : prev)
           if ((payload.new as CaseData).status !== 'processing') setPipelineRunning(false)

@@ -67,7 +67,7 @@ export default function DashboardSidebar() {
 
   const fetchCases = useCallback(async (uid: string) => {
     const { data, error } = await supabase
-      .from('cases')
+      .from('tsr_clients')
       .select('id, case_name, case_no, bank_name, status')
       .eq('user_id', uid)
       .order('created_at', { ascending: false })
@@ -106,7 +106,7 @@ export default function DashboardSidebar() {
       .channel('tsr-sidebar-cases')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'cases', filter: `user_id=eq.${user.id}` },
+        { event: 'INSERT', schema: 'public', table: 'tsr_clients', filter: `user_id=eq.${user.id}` },
         (payload) => {
           const newCase = payload.new as Case
           setCases(prev =>
@@ -116,7 +116,7 @@ export default function DashboardSidebar() {
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'cases', filter: `user_id=eq.${user.id}` },
+        { event: 'UPDATE', schema: 'public', table: 'tsr_clients', filter: `user_id=eq.${user.id}` },
         (payload) => {
           const updated = payload.new as Case
           setCases(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c))
@@ -124,7 +124,7 @@ export default function DashboardSidebar() {
       )
       .on(
         'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'cases' },
+        { event: 'DELETE', schema: 'public', table: 'tsr_clients' },
         (payload) => {
           const deletedId = (payload.old as { id: string }).id
           setCases(prev => prev.filter(c => c.id !== deletedId))
@@ -142,7 +142,7 @@ export default function DashboardSidebar() {
     setFormError(null)
 
     const { data, error } = await supabase
-      .from('cases')
+      .from('tsr_clients')
       .insert({
         user_id:   user.id,
         case_name: form.case_name.trim(),

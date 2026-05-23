@@ -346,7 +346,7 @@ export default function DashboardPage() {
           return;
         }
         const { data, error } = await tsrSupabase
-          .from('cases')
+          .from('tsr_clients')
           .select('id, case_name, case_no, bank_name, status, created_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })

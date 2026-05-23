@@ -68,10 +68,6 @@ export default function Research2Page() {
   const [selectedSourceMessageId, setSelectedSourceMessageId] = useState<string | null>(null);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [showCasesPanel, setShowCasesPanel] = useState(false);
-  // Bumped after any DocumentDialog upload completes — passed into CasesPanel
-  // so its local docs cache refetches immediately. Without this signal the
-  // newly-uploaded file only appears after the user switches cases / reloads.
-  const [documentsRefreshKey, setDocumentsRefreshKey] = useState(0);
   const [shareCopied, setShareCopied] = useState(false);
   const [isCurrentPinned, setIsCurrentPinned] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -821,7 +817,6 @@ export default function Research2Page() {
           onCaseChange={handleCaseChange}
           externalCases={sharedCases}
           onCasesChanged={fetchSharedCases}
-          documentsRefreshKey={documentsRefreshKey}
           onAttachDocs={(docs) => {
             // attachCaseDocs expects { id, name, mime_type? } — map from CasesPanel's CaseDoc format
             attachCaseDocs(docs.map((d) => ({
@@ -873,7 +868,6 @@ export default function Research2Page() {
           attachCaseDocs(docs);
           setShowDocumentDialog(false);
         }}
-        onUploaded={() => setDocumentsRefreshKey((k) => k + 1)}
       />
 
 

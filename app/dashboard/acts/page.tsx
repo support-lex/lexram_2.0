@@ -27,26 +27,22 @@ import {
   bucketName,
 } from '@/lib/lexram/acts-fastapi';
 
-/* ── Domain badge colours ────────────────────────────────────────────── */
-const DOMAIN_COLORS: Record<string, string> = {
-  'Family Law': 'bg-amber-100 text-amber-800 border-amber-200',
-  'Criminal Law': 'bg-red-100 text-red-800 border-red-200',
-  'Labour Law': 'bg-blue-100 text-blue-800 border-blue-200',
-  'Civil Law': 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  'Banking Law': 'bg-violet-100 text-violet-800 border-violet-200',
-  'Constitutional Law': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  'Corporate Law': 'bg-slate-100 text-slate-800 border-slate-200',
-  'Environmental Law': 'bg-green-100 text-green-800 border-green-200',
-  'Tax Law': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  'Commercial Law': 'bg-orange-100 text-orange-800 border-orange-200',
-  'Property Law': 'bg-teal-100 text-teal-800 border-teal-200',
-  'IP Law': 'bg-cyan-100 text-cyan-800 border-cyan-200',
-};
+/* ── Domain badge styling ────────────────────────────────────────────────
+ * On-brand palette: three coherent variants (maroon / rust / gold) cycled
+ * deterministically per domain name so colors stay stable across renders. */
+const DOMAIN_TONE_STYLES = [
+  // maroon
+  'bg-[var(--acts-maroon-soft)] text-[var(--acts-maroon)] border-[var(--acts-maroon-tint)]',
+  // rust
+  'bg-[var(--acts-rust-soft)] text-[var(--acts-rust-deep)] border-[var(--acts-rust-tint)]',
+  // gold accent
+  'bg-[var(--acts-gold-soft)] text-[#7A6230] border-[var(--acts-gold-soft)]',
+];
 function domainClass(d?: string | null) {
-  return d
-    ? DOMAIN_COLORS[d] ??
-        'bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20'
-    : '';
+  if (!d) return '';
+  let hash = 0;
+  for (let i = 0; i < d.length; i++) hash = (hash * 31 + d.charCodeAt(i)) | 0;
+  return DOMAIN_TONE_STYLES[Math.abs(hash) % DOMAIN_TONE_STYLES.length];
 }
 
 function actTitle(a: ActSummary) {
@@ -290,7 +286,10 @@ export default function ActsPage() {
   );
 
   return (
-    <div className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden">
+    <div
+      data-acts
+      className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden"
+    >
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">
           {/* ── Header ──────────────────────────────────────────────── */}
@@ -352,37 +351,37 @@ export default function ActsPage() {
                 label="Total Acts"
                 value={stats.total_acts}
                 icon={Database}
-                tone="indigo"
+                tone="maroon"
               />
               <StatTile
                 label="Domains"
                 value={stats.domains}
                 icon={Globe2}
-                tone="emerald"
+                tone="rust"
               />
               <StatTile
                 label="Ministries"
                 value={stats.unique_ministries}
                 icon={Building2}
-                tone="amber"
+                tone="gold"
               />
               <StatTile
                 label="With PDF"
                 value={stats.with_pdf}
                 icon={FileText}
-                tone="sky"
+                tone="cream"
               />
               <StatTile
                 label="Repealed"
                 value={stats.repealed}
                 icon={ScrollText}
-                tone="rose"
+                tone="maroonDeep"
               />
               <StatTile
                 label="Synced"
                 value={stats.synced}
                 icon={BadgeCheck}
-                tone="violet"
+                tone="rustOutline"
               />
             </section>
           )}
@@ -432,8 +431,8 @@ export default function ActsPage() {
                 onClick={() => setFEnforcement(e.value)}
                 className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all ${
                   fEnforcement === e.value
-                    ? 'bg-emerald-600 text-white border-emerald-600'
-                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-emerald-400'
+                    ? 'bg-[var(--acts-maroon)] text-[var(--acts-cream)] border-[var(--acts-maroon)]'
+                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-[var(--acts-maroon-tint)]'
                 }`}
               >
                 {e.label}
@@ -572,11 +571,11 @@ export default function ActsPage() {
 
           {/* ── Error ───────────────────────────────────────────────── */}
           {error && (
-            <div className="mb-4 bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center justify-between">
-              <p className="text-sm text-rose-700">{error}</p>
+            <div className="mb-4 bg-[var(--acts-maroon-soft)] border border-[var(--acts-maroon-tint)] rounded-xl p-4 flex items-center justify-between">
+              <p className="text-sm text-[var(--acts-maroon)]">{error}</p>
               <button
                 onClick={() => fetchActs(page)}
-                className="text-xs px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg"
+                className="text-xs px-3 py-1.5 bg-[var(--acts-maroon)] hover:bg-[var(--acts-maroon-deep)] text-[var(--acts-cream)] rounded-lg transition-colors"
               >
                 Retry
               </button>
@@ -757,13 +756,21 @@ function Th({ children, w }: { children?: React.ReactNode; w?: string }) {
   );
 }
 
+/* Six brand tones used by the stats banner — all drawn from the
+ * maroon/rust/cream/gold token set. */
 const TONE_BG: Record<string, string> = {
-  indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
-  emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-  amber: 'bg-amber-50 text-amber-600 border-amber-100',
-  sky: 'bg-sky-50 text-sky-600 border-sky-100',
-  rose: 'bg-rose-50 text-rose-600 border-rose-100',
-  violet: 'bg-violet-50 text-violet-600 border-violet-100',
+  maroon:
+    'bg-[var(--acts-maroon-soft)] text-[var(--acts-maroon)] border-[var(--acts-maroon-tint)]',
+  rust:
+    'bg-[var(--acts-rust-soft)] text-[var(--acts-rust-deep)] border-[var(--acts-rust-tint)]',
+  gold:
+    'bg-[var(--acts-gold-soft)] text-[#7A6230] border-[var(--acts-gold-soft)]',
+  maroonDeep:
+    'bg-[var(--acts-maroon-tint)] text-[var(--acts-maroon-deep)] border-[var(--acts-maroon-tint)]',
+  cream:
+    'bg-[var(--acts-cream-warm)] text-[var(--acts-ink)] border-[var(--acts-maroon-tint)]',
+  rustOutline:
+    'bg-[var(--bg-surface)] text-[var(--acts-rust)] border-[var(--acts-rust-tint)]',
 };
 
 function StatTile({
@@ -778,7 +785,7 @@ function StatTile({
   tone: keyof typeof TONE_BG;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-2.5 flex items-center gap-2.5">
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-2.5 flex items-center gap-2.5 shadow-[var(--shadow-sm)]">
       <span
         className={`grid place-items-center w-8 h-8 rounded-lg border ${TONE_BG[tone]}`}
       >
@@ -871,12 +878,14 @@ function JurisdictionBadge({
 }) {
   if (!kind) return <span className="text-[var(--text-muted)] text-xs">—</span>;
   const k = kind.toLowerCase();
+  // Central = deep maroon (federal authority), State = rust (regional),
+  // UT = gold (administrative). All sit on the cream surface.
   const style =
     k === 'central'
-      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+      ? 'bg-[var(--acts-maroon-soft)] text-[var(--acts-maroon)] border-[var(--acts-maroon-tint)]'
       : k === 'state'
-      ? 'bg-amber-50 text-amber-700 border-amber-200'
-      : 'bg-violet-50 text-violet-700 border-violet-200';
+      ? 'bg-[var(--acts-rust-soft)] text-[var(--acts-rust-deep)] border-[var(--acts-rust-tint)]'
+      : 'bg-[var(--acts-gold-soft)] text-[#7A6230] border-[var(--acts-gold-soft)]';
   return (
     <span
       className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border uppercase tracking-wide ${style}`}
@@ -901,7 +910,9 @@ function StatusBadge({
     <div className="flex items-center gap-1.5">
       <span
         className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-          isRepealed ? 'bg-rose-400' : 'bg-emerald-500'
+          isRepealed
+            ? 'bg-[var(--acts-rust)]'
+            : 'bg-[var(--acts-maroon)]'
         }`}
       />
       <span className="text-[11px] text-[var(--text-muted)] capitalize">

@@ -17,7 +17,7 @@ import {
   LayoutGrid,
   Search,
   Library,
-  Folder,
+  FileSearch,
   Users,
   Settings,
   HelpCircle,
@@ -80,10 +80,10 @@ const NAV_ITEMS: NavItem[] = [
       p.startsWith("/dashboard/case-status"),
   },
   {
-    title: "Matters",
-    url: "/dashboard/matters",
-    icon: <Folder className="size-4" strokeWidth={1.75} />,
-    match: (p) => p.startsWith("/dashboard/matters"),
+    title: "TSR",
+    url: "/dashboard/tsr",
+    icon: <FileSearch className="size-4" strokeWidth={1.75} />,
+    match: (p) => p.startsWith("/dashboard/tsr"),
   },
   {
     title: "Network",

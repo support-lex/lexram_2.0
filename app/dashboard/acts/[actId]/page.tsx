@@ -53,6 +53,18 @@ function formatDate(d?: string | null) {
   }
 }
 
+/** Backend sometimes returns keywords/tags as a comma-separated string,
+ *  occasionally as null. Coerce to a clean string[] either way. */
+function toStringArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === 'string' && x.length > 0);
+  if (typeof v === 'string')
+    return v
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  return [];
+}
+
 function chapterTitle(c: ChapterDetail) {
   return (
     c.title ??
@@ -127,8 +139,8 @@ function SectionCard({ section }: { section: SectionDetail }) {
           <span
             className={`w-1.5 h-1.5 rounded-full ${
               section.enforcement_status.toLowerCase().includes('repeal')
-                ? 'bg-rose-400'
-                : 'bg-emerald-500'
+                ? 'bg-[var(--acts-rust)]'
+                : 'bg-[var(--acts-maroon)]'
             }`}
           />
           {section.enforcement_status.replace(/_/g, ' ')}
@@ -187,7 +199,10 @@ export default function ActDetailPage() {
 
   if (loading) {
     return (
-      <div className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden">
+      <div
+        data-acts
+        className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden"
+      >
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">
             <div className="flex items-center justify-center h-64">
@@ -201,7 +216,10 @@ export default function ActDetailPage() {
 
   if (error || !law) {
     return (
-      <div className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden">
+      <div
+        data-acts
+        className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden"
+      >
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">
             <Link
@@ -218,7 +236,7 @@ export default function ActDetailPage() {
               {error && (
                 <button
                   onClick={() => setNonce((n) => n + 1)}
-                  className="text-xs px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg"
+                  className="text-xs px-3 py-1.5 bg-[var(--acts-maroon)] hover:bg-[var(--acts-maroon-deep)] text-[var(--acts-cream)] rounded-lg transition-colors"
                 >
                   Retry
                 </button>
@@ -250,7 +268,10 @@ export default function ActDetailPage() {
     law.status?.toLowerCase().includes('repeal') === true;
 
   return (
-    <div className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden">
+    <div
+      data-acts
+      className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden"
+    >
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">
           <motion.div
@@ -406,28 +427,32 @@ export default function ActDetailPage() {
                     />
                   </div>
 
-                  {/* Tag chips */}
-                  {((law.keywords && law.keywords.length) ||
-                    (law.tags && law.tags.length)) && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {(law.keywords ?? []).slice(0, 8).map((k) => (
-                        <span
-                          key={`kw-${k}`}
-                          className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--accent)]/8 text-[var(--accent)] border border-[var(--accent)]/15"
-                        >
-                          {k}
-                        </span>
-                      ))}
-                      {(law.tags ?? []).slice(0, 6).map((t) => (
-                        <span
-                          key={`tag-${t}`}
-                          className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-primary)] text-[var(--text-muted)] border border-[var(--border-default)]"
-                        >
-                          #{t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {/* Tag chips — defensive against non-array keyword/tag fields */}
+                  {(() => {
+                    const kw = toStringArray(law.keywords);
+                    const tg = toStringArray(law.tags);
+                    if (!kw.length && !tg.length) return null;
+                    return (
+                      <div className="flex flex-wrap gap-1.5">
+                        {kw.slice(0, 8).map((k) => (
+                          <span
+                            key={`kw-${k}`}
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--accent)]/8 text-[var(--accent)] border border-[var(--accent)]/15"
+                          >
+                            {k}
+                          </span>
+                        ))}
+                        {tg.slice(0, 6).map((t) => (
+                          <span
+                            key={`tag-${t}`}
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-primary)] text-[var(--text-muted)] border border-[var(--border-default)]"
+                          >
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* TAB CONTENT */}
@@ -491,19 +516,19 @@ function OverviewTab({
           label="Chapters"
           value={totalChapters}
           icon={Layers}
-          tone="indigo"
+          tone="maroon"
         />
         <CountCard
           label="Sections"
           value={totalSections}
           icon={ScrollText}
-          tone="emerald"
+          tone="rust"
         />
         <CountCard
           label="PDF pages"
           value={law.pdf_page_count ?? 0}
           icon={FileText}
-          tone="amber"
+          tone="gold"
         />
       </div>
 
@@ -683,7 +708,7 @@ function InstrumentsTab({
         const body = (
           <>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200 uppercase">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--acts-rust-soft)] text-[var(--acts-rust-deep)] border border-[var(--acts-rust-tint)] uppercase">
                 {kind}
               </span>
               {inst.number && (
@@ -826,9 +851,12 @@ function MetaCard({
 }
 
 const TONE_BG: Record<string, string> = {
-  indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
-  emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-  amber: 'bg-amber-50 text-amber-600 border-amber-100',
+  maroon:
+    'bg-[var(--acts-maroon-soft)] text-[var(--acts-maroon)] border-[var(--acts-maroon-tint)]',
+  rust:
+    'bg-[var(--acts-rust-soft)] text-[var(--acts-rust-deep)] border-[var(--acts-rust-tint)]',
+  gold:
+    'bg-[var(--acts-gold-soft)] text-[#7A6230] border-[var(--acts-gold-soft)]',
 };
 
 function CountCard({
@@ -869,9 +897,10 @@ function StatusPill({
   label: string;
 }) {
   const Icon = repealed ? ShieldAlert : ShieldCheck;
+  // In-force = maroon (authority, validity). Repealed = rust (warm warning).
   const cls = repealed
-    ? 'bg-rose-50 text-rose-700 border-rose-200'
-    : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    ? 'bg-[var(--acts-rust-soft)] text-[var(--acts-rust-deep)] border-[var(--acts-rust-tint)]'
+    : 'bg-[var(--acts-maroon-soft)] text-[var(--acts-maroon)] border-[var(--acts-maroon-tint)]';
   return (
     <span
       className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border ${cls}`}

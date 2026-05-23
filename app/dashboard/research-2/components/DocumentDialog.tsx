@@ -53,6 +53,13 @@ interface DocumentDialogProps {
   onAttach?: (
     docs: { id: string; name: string; size?: number; mime_type?: string }[],
   ) => void;
+  /**
+   * Fires after at least one document successfully uploads. The parent uses
+   * this to invalidate sibling caches — specifically the CasesPanel's local
+   * `docs` state, which would otherwise miss the new file until the user
+   * switches cases or reloads.
+   */
+  onUploaded?: () => void;
 }
 
 const ACCEPT = ".pdf,.txt,.md,.doc,.docx,.xls,.xlsx";
@@ -172,6 +179,7 @@ export default function DocumentDialog({
   caseId,
   ensureCaseId,
   onAttach,
+  onUploaded,
 }: DocumentDialogProps) {
   const [docs, setDocs] = useState<SessionDocument[]>([]);
   const [loading, setLoading] = useState(false);
@@ -327,9 +335,13 @@ export default function DocumentDialog({
           { description: "Indexing — they'll be ready in a moment." },
         );
         refresh();
+        // Notify the parent so it can re-fetch any sibling list (e.g. the
+        // CasesPanel's doc list) that would otherwise be stale until the
+        // user switches cases or reloads.
+        onUploaded?.();
       }
     },
-    [caseId, ensureCaseId, refresh],
+    [caseId, ensureCaseId, refresh, onUploaded],
   );
 
   const handleDelete = async (id: string) => {

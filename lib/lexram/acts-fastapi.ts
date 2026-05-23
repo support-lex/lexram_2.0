@@ -258,17 +258,27 @@ export const ActsAPI = {
   stats: () => actsApiGet<ActStats>('stats'),
 
   domains: (sort_by: 'name' | 'count' = 'count') =>
-    actsApiGet<NamedCount[]>('domains', { sort_by }),
+    actsApiGet<unknown>('domains', { sort_by }).then((r) =>
+      normaliseCounts(r, 'domain')
+    ),
 
-  ministries: (limit = 50) => actsApiGet<NamedCount[]>('ministries', { limit }),
+  ministries: (limit = 50) =>
+    actsApiGet<unknown>('ministries', { limit }).then((r) =>
+      normaliseCounts(r, 'ministry')
+    ),
 
   categories: (sort_by: 'name' | 'count' = 'count') =>
-    actsApiGet<NamedCount[]>('categories', { sort_by }),
+    actsApiGet<unknown>('categories', { sort_by }).then((r) =>
+      normaliseCounts(r, 'category')
+    ),
 
   departments: (limit = 100, sort_by: 'name' | 'count' = 'count') =>
-    actsApiGet<NamedCount[]>('departments', { limit, sort_by }),
+    actsApiGet<unknown>('departments', { limit, sort_by }).then((r) =>
+      normaliseCounts(r, 'department')
+    ),
 
-  years: () => actsApiGet<YearCount[]>('years'),
+  years: () =>
+    actsApiGet<unknown>('years').then((r) => normaliseYears(r)),
 };
 
 /* ── Helpers ─────────────────────────────────────────────────────────── */
@@ -297,16 +307,95 @@ export function unwrapList<T>(
 
 /** Best-effort name extractor for NamedCount records — backend sometimes uses
  *  the column name as the key (domain/ministry/category/department) rather
- *  than a generic `name`. */
-export function bucketName(b: NamedCount): string {
+ *  than a generic `name`. Also tolerates raw strings (when the API returns
+ *  just an array of names instead of {name,count} objects). */
+export function bucketName(b: NamedCount | string | null | undefined): string {
+  if (b == null) return '';
+  if (typeof b === 'string') return b;
+  if (typeof b !== 'object') return String(b);
   return (
     b.name ??
     b.domain ??
     b.ministry ??
     b.category ??
     b.department ??
-    'Unknown'
+    ''
   );
+}
+
+/** Coerce the various shapes /domains, /ministries, /categories, /departments
+ *  may return into a clean NamedCount[]. Tolerates:
+ *    - a bare array of objects     [{domain:'X',count:5}, ...]
+ *    - a bare array of strings     ['X', 'Y', ...]
+ *    - a wrapped object            {data: [...]}
+ *    - a dict map                  {'X': 5, 'Y': 3}
+ *    - a JSON-encoded string of any of the above. */
+export function normaliseCounts(
+  res: unknown,
+  field: 'domain' | 'ministry' | 'category' | 'department'
+): NamedCount[] {
+  if (typeof res === 'string') {
+    try {
+      return normaliseCounts(JSON.parse(res), field);
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(res)) {
+    return res
+      .map((item): NamedCount | null => {
+        if (item == null) return null;
+        if (typeof item === 'string')
+          return { [field]: item, count: null } as NamedCount;
+        if (typeof item === 'object')
+          return item as NamedCount;
+        return null;
+      })
+      .filter((x): x is NamedCount => x !== null);
+  }
+  if (res && typeof res === 'object') {
+    const obj = res as Record<string, unknown>;
+    if (Array.isArray(obj.data)) return normaliseCounts(obj.data, field);
+    return Object.entries(obj)
+      .filter(([, v]) => typeof v === 'number' || typeof v === 'string')
+      .map(([k, v]) => ({
+        [field]: k,
+        count: typeof v === 'number' ? v : Number(v) || null,
+      })) as NamedCount[];
+  }
+  return [];
+}
+
+/** /years normaliser — accepts array of {year,count}, dict {year: count},
+ *  or wrapped {data:[...]}. */
+export function normaliseYears(res: unknown): YearCount[] {
+  if (typeof res === 'string') {
+    try {
+      return normaliseYears(JSON.parse(res));
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(res)) {
+    return res
+      .map((item): YearCount | null => {
+        if (!item || typeof item !== 'object') return null;
+        const obj = item as Record<string, unknown>;
+        const y = Number(obj.year);
+        const c = Number(obj.count);
+        if (!Number.isFinite(y)) return null;
+        return { year: y, count: Number.isFinite(c) ? c : 0 };
+      })
+      .filter((x): x is YearCount => x !== null);
+  }
+  if (res && typeof res === 'object') {
+    const obj = res as Record<string, unknown>;
+    if (Array.isArray(obj.data)) return normaliseYears(obj.data);
+    return Object.entries(obj)
+      .map(([k, v]) => ({ year: Number(k), count: Number(v) || 0 }))
+      .filter((x) => Number.isFinite(x.year));
+  }
+  return [];
 }
 
 /** Best-effort title for instruments. */

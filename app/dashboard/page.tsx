@@ -249,18 +249,35 @@ export default function DashboardPage() {
 
   // Tiles — every value pulled from a real backend (LexRam, TSR Supabase,
   // blog table or network table). No localStorage placeholders.
-  const tiles: { label: string; value: number; href: string; icon: typeof FileText; color: string }[] = [
-    { label: 'Research Threads', value: sessionCount, href: '/dashboard/research-2', icon: MessageSquare, color: 'text-sky-600 bg-sky-50' },
-    { label: 'Cases',            value: caseCount,    href: '/dashboard/research-2', icon: Briefcase,      color: 'text-amber-600 bg-amber-50' },
-    { label: 'Drafts',           value: draftCount,   href: '/dashboard/research-2', icon: NotebookPen,    color: 'text-violet-600 bg-violet-50' },
-    { label: 'TSR Reports',      value: tsrCount,     href: '/dashboard/tsr',        icon: FileSearch,     color: 'text-rose-600 bg-rose-50' },
-    { label: 'Blog Posts',       value: blogCount,    href: '/dashboard/blog',       icon: PenLine,        color: 'text-emerald-600 bg-emerald-50' },
-    { label: 'Network',          value: connectionCount, href: '/dashboard/network', icon: Network,        color: 'text-indigo-600 bg-indigo-50' },
+  //
+  // Palette is restricted to the brand's creamy / rust / maroon family —
+  // each tile differentiates with a slightly different cream tint + icon
+  // accent (maroon vs. rust) instead of pulling in off-brand sky/violet/
+  // emerald/indigo shades like the previous iteration.
+  const tiles: { label: string; value: number; href: string; icon: typeof FileText; iconBg: string; iconColor: string }[] = [
+    { label: 'Research Threads', value: sessionCount,    href: '/dashboard/research-2', icon: MessageSquare, iconBg: 'bg-[#FFF0DF]',       iconColor: 'text-[#680318]' },
+    { label: 'Cases',            value: caseCount,       href: '/dashboard/research-2', icon: Briefcase,     iconBg: 'bg-[#F9E4C9]',       iconColor: 'text-[#B94826]' },
+    { label: 'Drafts',           value: draftCount,      href: '/dashboard/research-2', icon: NotebookPen,   iconBg: 'bg-[#FFE6CB]',       iconColor: 'text-[#680318]' },
+    { label: 'TSR Reports',      value: tsrCount,        href: '/dashboard/tsr',        icon: FileSearch,    iconBg: 'bg-[#F9E4C9]',       iconColor: 'text-[#8f3318]' },
+    { label: 'Blog Posts',       value: blogCount,       href: '/dashboard/blog',       icon: PenLine,       iconBg: 'bg-[#FFF0DF]',       iconColor: 'text-[#B94826]' },
+    { label: 'Network',          value: connectionCount, href: '/dashboard/network',    icon: Network,       iconBg: 'bg-[#FFE6CB]',       iconColor: 'text-[#7a1f2b]' },
   ];
 
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
   return (
+    // The parent <main> in app/dashboard/layout.tsx is a flex column with
+    // overflow-hidden — every dashboard page is expected to own its own
+    // scroll container. Wrapping in flex-1 + min-h-0 + overflow-y-auto is
+    // what makes /dashboard scrollable here (previously it was a plain
+    // block div so all the content below the fold was being clipped).
+    <div
+      className="flex-1 min-h-0 overflow-y-auto custom-scrollbar"
+      style={{
+        background:
+          'radial-gradient(ellipse 80% 60% at 70% 0%, rgba(185,72,38,0.10) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 20% 100%, rgba(104,3,24,0.06) 0%, transparent 60%), linear-gradient(180deg, #FFF7EC 0%, #FFF0DF 100%)',
+      }}
+    >
     <div className="p-6 space-y-6">
       <DashboardHeader
         today={new Date().toLocaleDateString('en-IN', {
@@ -274,11 +291,11 @@ export default function DashboardPage() {
       {/* ── Live workspace tiles ────────────────────────────────────────── */}
       <section>
         {liveError && (
-          <div className="mb-3 bg-rose-50 border border-rose-200 rounded-lg p-3 flex items-center justify-between">
-            <p className="text-xs text-rose-700">Some workspace data failed to load: {liveError}</p>
+          <div className="mb-3 bg-[#FFE6CB] border border-[#B94826]/30 rounded-lg p-3 flex items-center justify-between">
+            <p className="text-xs text-[#680318]">Some workspace data failed to load: {liveError}</p>
             <button
               onClick={() => setReloadNonce((n) => n + 1)}
-              className="text-[11px] px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md"
+              className="text-[11px] px-2.5 py-1 bg-[#680318] hover:bg-[#4a0210] text-[#FFF0DF] rounded-md transition-colors"
             >
               Retry
             </button>
@@ -292,17 +309,17 @@ export default function DashboardPage() {
               <Link
                 key={t.label}
                 href={t.href}
-                className="group bg-white border border-[var(--border-default)] rounded-xl p-4 hover:border-[var(--lex-maroon,#7a1f2b)]/40 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(122,31,43,0.25)] transition-all duration-300"
+                className="group bg-white/90 backdrop-blur-sm border border-[#680318]/12 rounded-xl p-4 hover:border-[#680318]/35 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(104,3,24,0.30)] transition-all duration-300"
               >
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-2 ${t.color}`}>
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-2 ${t.iconBg} ${t.iconColor}`}>
                   <Icon className="w-4 h-4" />
                 </div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#680318]/70">
                   {t.label}
                 </p>
-                <p className="text-2xl font-semibold text-[var(--text-primary)] font-mono mt-0.5">
+                <p className="text-2xl font-semibold text-[#3a0510] font-mono mt-0.5">
                   {liveLoading ? (
-                    <span className="inline-block h-7 w-10 rounded bg-[var(--border-default)]/60 animate-pulse align-middle" />
+                    <span className="inline-block h-7 w-10 rounded bg-[#680318]/15 animate-pulse align-middle" />
                   ) : (
                     t.value.toLocaleString('en-IN')
                   )}
@@ -317,31 +334,31 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column — Recent research + Recent blog (span 2) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Recent research threads */}
-          <div className="bg-white border border-[var(--border-default)] rounded-xl p-5">
+          {/* Recent research threads — maroon accent */}
+          <div className="bg-white/95 backdrop-blur-sm border border-[#680318]/12 rounded-xl p-5 shadow-[0_18px_40px_-30px_rgba(104,3,24,0.35)]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-sky-600" />
-                <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wide">
+                <MessageSquare className="w-4 h-4 text-[#680318]" />
+                <h3 className="text-sm font-semibold text-[#3a0510] uppercase tracking-wide">
                   Recent Research
                 </h3>
               </div>
-              <Link href="/dashboard/research-2" className="text-xs text-sky-600 hover:text-sky-700">
+              <Link href="/dashboard/research-2" className="text-xs text-[#680318] hover:text-[#B94826] font-medium transition-colors">
                 Open Research
               </Link>
             </div>
             {liveLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-12 rounded-lg bg-[var(--border-default)]/40 animate-pulse" />
+                  <div key={i} className="h-12 rounded-lg bg-[#680318]/8 animate-pulse" />
                 ))}
               </div>
             ) : recentSessions.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-sm text-[var(--text-muted)] mb-3">No research threads yet.</p>
+                <p className="text-sm text-[#680318]/60 mb-3">No research threads yet.</p>
                 <Link
                   href="/dashboard/research-2"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-600 hover:text-sky-700"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#680318] hover:text-[#B94826]"
                 >
                   <Plus className="w-3.5 h-3.5" /> Start your first research
                 </Link>
@@ -354,19 +371,19 @@ export default function DashboardPage() {
                     <Link
                       key={s.id}
                       href={`/dashboard/research-2?session=${s.id}`}
-                      className="block border border-[var(--border-default)] rounded-lg p-3 hover:border-sky-300 hover:bg-sky-50/30 transition-colors"
+                      className="block border border-[#680318]/10 rounded-lg p-3 hover:border-[#680318]/35 hover:bg-[#FFF0DF]/50 transition-colors"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm text-[var(--text-primary)] line-clamp-1 font-medium flex-1">
+                        <p className="text-sm text-[#3a0510] line-clamp-1 font-medium flex-1">
                           {s.title || 'Untitled thread'}
                         </p>
                         {hasDraft && (
-                          <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-semibold">
+                          <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#F9E4C9] text-[#680318] text-[10px] font-semibold">
                             <NotebookPen className="w-2.5 h-2.5" /> Draft
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-1 text-[11px] text-[var(--text-muted)] font-mono">
+                      <div className="flex items-center gap-2 mt-1 text-[11px] text-[#680318]/55 font-mono">
                         <span>{s.messages.length} msg{s.messages.length === 1 ? '' : 's'}</span>
                         <span>·</span>
                         <span>{relativeDate(s.updatedAt)}</span>
@@ -378,34 +395,34 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Recent blog posts */}
-          <div className="bg-white border border-[var(--border-default)] rounded-xl p-5">
+          {/* Recent blog posts — rust accent */}
+          <div className="bg-white/95 backdrop-blur-sm border border-[#680318]/12 rounded-xl p-5 shadow-[0_18px_40px_-30px_rgba(104,3,24,0.35)]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <PenLine className="w-4 h-4 text-emerald-600" />
-                <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wide">
+                <PenLine className="w-4 h-4 text-[#B94826]" />
+                <h3 className="text-sm font-semibold text-[#3a0510] uppercase tracking-wide">
                   Recent Blogs
                 </h3>
-                <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                <span className="text-[10px] text-[#680318]/55 font-mono">
                   {publishedBlogs} published · {blogCount - publishedBlogs} draft
                 </span>
               </div>
-              <Link href="/dashboard/blog" className="text-xs text-emerald-600 hover:text-emerald-700">
+              <Link href="/dashboard/blog" className="text-xs text-[#B94826] hover:text-[#8f3318] font-medium transition-colors">
                 All posts
               </Link>
             </div>
             {liveLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-12 rounded-lg bg-[var(--border-default)]/40 animate-pulse" />
+                  <div key={i} className="h-12 rounded-lg bg-[#B94826]/8 animate-pulse" />
                 ))}
               </div>
             ) : recentBlogs.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-sm text-[var(--text-muted)] mb-3">No blog posts yet.</p>
+                <p className="text-sm text-[#680318]/60 mb-3">No blog posts yet.</p>
                 <Link
                   href="/dashboard/blog/create"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#B94826] hover:text-[#8f3318]"
                 >
                   <Plus className="w-3.5 h-3.5" /> Write a post
                 </Link>
@@ -419,26 +436,26 @@ export default function DashboardPage() {
                     <Link
                       key={p.id}
                       href={p.slug ? `/blog/${p.slug}` : '/dashboard/blog'}
-                      className="block border border-[var(--border-default)] rounded-lg p-3 hover:border-emerald-300 hover:bg-emerald-50/30 transition-colors"
+                      className="block border border-[#680318]/10 rounded-lg p-3 hover:border-[#B94826]/35 hover:bg-[#F9E4C9]/40 transition-colors"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm text-[var(--text-primary)] line-clamp-1 font-medium flex-1">
+                        <p className="text-sm text-[#3a0510] line-clamp-1 font-medium flex-1">
                           {p.title}
                         </p>
                         <div className="flex items-center gap-1 shrink-0">
                           {isNew && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#B94826] text-[#FFF0DF] text-[10px] font-semibold">
                               <Sparkles className="w-2.5 h-2.5" /> NEW
                             </span>
                           )}
                           {!p.published_at && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold">
+                            <span className="px-1.5 py-0.5 rounded-full bg-[#F9E4C9] text-[#8f3318] text-[10px] font-semibold">
                               Draft
                             </span>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-1 text-[11px] text-[var(--text-muted)] font-mono">
+                      <div className="flex items-center gap-2 mt-1 text-[11px] text-[#680318]/55 font-mono">
                         {p.published_at ? <span>Published {relativeDate(p.published_at)}</span> : <span>Updated {relativeDate(ts)}</span>}
                         {p.reading_time && <span>· {p.reading_time} min read</span>}
                       </div>
@@ -452,84 +469,97 @@ export default function DashboardPage() {
 
         {/* Right column — TSR cases + Quick actions */}
         <div className="space-y-6">
-          {/* Recent TSR cases */}
-          <div className="bg-white border border-[var(--border-default)] rounded-xl p-5">
+          {/* Recent TSR cases — rust-deep accent */}
+          <div className="bg-white/95 backdrop-blur-sm border border-[#680318]/12 rounded-xl p-5 shadow-[0_18px_40px_-30px_rgba(104,3,24,0.35)]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <FileSearch className="w-4 h-4 text-rose-600" />
-                <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wide">
+                <FileSearch className="w-4 h-4 text-[#8f3318]" />
+                <h3 className="text-sm font-semibold text-[#3a0510] uppercase tracking-wide">
                   TSR Cases
                 </h3>
               </div>
-              <Link href="/dashboard/tsr" className="text-xs text-rose-600 hover:text-rose-700">
+              <Link href="/dashboard/tsr" className="text-xs text-[#8f3318] hover:text-[#680318] font-medium transition-colors">
                 Open TSR
               </Link>
             </div>
             {liveLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-14 rounded-lg bg-[var(--border-default)]/40 animate-pulse" />
+                  <div key={i} className="h-14 rounded-lg bg-[#8f3318]/8 animate-pulse" />
                 ))}
               </div>
             ) : recentTsr.length === 0 ? (
               <div className="text-center py-6">
-                <p className="text-sm text-[var(--text-muted)] mb-3">No TSR cases yet.</p>
+                <p className="text-sm text-[#680318]/60 mb-3">No TSR cases yet.</p>
                 <Link
                   href="/dashboard/tsr"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8f3318] hover:text-[#680318]"
                 >
                   <Plus className="w-3.5 h-3.5" /> Create your first TSR
                 </Link>
               </div>
             ) : (
               <div className="space-y-1.5">
-                {recentTsr.map((c) => (
-                  <Link
-                    key={c.id}
-                    href={`/dashboard/tsr/${c.id}`}
-                    className="block border border-[var(--border-default)] rounded-lg p-3 hover:border-rose-300 hover:bg-rose-50/30 transition-colors"
-                  >
-                    <p className="text-sm text-[var(--text-primary)] line-clamp-1 font-medium">
-                      {c.case_name || 'Untitled case'}
-                    </p>
-                    <div className="flex items-center justify-between gap-2 mt-1 text-[11px] text-[var(--text-muted)] font-mono">
-                      <span className="truncate">{c.case_no} · {c.bank_name}</span>
-                      <span
-                        className="px-1.5 py-0.5 rounded-full font-semibold text-[10px]"
-                        style={{
-                          backgroundColor: c.status === 'complete' ? '#D1FAE5' : c.status === 'error' ? '#FEE2E2' : '#fff7ec',
-                          color: c.status === 'complete' ? '#065F46' : c.status === 'error' ? '#991B1B' : '#680318',
-                        }}
-                      >
-                        {c.status}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
+                {recentTsr.map((c) => {
+                  // Status pills: keep the original semantic colors (green
+                  // for complete, red for error) but warm them toward the
+                  // brand cream/rust family for the rest.
+                  const status = c.status || 'new';
+                  const pillStyle =
+                    status === 'complete'
+                      ? { backgroundColor: '#E7F4D8', color: '#3F5B14' }
+                      : status === 'error'
+                      ? { backgroundColor: '#F9D6CC', color: '#7a1f17' }
+                      : status === 'processing'
+                      ? { backgroundColor: '#F9E4C9', color: '#8f3318' }
+                      : { backgroundColor: '#FFF0DF', color: '#680318' };
+                  return (
+                    <Link
+                      key={c.id}
+                      href={`/dashboard/tsr/${c.id}`}
+                      className="block border border-[#680318]/10 rounded-lg p-3 hover:border-[#8f3318]/35 hover:bg-[#F9E4C9]/40 transition-colors"
+                    >
+                      <p className="text-sm text-[#3a0510] line-clamp-1 font-medium">
+                        {c.case_name || 'Untitled case'}
+                      </p>
+                      <div className="flex items-center justify-between gap-2 mt-1 text-[11px] text-[#680318]/55 font-mono">
+                        <span className="truncate">{c.case_no} · {c.bank_name}</span>
+                        <span className="px-1.5 py-0.5 rounded-full font-semibold text-[10px]" style={pillStyle}>
+                          {status}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {/* Quick Actions */}
-          <div className="bg-gradient-to-br from-[#fff7ec] to-white border border-[var(--border-default)] rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wide mb-4">
+          {/* Quick Actions — cream gradient panel with maroon/rust accents */}
+          <div
+            className="rounded-xl p-5 border border-[#680318]/15"
+            style={{
+              background: 'linear-gradient(135deg, #FFF0DF 0%, #F9E4C9 100%)',
+            }}
+          >
+            <h3 className="text-sm font-semibold text-[#3a0510] uppercase tracking-wide mb-4">
               Quick Actions
             </h3>
             <div className="space-y-2">
               {[
-                { href: '/dashboard/research-2', icon: Search, label: 'New research thread', accent: 'text-sky-600' },
-                { href: '/dashboard/tsr',        icon: FileSearch, label: 'New TSR report',  accent: 'text-rose-600' },
-                { href: '/dashboard/blog/create', icon: PenLine, label: 'Write a blog post', accent: 'text-emerald-600' },
-                { href: '/dashboard/network',   icon: Network, label: 'Browse network',     accent: 'text-indigo-600' },
+                { href: '/dashboard/research-2',  icon: Search,      label: 'New research thread', accent: 'text-[#680318]' },
+                { href: '/dashboard/tsr',         icon: FileSearch,  label: 'New TSR report',      accent: 'text-[#8f3318]' },
+                { href: '/dashboard/blog/create', icon: PenLine,     label: 'Write a blog post',   accent: 'text-[#B94826]' },
+                { href: '/dashboard/network',     icon: Network,     label: 'Browse network',      accent: 'text-[#7a1f2b]' },
               ].map(({ href, icon: Icon, label, accent }) => (
                 <Link
                   key={href}
                   href={href}
-                  className="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white border border-[var(--border-default)] hover:border-[var(--lex-maroon,#7a1f2b)]/30 transition-colors"
+                  className="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/85 backdrop-blur-sm border border-[#680318]/10 hover:border-[#680318]/35 hover:bg-white transition-colors"
                 >
                   <Icon className={`w-4 h-4 ${accent}`} />
-                  <span className="text-sm font-medium text-[var(--text-primary)] flex-1">{label}</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-[var(--text-muted)] -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all" />
+                  <span className="text-sm font-medium text-[#3a0510] flex-1">{label}</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#680318]/55 -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all" />
                 </Link>
               ))}
             </div>
@@ -538,12 +568,12 @@ export default function DashboardPage() {
       </div>
 
       {/* ── More resources — every other top-level module in one place ── */}
-      <section className="pt-4 border-t border-[var(--border-default)]">
+      <section className="pt-4 border-t border-[#680318]/15">
         <div className="mb-4">
-          <p className="text-xs font-medium tracking-widest uppercase text-[var(--text-muted)] mb-1">
+          <p className="text-xs font-medium tracking-widest uppercase text-[#680318]/65 mb-1">
             Workspace
           </p>
-          <h2 className="text-2xl font-serif font-bold text-[var(--text-primary)]">
+          <h2 className="text-2xl font-serif font-bold text-[#3a0510]">
             More Resources
           </h2>
         </div>
@@ -551,7 +581,7 @@ export default function DashboardPage() {
         <div className="space-y-6">
           {RESOURCE_GROUPS.map((group) => (
             <div key={group.title}>
-              <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--lex-maroon,#7a1f2b)] mb-2">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#B94826] mb-2">
                 {group.title}
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -559,16 +589,16 @@ export default function DashboardPage() {
                   <Link
                     key={href}
                     href={href}
-                    className="group bg-white p-3.5 rounded-xl border border-[var(--border-default)] hover:border-[var(--lex-maroon,#7a1f2b)]/40 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(122,31,43,0.25)] transition-all duration-300 flex items-start gap-3"
+                    className="group bg-white/90 backdrop-blur-sm p-3.5 rounded-xl border border-[#680318]/12 hover:border-[#680318]/40 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(104,3,24,0.30)] transition-all duration-300 flex items-start gap-3"
                   >
-                    <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--lex-maroon,#7a1f2b)]/8 text-[var(--lex-maroon,#7a1f2b)] shrink-0 group-hover:bg-[var(--lex-maroon,#7a1f2b)] group-hover:text-white transition-colors">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#FFF0DF] text-[#680318] shrink-0 group-hover:bg-[#680318] group-hover:text-[#FFF0DF] transition-colors">
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className="font-semibold text-sm text-[var(--text-primary)] truncate">
+                      <h4 className="font-semibold text-sm text-[#3a0510] truncate">
                         {title}
                       </h4>
-                      <p className="text-[12px] text-[var(--text-muted)] mt-0.5 line-clamp-1">
+                      <p className="text-[12px] text-[#680318]/60 mt-0.5 line-clamp-1">
                         {desc}
                       </p>
                     </div>
@@ -581,13 +611,13 @@ export default function DashboardPage() {
       </section>
 
       {/* ── Legal Intelligence Overview — live LexRam corpus data ── */}
-      <section className="pt-4 border-t border-[var(--border-default)]">
+      <section className="pt-4 border-t border-[#680318]/15">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium tracking-widest uppercase text-[var(--text-muted)] mb-1">
+            <p className="text-xs font-medium tracking-widest uppercase text-[#680318]/65 mb-1">
               Legal Corpus
             </p>
-            <h2 className="text-2xl font-serif font-bold text-[var(--text-primary)]">
+            <h2 className="text-2xl font-serif font-bold text-[#3a0510]">
               Legal Intelligence Overview
             </h2>
           </div>
@@ -595,16 +625,16 @@ export default function DashboardPage() {
 
         {corpusLoading && (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-[var(--lex-rust,#b94826)]" />
+            <Loader2 className="w-6 h-6 animate-spin text-[#B94826]" />
           </div>
         )}
 
         {corpusError && !corpusLoading && (
-          <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 flex items-center justify-between">
-            <p className="text-sm text-rose-700">Failed to load corpus: {corpusError}</p>
+          <div className="bg-[#FFE6CB] border border-[#B94826]/30 rounded-lg p-4 flex items-center justify-between">
+            <p className="text-sm text-[#680318]">Failed to load corpus: {corpusError}</p>
             <button
               onClick={() => setReloadNonce((n) => n + 1)}
-              className="text-xs px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg"
+              className="text-xs px-3 py-1.5 bg-[#680318] hover:bg-[#4a0210] text-[#FFF0DF] rounded-lg transition-colors"
             >
               Retry
             </button>
@@ -615,21 +645,21 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {[
-                { label: 'Acts',          value: num(corpusStats.acts),                   icon: Scale,    color: 'text-amber-600 bg-amber-50' },
-                { label: 'Sections',      value: num(corpusStats.sections),               icon: BookOpen, color: 'text-indigo-600 bg-indigo-50' },
-                { label: 'Sub-Leg.',      value: num(corpusStats.subordinate_legislation),icon: Layers,   color: 'text-violet-600 bg-violet-50' },
-                { label: 'Circulars',     value: num(corpusStats.circulars),              icon: FileText, color: 'text-sky-600 bg-sky-50' },
-                { label: 'Amendments',    value: num(corpusStats.amendments),             icon: GitBranch,color: 'text-rose-600 bg-rose-50' },
-                { label: 'Schedules',     value: num(corpusStats.schedules),              icon: Calendar, color: 'text-teal-600 bg-teal-50' },
+                { label: 'Acts',       value: num(corpusStats.acts),                    icon: Scale,    iconBg: 'bg-[#FFF0DF]',  iconColor: 'text-[#680318]' },
+                { label: 'Sections',   value: num(corpusStats.sections),                icon: BookOpen, iconBg: 'bg-[#F9E4C9]',  iconColor: 'text-[#8f3318]' },
+                { label: 'Sub-Leg.',   value: num(corpusStats.subordinate_legislation), icon: Layers,   iconBg: 'bg-[#FFE6CB]',  iconColor: 'text-[#B94826]' },
+                { label: 'Circulars',  value: num(corpusStats.circulars),               icon: FileText, iconBg: 'bg-[#FFF0DF]',  iconColor: 'text-[#7a1f2b]' },
+                { label: 'Amendments', value: num(corpusStats.amendments),              icon: GitBranch,iconBg: 'bg-[#F9E4C9]',  iconColor: 'text-[#680318]' },
+                { label: 'Schedules',  value: num(corpusStats.schedules),               icon: Calendar, iconBg: 'bg-[#FFE6CB]',  iconColor: 'text-[#8f3318]' },
               ].map((s) => {
                 const Icon = s.icon;
                 return (
-                  <div key={s.label} className="bg-white border border-[var(--border-default)] rounded-xl p-4">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${s.color}`}>
+                  <div key={s.label} className="bg-white/90 backdrop-blur-sm border border-[#680318]/12 rounded-xl p-4">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${s.iconBg} ${s.iconColor}`}>
                       <Icon className="w-4 h-4" />
                     </div>
-                    <p className="text-xs text-[var(--text-muted)]">{s.label}</p>
-                    <p className="text-xl font-semibold text-[var(--text-primary)] font-mono">
+                    <p className="text-xs text-[#680318]/65">{s.label}</p>
+                    <p className="text-xl font-semibold text-[#3a0510] font-mono">
                       {s.value.toLocaleString('en-IN')}
                     </p>
                   </div>
@@ -638,12 +668,12 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white border border-[var(--border-default)] rounded-xl p-5">
+              <div className="bg-white/90 backdrop-blur-sm border border-[#680318]/12 rounded-xl p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wide">
+                  <h3 className="text-sm font-semibold text-[#3a0510] uppercase tracking-wide">
                     Recent Circulars
                   </h3>
-                  <Link href="/dashboard/circulars" className="text-xs text-sky-600 hover:text-sky-700">
+                  <Link href="/dashboard/circulars" className="text-xs text-[#680318] hover:text-[#B94826] font-medium transition-colors">
                     View all
                   </Link>
                 </div>
@@ -652,10 +682,10 @@ export default function DashboardPage() {
                     <Link
                       key={c.id}
                       href={`/dashboard/circulars/${c.id}`}
-                      className="block border border-[var(--border-default)] rounded-lg p-3 hover:border-sky-300 transition-colors"
+                      className="block border border-[#680318]/10 rounded-lg p-3 hover:border-[#680318]/35 hover:bg-[#FFF0DF]/40 transition-colors"
                     >
-                      <p className="text-sm text-[var(--text-primary)] line-clamp-1 font-medium">{c.subject}</p>
-                      <div className="flex items-center gap-2 mt-1 text-[11px] text-[var(--text-muted)] font-mono">
+                      <p className="text-sm text-[#3a0510] line-clamp-1 font-medium">{c.subject}</p>
+                      <div className="flex items-center gap-2 mt-1 text-[11px] text-[#680318]/55 font-mono">
                         {c.circular_number && <span>{c.circular_number}</span>}
                         {c.issue_date && <span>· {formatDate(c.issue_date)}</span>}
                         {c.ministry && <span className="font-sans">· {c.ministry}</span>}
@@ -663,27 +693,27 @@ export default function DashboardPage() {
                     </Link>
                   ))}
                   {(corpusRecent?.circulars?.length ?? 0) === 0 && (
-                    <p className="text-xs text-[var(--text-muted)]">No recent circulars.</p>
+                    <p className="text-xs text-[#680318]/55">No recent circulars.</p>
                   )}
                 </div>
               </div>
 
-              <div className="bg-white border border-[var(--border-default)] rounded-xl p-5">
+              <div className="bg-white/90 backdrop-blur-sm border border-[#680318]/12 rounded-xl p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wide">
+                  <h3 className="text-sm font-semibold text-[#3a0510] uppercase tracking-wide">
                     Recent Amendments
                   </h3>
-                  <Link href="/dashboard/amendments/tracker" className="text-xs text-rose-600 hover:text-rose-700">
+                  <Link href="/dashboard/amendments/tracker" className="text-xs text-[#B94826] hover:text-[#8f3318] font-medium transition-colors">
                     View all
                   </Link>
                 </div>
                 <div className="space-y-2">
                   {(corpusRecent?.amendments ?? []).slice(0, 5).map((a) => (
-                    <div key={a.id} className="border border-[var(--border-default)] rounded-lg p-3">
-                      <p className="text-sm text-[var(--text-primary)] line-clamp-1 font-medium">
+                    <div key={a.id} className="border border-[#680318]/10 rounded-lg p-3">
+                      <p className="text-sm text-[#3a0510] line-clamp-1 font-medium">
                         {a.amendment_act_name ?? 'Amendment'}
                       </p>
-                      <div className="flex items-center gap-2 mt-1 text-[11px] text-[var(--text-muted)] font-mono">
+                      <div className="flex items-center gap-2 mt-1 text-[11px] text-[#680318]/55 font-mono">
                         {a.amendment_year && <span>{a.amendment_year}</span>}
                         {a.amendment_date && <span>· {formatDate(a.amendment_date)}</span>}
                         {a.status && <span className="font-sans">· {a.status}</span>}
@@ -691,15 +721,15 @@ export default function DashboardPage() {
                     </div>
                   ))}
                   {(corpusRecent?.amendments?.length ?? 0) === 0 && (
-                    <p className="text-xs text-[var(--text-muted)]">No recent amendments.</p>
+                    <p className="text-xs text-[#680318]/55">No recent amendments.</p>
                   )}
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white border border-[var(--border-default)] rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wide mb-3">
+              <div className="bg-white/90 backdrop-blur-sm border border-[#680318]/12 rounded-xl p-5">
+                <h3 className="text-sm font-semibold text-[#3a0510] uppercase tracking-wide mb-3">
                   Top Legal Domains
                 </h3>
                 <div className="space-y-2">
@@ -710,21 +740,21 @@ export default function DashboardPage() {
                       const total = num(d.act_count) + num(d.circular_count) + num(d.subleg_count);
                       return (
                         <div key={d.domain} className="flex items-center justify-between text-sm">
-                          <span className="text-[var(--text-primary)]">{d.domain}</span>
-                          <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] font-mono">
+                          <span className="text-[#3a0510]">{d.domain}</span>
+                          <div className="flex items-center gap-3 text-xs text-[#680318]/65 font-mono">
                             <span>{num(d.act_count)} acts</span>
                             <span>{num(d.circular_count)} circ.</span>
-                            <span className="text-[var(--text-primary)]">{total.toLocaleString('en-IN')}</span>
+                            <span className="text-[#3a0510]">{total.toLocaleString('en-IN')}</span>
                           </div>
                         </div>
                       );
                     })}
-                  {corpusDomains.length === 0 && <p className="text-xs text-[var(--text-muted)]">No domain data.</p>}
+                  {corpusDomains.length === 0 && <p className="text-xs text-[#680318]/55">No domain data.</p>}
                 </div>
               </div>
 
-              <div className="bg-white border border-[var(--border-default)] rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wide mb-3">
+              <div className="bg-white/90 backdrop-blur-sm border border-[#680318]/12 rounded-xl p-5">
+                <h3 className="text-sm font-semibold text-[#3a0510] uppercase tracking-wide mb-3">
                   Top Ministries
                 </h3>
                 <div className="space-y-2">
@@ -733,19 +763,20 @@ export default function DashboardPage() {
                     .slice(0, 6)
                     .map((m) => (
                       <div key={m.ministry} className="flex items-center justify-between text-sm">
-                        <span className="text-[var(--text-primary)] line-clamp-1">{m.ministry}</span>
-                        <span className="text-xs text-[var(--text-muted)] font-mono">
+                        <span className="text-[#3a0510] line-clamp-1">{m.ministry}</span>
+                        <span className="text-xs text-[#680318]/65 font-mono">
                           {num(m.count).toLocaleString('en-IN')}
                         </span>
                       </div>
                     ))}
-                  {corpusMinistries.length === 0 && <p className="text-xs text-[var(--text-muted)]">No ministry data.</p>}
+                  {corpusMinistries.length === 0 && <p className="text-xs text-[#680318]/55">No ministry data.</p>}
                 </div>
               </div>
             </div>
           </div>
         )}
       </section>
+    </div>
     </div>
   );
 }

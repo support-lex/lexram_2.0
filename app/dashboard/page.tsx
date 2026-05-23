@@ -138,92 +138,229 @@ interface CaseItem {
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// sessionStorage cache — stores the last-known value of each data source
+// keyed by name. Reads are best-effort (returns the fallback on any parse
+// error); writes are fire-and-forget so quota issues never break the page.
+// Repeat dashboard visits paint cached counts on the very first frame and
+// then fade in fresh data once the network catches up — no full-page
+// "Loading…" blink while sessions/blog/network re-fetch.
+// ─────────────────────────────────────────────────────────────────────────────
+const CACHE_PREFIX = 'lexram_dashboard_v2:';
+
+function loadCached<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.sessionStorage.getItem(CACHE_PREFIX + key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveCached<T>(key: string, value: T): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify(value));
+  } catch {
+    /* quota / disabled storage — swallow */
+  }
+}
+
 export default function DashboardPage() {
-  const [sessions, setSessions] = useState<ResearchSession[]>([]);
-  const [cases, setCases] = useState<CaseItem[]>([]);
-  const [tsrCases, setTsrCases] = useState<TsrCase[]>([]);
-  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
-  const [connectionCount, setConnectionCount] = useState(0);
-  const [liveLoading, setLiveLoading] = useState(true);
-  const [liveError, setLiveError] = useState<string | null>(null);
+  // Each data source has its OWN state + loading flag and fires its OWN
+  // fetch — the old Promise.allSettled([...]) held the whole UI hostage
+  // until every endpoint returned, so one slow source (LexRam sessions or
+  // the network query) made the dashboard feel broken. With independent
+  // loaders + sessionStorage seeding, each tile / rail hydrates as soon
+  // as its data lands and repeat visits paint last-known values
+  // immediately.
+  const [sessions, setSessions]               = useState<ResearchSession[]>(() => loadCached<ResearchSession[]>('sessions', []));
+  const [sessionsLoading, setSessionsLoading] = useState(() => loadCached<ResearchSession[]>('sessions', []).length === 0);
+
+  const [cases, setCases]                     = useState<CaseItem[]>(() => loadCached<CaseItem[]>('cases', []));
+  const [casesLoading, setCasesLoading]       = useState(() => loadCached<CaseItem[]>('cases', []).length === 0);
+
+  const [tsrCases, setTsrCases]               = useState<TsrCase[]>(() => loadCached<TsrCase[]>('tsrCases', []));
+  const [tsrLoading, setTsrLoading]           = useState(() => loadCached<TsrCase[]>('tsrCases', []).length === 0);
+
+  const [blogPosts, setBlogPosts]             = useState<BlogPost[]>(() => loadCached<BlogPost[]>('blogPosts', []));
+  const [blogLoading, setBlogLoading]         = useState(() => loadCached<BlogPost[]>('blogPosts', []).length === 0);
+
+  const [connectionCount, setConnectionCount] = useState(() => loadCached<number>('connectionCount', 0));
+  const [networkLoading, setNetworkLoading]   = useState(() => loadCached<number>('connectionCount', 0) === 0);
+
+  // Aggregate error banner — keyed by source so per-source failures are
+  // visible without nuking the whole page.
+  const [sourceErrors, setSourceErrors] = useState<Record<string, string>>({});
 
   // ── Legal corpus (LexRam backend) ──────────────────────────────────────
-  const [corpusStats, setCorpusStats] = useState<DashboardStatsData | null>(null);
-  const [corpusRecent, setCorpusRecent] = useState<DashboardRecent | null>(null);
-  const [corpusDomains, setCorpusDomains] = useState<DashboardDomain[]>([]);
-  const [corpusMinistries, setCorpusMinistries] = useState<DashboardMinistry[]>([]);
-  const [corpusLoading, setCorpusLoading] = useState(true);
-  const [corpusError, setCorpusError] = useState<string | null>(null);
+  const [corpusStats, setCorpusStats]           = useState<DashboardStatsData | null>(() => loadCached<DashboardStatsData | null>('corpusStats', null));
+  const [corpusRecent, setCorpusRecent]         = useState<DashboardRecent | null>(() => loadCached<DashboardRecent | null>('corpusRecent', null));
+  const [corpusDomains, setCorpusDomains]       = useState<DashboardDomain[]>(() => loadCached<DashboardDomain[]>('corpusDomains', []));
+  const [corpusMinistries, setCorpusMinistries] = useState<DashboardMinistry[]>(() => loadCached<DashboardMinistry[]>('corpusMinistries', []));
+  const [corpusLoading, setCorpusLoading]       = useState(() => loadCached<DashboardStatsData | null>('corpusStats', null) === null);
+  const [corpusError, setCorpusError]           = useState<string | null>(null);
+
   const [reloadNonce, setReloadNonce] = useState(0);
 
-  const loadLive = useCallback(async () => {
-    setLiveLoading(true);
-    setLiveError(null);
-    try {
-      // Pull the lexram user id once so we can scope network + TSR queries.
-      const { data: userRes } = await lexramSupabase().auth.getUser();
-      const userId = userRes.user?.id ?? null;
+  // First error we collected — surfaced in a single banner so the user
+  // sees "something failed" without losing the rest of the dashboard.
+  // Individual rails / tiles use their own per-source flags so they each
+  // hydrate independently.
+  const liveError = Object.values(sourceErrors)[0] ?? null;
 
-      const [sessionsRes, casesRes, blogRes, tsrRes, connRes] = await Promise.allSettled([
-        chatSessionRepository.list(),
-        api.get<{ cases: CaseItem[] } | CaseItem[]>('/cases'),
-        listPosts({ includeDrafts: true }),
-        userId
-          ? tsrSupabase
-              .from('cases')
-              .select('id, case_name, case_no, bank_name, status, created_at')
-              .eq('user_id', userId)
-              .order('created_at', { ascending: false })
-              .limit(50)
-          : Promise.resolve({ data: [] as TsrCase[], error: null }),
-        userId ? listAcceptedConnections(userId) : Promise.resolve([]),
-      ]);
-
-      if (sessionsRes.status === 'fulfilled') setSessions(sessionsRes.value);
-      if (casesRes.status === 'fulfilled') {
-        const v = casesRes.value.data;
-        setCases(Array.isArray(v) ? v : v?.cases ?? []);
-      }
-      if (blogRes.status === 'fulfilled') setBlogPosts(blogRes.value);
-      if (tsrRes.status === 'fulfilled') {
-        const value = tsrRes.value as { data: TsrCase[] | null; error: unknown };
-        setTsrCases(value.data ?? []);
-      }
-      if (connRes.status === 'fulfilled') {
-        setConnectionCount(Array.isArray(connRes.value) ? connRes.value.length : 0);
-      }
-    } catch (e) {
-      setLiveError(e instanceof Error ? e.message : 'Failed to load workspace data');
-    } finally {
-      setLiveLoading(false);
-    }
+  const recordError = useCallback((source: string, err: unknown) => {
+    const message = err instanceof Error ? err.message : 'Failed to load';
+    setSourceErrors((prev) => ({ ...prev, [source]: message }));
   }, []);
 
-  const loadCorpus = useCallback(async () => {
-    setCorpusLoading(true);
-    setCorpusError(null);
-    try {
-      const [s, r, d, m] = await Promise.all([
-        LexramAPI.dashboardStats(),
-        LexramAPI.dashboardRecent(),
-        LexramAPI.dashboardDomains(),
-        LexramAPI.dashboardMinistries(),
-      ]);
-      setCorpusStats(s);
-      setCorpusRecent(r);
-      setCorpusDomains(Array.isArray(d) ? d : []);
-      setCorpusMinistries(Array.isArray(m) ? m : []);
-    } catch (e) {
-      setCorpusError(e instanceof Error ? e.message : 'Failed to load corpus');
-    } finally {
-      setCorpusLoading(false);
-    }
+  const clearError = useCallback((source: string) => {
+    setSourceErrors((prev) => {
+      if (!(source in prev)) return prev;
+      const next = { ...prev };
+      delete next[source];
+      return next;
+    });
   }, []);
 
   useEffect(() => {
-    loadLive();
-    loadCorpus();
-  }, [loadLive, loadCorpus, reloadNonce]);
+    let cancelled = false;
+
+    // Pull the lexram user id once so we can scope network + TSR queries.
+    // Wrapped in its own promise so each downstream fetch fires the moment
+    // the auth probe resolves, instead of blocking on a sequential chain.
+    const userIdPromise = lexramSupabase()
+      .auth.getUser()
+      .then(({ data }) => data.user?.id ?? null)
+      .catch(() => null);
+
+    // 1. Research sessions — talks to LexRam + Supabase. Usually the
+    //    slowest source, so it gets its own independent flag.
+    chatSessionRepository
+      .list()
+      .then((data) => {
+        if (cancelled) return;
+        setSessions(data);
+        saveCached('sessions', data);
+        clearError('sessions');
+      })
+      .catch((e) => !cancelled && recordError('sessions', e))
+      .finally(() => !cancelled && setSessionsLoading(false));
+
+    // 2. Research cases — fast /cases endpoint.
+    api
+      .get<{ cases: CaseItem[] } | CaseItem[]>('/cases')
+      .then((res) => {
+        if (cancelled) return;
+        const v = res.data;
+        const list = Array.isArray(v) ? v : v?.cases ?? [];
+        setCases(list);
+        saveCached('cases', list);
+        clearError('cases');
+      })
+      .catch((e) => !cancelled && recordError('cases', e))
+      .finally(() => !cancelled && setCasesLoading(false));
+
+    // 3. Blog posts — Supabase table, usually under 100 ms.
+    listPosts({ includeDrafts: true })
+      .then((data) => {
+        if (cancelled) return;
+        setBlogPosts(data);
+        saveCached('blogPosts', data);
+        clearError('blogPosts');
+      })
+      .catch((e) => !cancelled && recordError('blogPosts', e))
+      .finally(() => !cancelled && setBlogLoading(false));
+
+    // 4. TSR cases — needs the user id; queues on userIdPromise but
+    //    doesn't block any other source.
+    userIdPromise
+      .then(async (userId) => {
+        if (cancelled) return;
+        if (!userId) {
+          setTsrCases([]);
+          setTsrLoading(false);
+          return;
+        }
+        const { data, error } = await tsrSupabase
+          .from('cases')
+          .select('id, case_name, case_no, bank_name, status, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (cancelled) return;
+        if (error) {
+          recordError('tsrCases', error);
+        } else {
+          const list = (data ?? []) as TsrCase[];
+          setTsrCases(list);
+          saveCached('tsrCases', list);
+          clearError('tsrCases');
+        }
+      })
+      .catch((e) => !cancelled && recordError('tsrCases', e))
+      .finally(() => !cancelled && setTsrLoading(false));
+
+    // 5. Network connections.
+    userIdPromise
+      .then(async (userId) => {
+        if (cancelled) return;
+        if (!userId) {
+          setConnectionCount(0);
+          setNetworkLoading(false);
+          return;
+        }
+        const list = await listAcceptedConnections(userId);
+        if (cancelled) return;
+        const count = Array.isArray(list) ? list.length : 0;
+        setConnectionCount(count);
+        saveCached('connectionCount', count);
+        clearError('network');
+      })
+      .catch((e) => !cancelled && recordError('network', e))
+      .finally(() => !cancelled && setNetworkLoading(false));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadNonce, recordError, clearError]);
+
+  // Legal corpus — its own independent loader. Fires Promise.all here
+  // because all four endpoints live on the same upstream; serialising
+  // them wouldn't help and the four are conceptually one block.
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      LexramAPI.dashboardStats(),
+      LexramAPI.dashboardRecent(),
+      LexramAPI.dashboardDomains(),
+      LexramAPI.dashboardMinistries(),
+    ])
+      .then(([s, r, d, m]) => {
+        if (cancelled) return;
+        setCorpusStats(s);
+        setCorpusRecent(r);
+        const domains = Array.isArray(d) ? d : [];
+        const ministries = Array.isArray(m) ? m : [];
+        setCorpusDomains(domains);
+        setCorpusMinistries(ministries);
+        saveCached('corpusStats', s);
+        saveCached('corpusRecent', r);
+        saveCached('corpusDomains', domains);
+        saveCached('corpusMinistries', ministries);
+        setCorpusError(null);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setCorpusError(e instanceof Error ? e.message : 'Failed to load corpus');
+      })
+      .finally(() => !cancelled && setCorpusLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadNonce]);
 
   // ── Derived counts ────────────────────────────────────────────────────
   const sessionCount = sessions.length;
@@ -254,13 +391,25 @@ export default function DashboardPage() {
   // each tile differentiates with a slightly different cream tint + icon
   // accent (maroon vs. rust) instead of pulling in off-brand sky/violet/
   // emerald/indigo shades like the previous iteration.
-  const tiles: { label: string; value: number; href: string; icon: typeof FileText; iconBg: string; iconColor: string }[] = [
-    { label: 'Research Threads', value: sessionCount,    href: '/dashboard/research-2', icon: MessageSquare, iconBg: 'bg-[#FFF0DF]',       iconColor: 'text-[#680318]' },
-    { label: 'Cases',            value: caseCount,       href: '/dashboard/research-2', icon: Briefcase,     iconBg: 'bg-[#F9E4C9]',       iconColor: 'text-[#B94826]' },
-    { label: 'Drafts',           value: draftCount,      href: '/dashboard/research-2', icon: NotebookPen,   iconBg: 'bg-[#FFE6CB]',       iconColor: 'text-[#680318]' },
-    { label: 'TSR Reports',      value: tsrCount,        href: '/dashboard/tsr',        icon: FileSearch,    iconBg: 'bg-[#F9E4C9]',       iconColor: 'text-[#8f3318]' },
-    { label: 'Blog Posts',       value: blogCount,       href: '/dashboard/blog',       icon: PenLine,       iconBg: 'bg-[#FFF0DF]',       iconColor: 'text-[#B94826]' },
-    { label: 'Network',          value: connectionCount, href: '/dashboard/network',    icon: Network,       iconBg: 'bg-[#FFE6CB]',       iconColor: 'text-[#7a1f2b]' },
+  // Each tile carries its OWN loading flag so a single slow upstream can't
+  // freeze the whole tile row. Cached values stay visible while their
+  // source revalidates — the skeleton only appears when there's literally
+  // nothing to render yet.
+  const tiles: {
+    label: string;
+    value: number;
+    href: string;
+    icon: typeof FileText;
+    iconBg: string;
+    iconColor: string;
+    loading: boolean;
+  }[] = [
+    { label: 'Research Threads', value: sessionCount,    href: '/dashboard/research-2', icon: MessageSquare, iconBg: 'bg-[#FFF0DF]', iconColor: 'text-[#680318]', loading: sessionsLoading },
+    { label: 'Cases',            value: caseCount,       href: '/dashboard/research-2', icon: Briefcase,     iconBg: 'bg-[#F9E4C9]', iconColor: 'text-[#B94826]', loading: casesLoading },
+    { label: 'Drafts',           value: draftCount,      href: '/dashboard/research-2', icon: NotebookPen,   iconBg: 'bg-[#FFE6CB]', iconColor: 'text-[#680318]', loading: sessionsLoading },
+    { label: 'TSR Reports',      value: tsrCount,        href: '/dashboard/tsr',        icon: FileSearch,    iconBg: 'bg-[#F9E4C9]', iconColor: 'text-[#8f3318]', loading: tsrLoading },
+    { label: 'Blog Posts',       value: blogCount,       href: '/dashboard/blog',       icon: PenLine,       iconBg: 'bg-[#FFF0DF]', iconColor: 'text-[#B94826]', loading: blogLoading },
+    { label: 'Network',          value: connectionCount, href: '/dashboard/network',    icon: Network,       iconBg: 'bg-[#FFE6CB]', iconColor: 'text-[#7a1f2b]', loading: networkLoading },
   ];
 
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -317,11 +466,19 @@ export default function DashboardPage() {
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#680318]/70">
                   {t.label}
                 </p>
-                <p className="text-2xl font-semibold text-[#3a0510] font-mono mt-0.5">
-                  {liveLoading ? (
+                <p className="text-2xl font-semibold text-[#3a0510] font-mono mt-0.5 flex items-center gap-1.5">
+                  {t.loading && t.value === 0 ? (
                     <span className="inline-block h-7 w-10 rounded bg-[#680318]/15 animate-pulse align-middle" />
                   ) : (
-                    t.value.toLocaleString('en-IN')
+                    <>
+                      {t.value.toLocaleString('en-IN')}
+                      {t.loading && (
+                        // Cached value present + fresh fetch in flight —
+                        // a tiny spinner shows it's revalidating, no full
+                        // skeleton flash.
+                        <Loader2 className="w-3 h-3 animate-spin text-[#B94826]/60" />
+                      )}
+                    </>
                   )}
                 </p>
               </Link>
@@ -347,7 +504,7 @@ export default function DashboardPage() {
                 Open Research
               </Link>
             </div>
-            {liveLoading ? (
+            {sessionsLoading && recentSessions.length === 0 ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="h-12 rounded-lg bg-[#680318]/8 animate-pulse" />
@@ -411,7 +568,7 @@ export default function DashboardPage() {
                 All posts
               </Link>
             </div>
-            {liveLoading ? (
+            {blogLoading && recentBlogs.length === 0 ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="h-12 rounded-lg bg-[#B94826]/8 animate-pulse" />
@@ -482,7 +639,7 @@ export default function DashboardPage() {
                 Open TSR
               </Link>
             </div>
-            {liveLoading ? (
+            {tsrLoading && recentTsr.length === 0 ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="h-14 rounded-lg bg-[#8f3318]/8 animate-pulse" />

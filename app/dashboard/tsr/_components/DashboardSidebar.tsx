@@ -9,15 +9,13 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase/client'
-import { supabase as lexramSupabase } from '@/lib/supabase/client'
 import type { User as SbUser } from '@supabase/supabase-js'
 
-// Auth lives in the main lexram supabase project (the one /sign-in uses).
-// Data lives in the TSR supabase project (the one the Render backend writes
-// to). We pass the lexram user_id through as the case owner so cases stay
-// scoped per signed-in user, but RLS on the TSR project must be permissive
-// for anon — see supabase/migrations/20260523_tsr_disable_rls.sql.
-const authClient = lexramSupabase()
+// TSR data + auth both live on the main lexram supabase. RLS on cases /
+// documents enforces auth.uid() = user_id, so every signed-in lexram user
+// automatically gets isolated TSR storage. See:
+//   supabase/migrations/20260522_tsr_cases.sql
+const authClient = supabase
 
 interface Case {
   id:         string

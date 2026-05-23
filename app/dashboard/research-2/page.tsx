@@ -157,12 +157,19 @@ export default function Research2Page() {
     setStoredData(STORAGE_KEYS.SESSION_CASES, map);
   }, [currentSessionId, setPendingCaseId, sharedCases]);
 
-  // ── New chat ──────────────────────────────────────────────────────────
-  // The case dropdown in the header defaults to "Unassigned" automatically,
-  // so we just clear the thread state. (We used to fire a "Select a case"
-  // toast that hung off the top bar with an upward-arrow icon — it was
-  // visually noisy and redundant with the dropdown's built-in default.)
-  const handleNewChatWithToast = handleNewSession;
+  // ── New chat → toast reminding the user to pick a case ───────────────
+  // Bottom-center placement (no leading arrow icon) so the prompt reads as
+  // an info bar rather than a callout pointing at the case dropdown — the
+  // earlier top-center + ArrowUp combo hung awkwardly off the global top
+  // bar and looked like a misplaced tooltip.
+  const handleNewChatWithToast = useCallback(() => {
+    handleNewSession();
+    toast.message("Please select a case for this chat", {
+      description: "Use the case dropdown in the chat header. Defaults to Unassigned.",
+      duration: 4500,
+      position: "bottom-center",
+    });
+  }, [handleNewSession]);
 
   // (sharedCases hoisted above handleCaseChange — see top of component.)
 

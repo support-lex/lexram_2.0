@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { History, Share, MoreHorizontal, Users, Pin, PinOff, Archive, Trash2, Check, Link2, Briefcase, ArrowUp, Plus, Bookmark, BookmarkCheck, Share2, PenLine, Loader2 } from "lucide-react";
+import { History, Share, MoreHorizontal, Users, Pin, PinOff, Archive, Trash2, Check, Link2, Briefcase, Plus, Bookmark, BookmarkCheck, Share2, PenLine, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   pinnedSessionRepository,
@@ -157,20 +157,17 @@ export default function Research2Page() {
     setStoredData(STORAGE_KEYS.SESSION_CASES, map);
   }, [currentSessionId, setPendingCaseId, sharedCases]);
 
-  // ── New chat → toast nudging the user to pick a case ──────────────────
-  // The case dropdown in the header stays visible so the user can pick (or
-  // leave it as Unassigned, which is the default pre-selection set by the
-  // effect below once /cases has loaded).
+  // ── New chat → toast reminding the user to pick a case ───────────────
+  // Bottom-center placement (no leading arrow icon) so the prompt reads as
+  // an info bar rather than a callout pointing at the case dropdown — the
+  // earlier top-center + ArrowUp combo hung awkwardly off the global top
+  // bar and looked like a misplaced tooltip.
   const handleNewChatWithToast = useCallback(() => {
     handleNewSession();
-    toast.message("Select a case for this chat", {
-      icon: <ArrowUp className="w-4 h-4 text-[var(--accent)]" />,
-      description: "Use the case dropdown above. Defaults to Unassigned.",
-      duration: 5000,
-      // top-center keeps the toast from overlapping the collapsed left rail
-      // icons (which `top-left` was covering) while staying close enough to
-      // the case dropdown that the ArrowUp icon still reads as "look above".
-      position: "top-center",
+    toast.message("Please select a case for this chat", {
+      description: "Use the case dropdown in the chat header. Defaults to Unassigned.",
+      duration: 4500,
+      position: "bottom-center",
     });
   }, [handleNewSession]);
 

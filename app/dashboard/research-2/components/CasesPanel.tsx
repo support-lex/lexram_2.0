@@ -37,6 +37,13 @@ export interface CasesPanelProps {
   onAttachDocs?: (docs: Array<{ id: string; name: string; size: number; type: string; source: "case"; caseDocId?: string }>) => void;
   externalCases?: Case[];
   onCasesChanged?: () => void;
+  /**
+   * Bump this from the parent (e.g. after DocumentDialog reports a successful
+   * upload via its onUploaded callback) to force the panel to re-fetch the
+   * case's documents. Without this signal, uploads done via DocumentDialog
+   * would not appear in the panel until the user switches cases or reloads.
+   */
+  documentsRefreshKey?: number;
 }
 
 /* ─── Helpers ────────────────────────────────────────────────── */
@@ -92,7 +99,7 @@ function PanelContent({
   sessions, currentSessionId, currentCaseId,
   onSelectSession, onNewSession, relativeDateLabel,
   onUploadDocument, onCaseChange, onAttachDocs, onClose,
-  externalCases, onCasesChanged,
+  externalCases, onCasesChanged, documentsRefreshKey,
 }: CasesPanelProps & { onClose: () => void }) {
   const router = useRouter();
 
@@ -136,14 +143,21 @@ function PanelContent({
   // Doc currently being previewed in the DocumentViewer modal; null = closed.
   const [viewingDoc, setViewingDoc] = useState<CaseDoc | null>(null);
 
+  // Wipe selection ONLY when the active case changes. Doc-list refreshes
+  // (driven by documentsRefreshKey after an upload) must not clear the
+  // user's existing tick marks — that's bug fix #2.
   useEffect(() => {
-    if (!currentCaseId) { setDocs([]); setSelectedDocs(new Set()); return; }
-    setDocsLoading(true); setSelectedDocs(new Set());
+    setSelectedDocs(new Set());
+  }, [currentCaseId]);
+
+  useEffect(() => {
+    if (!currentCaseId) { setDocs([]); return; }
+    setDocsLoading(true);
     api.get<{ documents: CaseDoc[] } | CaseDoc[]>(`/cases/${currentCaseId}/documents`)
       .then((res) => setDocs(Array.isArray(res.data) ? res.data : res.data?.documents ?? []))
       .catch(() => setDocs([]))
       .finally(() => setDocsLoading(false));
-  }, [currentCaseId]);
+  }, [currentCaseId, documentsRefreshKey]);
 
   /* Delete a document — DELETE /cases/{caseId}/documents/{docId}.
      Optimistic update so the row disappears instantly; on failure we
@@ -311,7 +325,9 @@ function PanelContent({
       .map((d) => ({ id: d.id, name: d.filename ?? d.title ?? d.id, size: 0, type: d.content_type ?? "document", source: "case" as const, caseDocId: d.id }));
     if (!chosen.length) return;
     onAttachDocs?.(chosen);
-    setSelectedDocs(new Set());
+    // Selection deliberately retained — gives the user visual confirmation
+    // of what was attached, and lets them re-attach or unselect manually
+    // instead of having the checkboxes silently wiped (bug fix #2).
     toast.success(`${chosen.length} doc${chosen.length > 1 ? "s" : ""} attached`);
   };
 

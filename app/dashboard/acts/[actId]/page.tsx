@@ -2,38 +2,43 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import {
   ArrowLeft,
-  Sparkles,
   FileText,
   Download,
   ExternalLink,
   BookOpen,
   Gavel,
-  Bell,
   Calendar,
-  Pencil,
-  FileStack,
   Loader2,
-  ChevronRight,
   ChevronDown,
+  Tag,
+  Globe2,
+  Building2,
+  Hash,
+  Languages,
+  ScrollText,
+  CalendarClock,
+  ShieldCheck,
+  ShieldAlert,
+  Sparkles,
+  Layers,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import {
-  LexramAPI,
-  unwrap,
-  type ActFull,
-  type ActChapter,
-  type ActSection,
-  type Circular,
-  type SubLegislation,
-  type Amendment,
-  type Schedule,
-} from '@/lib/lexram/api';
+  ActsAPI,
+  unwrapList,
+  instrumentTitle,
+  instrumentKind,
+  type ActDetail,
+  type ChapterDetail,
+  type SectionDetail,
+  type Instrument,
+} from '@/lib/lexram/acts-fastapi';
 import { cn } from '@/lib/utils';
 
-type Tab = 'sections' | 'rules' | 'circulars' | 'schedules' | 'amendments' | 'documents';
+type Tab = 'overview' | 'sections' | 'chapters' | 'instruments' | 'metadata';
 
 function formatDate(d?: string | null) {
   if (!d) return '';
@@ -48,48 +53,98 @@ function formatDate(d?: string | null) {
   }
 }
 
-// Inline minimal Accordion
-function Accordion({ title, children }: { title: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+/** Backend sometimes returns keywords/tags as a comma-separated string,
+ *  occasionally as null. Coerce to a clean string[] either way. */
+function toStringArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === 'string' && x.length > 0);
+  if (typeof v === 'string')
+    return v
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  return [];
+}
+
+function chapterTitle(c: ChapterDetail) {
   return (
-    <div className="border-b border-charcoal-200/60">
+    c.title ??
+    c.chapter_title ??
+    c.name ??
+    (c.chapter_number ? `Chapter ${c.chapter_number}` : 'Chapter')
+  );
+}
+
+function chapterNumber(c: ChapterDetail) {
+  return c.chapter_number ?? (c.chapter_order ?? c.order ?? '');
+}
+
+function sectionNumber(s: SectionDetail) {
+  return s.section_number ?? '';
+}
+
+function sectionHeading(s: SectionDetail) {
+  return s.heading ?? s.description ?? `Section ${sectionNumber(s)}`;
+}
+
+function Accordion({
+  title,
+  badge,
+  defaultOpen = false,
+  children,
+}: {
+  title: React.ReactNode;
+  badge?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-b border-[var(--border-light)] last:border-0">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between py-4 text-left group"
+        className="w-full flex items-center justify-between py-3.5 text-left group gap-3"
       >
-        <span className="font-serif text-lg md:text-xl text-charcoal-900 group-hover:text-charcoal-700 transition-colors">
-          {title}
+        <span className="flex items-center gap-3 min-w-0">
+          <span className="font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors truncate">
+            {title}
+          </span>
+          {badge}
         </span>
         <ChevronDown
           className={cn(
-            'w-4 h-4 text-charcoal-400 transition-transform duration-200',
+            'w-4 h-4 text-[var(--text-muted)] transition-transform duration-200 flex-shrink-0',
             open && 'rotate-180'
           )}
         />
       </button>
-      {open && <div className="pb-6">{children}</div>}
+      {open && <div className="pb-4">{children}</div>}
     </div>
   );
 }
 
-function SectionCard({ section }: { section: ActSection }) {
+function SectionCard({ section }: { section: SectionDetail }) {
   return (
-    <div className="bg-[var(--bg-surface)] rounded-lg border border-[var(--border-default)] p-4 mb-3">
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="flex items-baseline gap-2">
-          <span className="font-mono text-xs bg-charcoal-100 text-charcoal-700 px-2 py-0.5 rounded">
-            § {section.number}
-          </span>
-          <h4 className="font-semibold text-charcoal-900 text-sm">{section.heading}</h4>
-        </div>
-      </div>
-      {section.content && (
-        <p className="text-sm text-charcoal-700 leading-relaxed whitespace-pre-wrap">
-          {section.content}
+    <div className="bg-[var(--bg-primary)]/50 rounded-lg border border-[var(--border-light)] p-4">
+      {section.content || section.description ? (
+        <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+          {section.content ?? section.description}
+        </p>
+      ) : (
+        <p className="text-xs text-[var(--text-muted)] italic">
+          Section text not yet extracted.
         </p>
       )}
-      {section.ai_summary && (
-        <p className="text-xs text-indigo-700 mt-2 italic">{section.ai_summary}</p>
+      {section.enforcement_status && (
+        <div className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              section.enforcement_status.toLowerCase().includes('repeal')
+                ? 'bg-[var(--acts-rust)]'
+                : 'bg-[var(--acts-maroon)]'
+            }`}
+          />
+          {section.enforcement_status.replace(/_/g, ' ')}
+        </div>
       )}
     </div>
   );
@@ -97,46 +152,34 @@ function SectionCard({ section }: { section: ActSection }) {
 
 export default function ActDetailPage() {
   const params = useParams<{ actId: string }>();
-  const router = useRouter();
-  const actId = params?.actId as string;
+  const actId = params?.actId
+    ? decodeURIComponent(params.actId as string)
+    : '';
 
-  const [law, setLaw] = useState<ActFull | null>(null);
+  const [law, setLaw] = useState<ActDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
 
-  const [subLegs, setSubLegs] = useState<SubLegislation[]>([]);
-  const [circulars, setCirculars] = useState<Circular[]>([]);
-  const [amendments, setAmendments] = useState<Amendment[]>([]);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [instruments, setInstruments] = useState<Instrument[]>([]);
+  const [instrumentsLoading, setInstrumentsLoading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<Tab>('sections');
-  const [activeSection, setActiveSection] = useState('');
-  const [aiQuestion, setAiQuestion] = useState('');
-  const [aiAnswer, setAiAnswer] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   const load = useCallback(async () => {
     if (!actId) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await LexramAPI.act(actId);
+      const data = await ActsAPI.act(actId);
       setLaw(data);
-      // Related — best-effort, not fatal
-      const [amRes, schRes] = await Promise.allSettled([
-        LexramAPI.amendments({ limit: 50, act_id: actId }),
-        LexramAPI.schedules({ limit: 50, act_id: actId }),
-      ]);
-      if (amRes.status === 'fulfilled') setAmendments(unwrap(amRes.value));
-      if (schRes.status === 'fulfilled') setSchedules(unwrap(schRes.value));
-      // Generic lists — best-effort
-      const [subRes, cirRes] = await Promise.allSettled([
-        LexramAPI.subLegislation({ limit: 6 }),
-        LexramAPI.circulars({ limit: 6, ministry: data.ministry ?? undefined }),
-      ]);
-      if (subRes.status === 'fulfilled') setSubLegs(unwrap(subRes.value));
-      if (cirRes.status === 'fulfilled') setCirculars(unwrap(cirRes.value));
+
+      // Instruments — best-effort, separate request.
+      setInstrumentsLoading(true);
+      ActsAPI.instruments(actId)
+        .then((res) => setInstruments(unwrapList<Instrument>(res)))
+        .catch(() => setInstruments([]))
+        .finally(() => setInstrumentsLoading(false));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load act');
     } finally {
@@ -148,33 +191,22 @@ export default function ActDetailPage() {
     load();
   }, [load, nonce]);
 
-  const chapters: ActChapter[] = useMemo(() => law?.chapters ?? [], [law]);
-  const flatSections: ActSection[] = useMemo(() => {
-    if (!law) return [];
-    const fromChapters = chapters.flatMap((c) => c.sections ?? []);
-    if (fromChapters.length > 0) return fromChapters;
-    return law.sections ?? [];
-  }, [law, chapters]);
-
-  async function handleAskAI(e: React.FormEvent) {
-    e.preventDefault();
-    if (!aiQuestion.trim()) return;
-    setAiLoading(true);
-    setAiAnswer('');
-    await new Promise((r) => setTimeout(r, 600));
-    setAiAnswer(
-      `This act (${law?.name ?? ''}) covers the following key area: ${aiQuestion}. Based on available sections, consult §1–§3 for definitions and scope.`
-    );
-    setAiLoading(false);
-  }
+  const chapters: ChapterDetail[] = useMemo(() => law?.chapters ?? [], [law]);
+  const flatSections: SectionDetail[] = useMemo(
+    () => chapters.flatMap((c) => c.sections ?? []),
+    [chapters]
+  );
 
   if (loading) {
     return (
-      <div className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden">
+      <div
+        data-acts
+        className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden"
+      >
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-gold-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
             </div>
           </main>
         </div>
@@ -184,24 +216,27 @@ export default function ActDetailPage() {
 
   if (error || !law) {
     return (
-      <div className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden">
+      <div
+        data-acts
+        className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden"
+      >
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">
             <Link
               href="/dashboard/acts"
-              className="inline-flex items-center gap-1.5 text-sm text-charcoal-500 hover:text-charcoal-800 mb-4"
+              className="inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] mb-4"
             >
               <ArrowLeft className="w-4 h-4" /> All Acts
             </Link>
             <div className="text-center py-24">
-              <BookOpen className="w-10 h-10 mx-auto mb-3 text-charcoal-200" />
-              <p className="text-charcoal-600 text-sm mb-3">
+              <BookOpen className="w-10 h-10 mx-auto mb-3 text-[var(--text-muted)]" />
+              <p className="text-[var(--text-secondary)] text-sm mb-3">
                 {error ? `Failed to load: ${error}` : 'Act not found.'}
               </p>
               {error && (
                 <button
                   onClick={() => setNonce((n) => n + 1)}
-                  className="text-xs px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg"
+                  className="text-xs px-3 py-1.5 bg-[var(--acts-maroon)] hover:bg-[var(--acts-maroon-deep)] text-[var(--acts-cream)] rounded-lg transition-colors"
                 >
                   Retry
                 </button>
@@ -213,19 +248,30 @@ export default function ActDetailPage() {
     );
   }
 
+  const totalSections =
+    law.total_sections ??
+    flatSections.length ??
+    0;
+  const totalChapters = law.total_chapters ?? chapters.length;
+
   const tabs: { id: Tab; label: string; icon: typeof BookOpen; count?: number }[] = [
-    { id: 'sections', label: 'Sections', icon: BookOpen, count: flatSections.length },
-    { id: 'rules', label: 'Rules & Regs', icon: Gavel, count: subLegs.length },
-    { id: 'circulars', label: 'Circulars', icon: Bell, count: circulars.length },
-    { id: 'schedules', label: 'Schedules', icon: Calendar, count: schedules.length },
-    { id: 'amendments', label: 'Amendments', icon: Pencil, count: amendments.length },
-    { id: 'documents', label: 'Documents', icon: FileStack, count: 0 },
+    { id: 'overview', label: 'Overview', icon: BookOpen },
+    { id: 'chapters', label: 'Chapters', icon: Layers, count: totalChapters },
+    { id: 'sections', label: 'Sections', icon: ScrollText, count: totalSections },
+    { id: 'instruments', label: 'Rules & Circulars', icon: Gavel, count: instruments.length },
+    { id: 'metadata', label: 'Metadata', icon: Hash },
   ];
 
-  const statusLabel = law.status || 'In force';
+  const isRepealed =
+    law.is_repealed === true ||
+    law.enforcement_status?.toLowerCase().includes('repeal') === true ||
+    law.status?.toLowerCase().includes('repeal') === true;
 
   return (
-    <div className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden">
+    <div
+      data-acts
+      className="h-[calc(100vh-1rem)] flex flex-col bg-[var(--bg-primary)] overflow-hidden"
+    >
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">
           <motion.div
@@ -236,27 +282,41 @@ export default function ActDetailPage() {
             {/* Back */}
             <Link
               href="/dashboard/acts"
-              className="inline-flex items-center gap-1.5 text-sm text-charcoal-500 hover:text-charcoal-800 mb-4"
+              className="inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] mb-4"
             >
               <ArrowLeft className="w-4 h-4" /> All Acts
             </Link>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_300px] gap-6">
-              {/* LEFT RAIL */}
+            <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
+              {/* LEFT NAV RAIL */}
               <aside className="lg:sticky lg:top-0 self-start bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl p-4">
-                <div className="mb-4 pb-4 border-b border-charcoal-100">
-                  <p className="font-semibold text-charcoal-800 text-sm leading-snug mb-1">
+                <div className="mb-4 pb-4 border-b border-[var(--border-light)]">
+                  <p className="font-semibold text-[var(--text-primary)] text-sm leading-snug mb-2 line-clamp-3">
                     {law.name}
                   </p>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-charcoal-400">{law.year ?? '—'}</span>
-                    <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
-                      {statusLabel}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-mono text-[11px] text-[var(--text-muted)]">
+                      {law.year ?? '—'}
                     </span>
+                    {law.act_number && (
+                      <span className="font-mono text-[11px] text-[var(--text-muted)]">
+                        · Act {law.act_number}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2">
+                    <StatusPill
+                      repealed={isRepealed}
+                      label={
+                        law.enforcement_status ??
+                        law.status ??
+                        (isRepealed ? 'Repealed' : 'In force')
+                      }
+                    />
                   </div>
                 </div>
 
-                <div className="space-y-0.5 mb-4">
+                <div className="space-y-0.5">
                   {tabs.map((t) => {
                     const Icon = t.icon;
                     return (
@@ -266,443 +326,157 @@ export default function ActDetailPage() {
                         className={cn(
                           'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors',
                           activeTab === t.id
-                            ? 'bg-gold-50 text-gold-700 font-medium border-l-2 border-gold-500'
-                            : 'text-charcoal-600 hover:bg-charcoal-50'
+                            ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium border-l-2 border-[var(--accent)]'
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
                         )}
                       >
                         <Icon className="w-3.5 h-3.5 shrink-0" />
                         <span className="flex-1 text-left">{t.label}</span>
                         {t.count !== undefined && t.count > 0 && (
-                          <span className="text-[11px] font-mono text-charcoal-400">{t.count}</span>
+                          <span className="text-[11px] font-mono text-[var(--text-muted)]">
+                            {t.count}
+                          </span>
                         )}
                       </button>
                     );
                   })}
                 </div>
 
-                {activeTab === 'sections' && chapters.length > 0 && (
-                  <div className="border-t border-charcoal-100 pt-3 space-y-2">
-                    {chapters.map((ch) => (
-                      <div key={ch.id}>
-                        <button
-                          onClick={() => {
-                            setActiveSection(`chapter-${ch.id}`);
-                            document
-                              .getElementById(`chapter-${ch.id}`)
-                              ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                          }}
-                          className="text-xs font-semibold text-charcoal-800 text-left w-full hover:text-gold-700"
-                        >
-                          {ch.title || ch.name}
-                        </button>
-                        <div className="mt-1 space-y-0.5 pl-2">
-                          {(ch.sections ?? []).map((s) => (
-                            <button
-                              key={s.id}
-                              onClick={() => {
-                                setActiveSection(`section-${s.id}`);
-                                document
-                                  .getElementById(`section-${s.id}`)
-                                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                              }}
-                              className="block text-[11px] text-charcoal-500 hover:text-charcoal-800 text-left"
-                            >
-                              §{s.number} {s.heading}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {activeSection && <span className="hidden" />}
-              </aside>
-
-              {/* CENTER CONTENT */}
-              <section>
-                {/* Masthead */}
-                <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-6 mb-6">
-                  <div className="flex items-start justify-between gap-4 mb-4">
-                    <div>
-                      <h1 className="font-serif text-2xl font-semibold text-[var(--text-primary)] leading-tight mb-1">
-                        {law.name}
-                      </h1>
-                      {law.short_name && law.short_name !== law.name && (
-                        <p className="text-sm text-charcoal-500">{law.short_name}</p>
-                      )}
-                      <p className="font-mono text-sm text-charcoal-500 mt-1">
-                        Act No. {law.act_number || '\u2014'} of {law.year ?? '—'}
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-1 rounded">
-                      {statusLabel}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-4">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-charcoal-400 mb-0.5">
-                        Ministry
-                      </p>
-                      <span className="text-sm text-charcoal-700">{law.ministry || '\u2014'}</span>
-                    </div>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-charcoal-400 mb-0.5">
-                        Domain
-                      </p>
-                      <span className="text-sm text-charcoal-700">{law.domain || '\u2014'}</span>
-                    </div>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-charcoal-400 mb-0.5">
-                        Applicability
-                      </p>
-                      <span className="text-sm text-charcoal-700 line-clamp-2">
-                        {law.applicability || 'Whole of India'}
+                {/* Quick links */}
+                <div className="mt-4 pt-4 border-t border-[var(--border-light)] space-y-1.5">
+                  {law.pdf_url && (
+                    <a
+                      href={law.pdf_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--accent)] transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span className="truncate">
+                        PDF
+                        {law.pdf_page_count ? ` · ${law.pdf_page_count} pages` : ''}
                       </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[var(--border-default)] rounded-lg text-charcoal-600 hover:border-gold-400 hover:text-gold-700 transition-colors"
-                      type="button"
+                    </a>
+                  )}
+                  {law.indiacode_url && (
+                    <a
+                      href={law.indiacode_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--accent)] transition-colors"
                     >
-                      <Download className="w-3.5 h-3.5" /> PDF
-                    </button>
-                    <button
-                      onClick={() => router.push('/dashboard/cross-refs')}
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[var(--border-default)] rounded-lg text-charcoal-600 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" /> Cross-References
-                    </button>
-                    <button
-                      onClick={() => router.push('/dashboard/amendment-chain')}
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-[var(--border-default)] rounded-lg text-charcoal-600 hover:border-rose-400 hover:text-rose-600 transition-colors"
-                    >
-                      <FileText className="w-3.5 h-3.5" /> Version Tracker
-                    </button>
-                  </div>
-                </div>
-
-                {/* Tab content */}
-                {activeTab === 'sections' && (
-                  <div>
-                    {law.preamble && (
-                      <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-5 mb-4">
-                        <p className="text-[11px] font-mono uppercase tracking-wide text-charcoal-400 mb-2">
-                          Preamble
-                        </p>
-                        <p className="text-[15px] leading-relaxed text-charcoal-600 italic">
-                          {law.preamble}
-                        </p>
-                      </div>
-                    )}
-                    {law.introduction && (
-                      <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-5 mb-4">
-                        <p className="text-[11px] font-mono uppercase tracking-wide text-charcoal-400 mb-2">
-                          Introduction
-                        </p>
-                        <p className="text-[15px] leading-relaxed text-charcoal-700">
-                          {law.introduction}
-                        </p>
-                      </div>
-                    )}
-
-                    {chapters.length > 0 ? (
-                      chapters.map((ch) => (
-                        <div key={ch.id} id={`chapter-${ch.id}`} className="mb-6">
-                          <h2 className="text-base font-semibold text-charcoal-800 mb-3 flex items-center gap-2">
-                            {ch.order !== undefined && (
-                              <span className="font-mono text-xs bg-charcoal-100 text-charcoal-500 px-2 py-0.5 rounded">
-                                Ch. {ch.order}
-                              </span>
-                            )}
-                            {ch.title || ch.name}
-                          </h2>
-                          <div className="border-t border-charcoal-200/60">
-                            {(ch.sections ?? []).map((s) => (
-                              <div key={s.id} id={`section-${s.id}`}>
-                                <Accordion title={`§${s.number}  ${s.heading}`}>
-                                  <SectionCard section={s} />
-                                </Accordion>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))
-                    ) : flatSections.length > 0 ? (
-                      <div className="border-t border-charcoal-200/60">
-                        {flatSections.map((s) => (
-                          <div key={s.id} id={`section-${s.id}`}>
-                            <Accordion title={`§${s.number}  ${s.heading}`}>
-                              <SectionCard section={s} />
-                            </Accordion>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-16 text-charcoal-400">
-                        <BookOpen className="w-10 h-10 mx-auto mb-3 text-charcoal-200" />
-                        <p>Sections not yet extracted for this act.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {activeTab === 'rules' && (
-                  <div>
-                    {subLegs.length > 0 ? (
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {subLegs.map((sl) => (
-                          <Link
-                            key={sl.id}
-                            href={`/dashboard/sub-legislation/${sl.id}`}
-                            className="block bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-4 hover:border-gold-400 transition-colors"
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200 uppercase">
-                                {sl.doc_type}
-                              </span>
-                              <span className="text-[11px] font-mono text-charcoal-400">
-                                {formatDate(sl.effective_date ?? sl.enactment_date)}
-                              </span>
-                            </div>
-                            <p className="text-sm font-semibold text-charcoal-900 line-clamp-2 mb-1">
-                              {sl.name}
-                            </p>
-                            <p className="text-xs text-charcoal-500">{sl.ministry}</p>
-                          </Link>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-16 text-charcoal-400">
-                        <Gavel className="w-10 h-10 mx-auto mb-3 text-charcoal-200" />
-                        <p>No subordinate legislation found.</p>
-                      </div>
-                    )}
-                    <button
-                      onClick={() => router.push('/dashboard/sub-legislation')}
-                      className="mt-4 flex items-center gap-1.5 text-sm text-gold-600 hover:text-gold-700"
-                    >
-                      View all rules & regulations <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-
-                {activeTab === 'circulars' && (
-                  <div>
-                    {circulars.length > 0 ? (
-                      <div className="space-y-3">
-                        {circulars.map((c) => (
-                          <Link
-                            key={c.id}
-                            href={`/dashboard/circulars/${c.id}`}
-                            className="block bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-4 hover:border-gold-400 transition-colors"
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[10px] font-mono text-sky-700">
-                                {c.circular_number}
-                              </span>
-                              <span className="text-[11px] font-mono text-charcoal-400">
-                                {formatDate(c.issue_date)}
-                              </span>
-                            </div>
-                            <p className="text-sm font-semibold text-charcoal-900 mb-0.5">
-                              {c.subject}
-                            </p>
-                            <p className="text-xs text-charcoal-500">{c.ministry}</p>
-                          </Link>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-16 text-charcoal-400">
-                        <Bell className="w-10 h-10 mx-auto mb-3 text-charcoal-200" />
-                        <p>No circulars found for this act.</p>
-                      </div>
-                    )}
-                    <button
-                      onClick={() => router.push('/dashboard/circulars')}
-                      className="mt-4 flex items-center gap-1.5 text-sm text-gold-600 hover:text-gold-700"
-                    >
-                      View all circulars <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-
-                {activeTab === 'amendments' && (
-                  <div>
-                    {amendments.length > 0 ? (
-                      <div className="space-y-4">
-                        {amendments.map((a) => (
-                          <div
-                            key={a.id}
-                            className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-4"
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
-                                {a.amendment_type ?? 'Amendment'}
-                              </span>
-                              <span className="text-[11px] font-mono text-charcoal-400">
-                                {formatDate(a.amendment_date ?? a.effective_date)}
-                              </span>
-                            </div>
-                            <p className="text-sm font-semibold text-charcoal-900 mb-1">
-                              {a.amendment_act_name ?? a.description ?? 'Amendment'}
-                            </p>
-                            {a.description && (
-                              <p className="text-xs text-charcoal-500">{a.description}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-16 text-charcoal-400">
-                        <Pencil className="w-10 h-10 mx-auto mb-3 text-charcoal-200" />
-                        <p>No amendments found for this act.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {activeTab === 'schedules' && (
-                  <div>
-                    {schedules.length > 0 ? (
-                      <div className="grid gap-3 md:grid-cols-2">
-                        {schedules.map((s) => (
-                          <div
-                            key={s.id}
-                            className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] border-t-[3px] border-t-teal-400 p-4"
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200 uppercase">
-                                Schedule
-                              </span>
-                              <span className="text-xs font-mono text-charcoal-400">
-                                {s.schedule_number}
-                              </span>
-                            </div>
-                            <p className="text-sm font-semibold text-charcoal-900">{s.title}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-16 text-charcoal-400">
-                        <Calendar className="w-10 h-10 mx-auto mb-3 text-charcoal-200" />
-                        <p>No schedules linked.</p>
-                      </div>
-                    )}
-                    <button
-                      onClick={() => router.push('/dashboard/schedules')}
-                      className="mt-4 text-sm text-gold-600 hover:text-gold-700"
-                    >
-                      View in Schedules browser →
-                    </button>
-                  </div>
-                )}
-
-                {activeTab === 'documents' && (
-                  <div className="text-center py-16 text-charcoal-400">
-                    <FileStack className="w-10 h-10 mx-auto mb-3 text-charcoal-200" />
-                    <p>No documents found for this act.</p>
-                  </div>
-                )}
-              </section>
-
-              {/* RIGHT RAIL */}
-              <aside className="lg:sticky lg:top-0 self-start bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl p-4 space-y-5">
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Sparkles className="w-4 h-4 text-indigo-500" />
-                    <span className="text-sm font-semibold text-charcoal-800">AI Companion</span>
-                  </div>
-                  <form onSubmit={handleAskAI} className="space-y-2">
-                    <textarea
-                      value={aiQuestion}
-                      onChange={(e) => setAiQuestion(e.target.value)}
-                      placeholder="What does this act cover?"
-                      rows={2}
-                      className="w-full text-sm border border-[var(--border-default)] rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-indigo-400 text-charcoal-700 bg-[var(--bg-surface)]"
-                    />
-                    <button
-                      type="submit"
-                      disabled={aiLoading || !aiQuestion.trim()}
-                      className="w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm py-2 rounded-lg transition-colors"
-                    >
-                      {aiLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-4 h-4" />
-                      )}
-                      Ask AI
-                    </button>
-                  </form>
-                  {aiAnswer && (
-                    <div className="mt-3 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs text-charcoal-700">
-                      {aiAnswer}
-                    </div>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span className="truncate">IndiaCode source</span>
+                    </a>
                   )}
                 </div>
-
-                <hr className="border-charcoal-100" />
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-charcoal-400">
-                      Sub-Legislation
-                    </p>
-                    <span className="text-[11px] font-mono text-violet-600">{subLegs.length}</span>
-                  </div>
-                  {subLegs.slice(0, 3).map((sl) => (
-                    <div key={sl.id} className="py-1.5 border-b border-charcoal-50 last:border-0">
-                      <p className="text-xs text-charcoal-700 line-clamp-2">{sl.name}</p>
-                      <p className="text-[11px] font-mono text-charcoal-400">
-                        {sl.doc_type} · {formatDate(sl.effective_date ?? sl.enactment_date)}
-                      </p>
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => setActiveTab('rules')}
-                    className="mt-1 text-xs text-gold-600 hover:text-gold-700"
-                  >
-                    View all {subLegs.length} →
-                  </button>
-                </div>
-
-                <hr className="border-charcoal-100" />
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-charcoal-400">
-                      Recent Circulars
-                    </p>
-                    <span className="text-[11px] font-mono text-sky-600">{circulars.length}</span>
-                  </div>
-                  {circulars.slice(0, 3).map((c) => (
-                    <div key={c.id} className="py-1.5 border-b border-charcoal-50 last:border-0">
-                      <p className="text-xs text-charcoal-700 line-clamp-1">{c.subject}</p>
-                      <p className="text-[11px] font-mono text-charcoal-400">
-                        {formatDate(c.issue_date)}
-                      </p>
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => setActiveTab('circulars')}
-                    className="mt-1 text-xs text-gold-600 hover:text-gold-700"
-                  >
-                    View all {circulars.length} →
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => router.push('/dashboard/cross-refs')}
-                  className="w-full text-left p-3 bg-charcoal-50 hover:bg-charcoal-100 rounded-lg border border-[var(--border-default)] transition-colors"
-                >
-                  <p className="text-xs font-semibold text-charcoal-700">Legislative Ecosystem</p>
-                  <p className="text-[11px] text-charcoal-400 mt-0.5">
-                    Visualize all connected legislation →
-                  </p>
-                </button>
               </aside>
+
+              {/* MAIN CONTENT */}
+              <section>
+                {/* Masthead */}
+                <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-6 mb-5">
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="min-w-0">
+                      <h1 className="font-serif text-2xl font-semibold text-[var(--text-primary)] leading-tight mb-1">
+                        {law.full_name ?? law.name}
+                      </h1>
+                      {law.short_name && law.short_name !== law.name && (
+                        <p className="text-sm text-[var(--text-muted)]">{law.short_name}</p>
+                      )}
+                      {law.hindi_title && (
+                        <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 mt-1">
+                          <Languages className="w-3 h-3" /> {law.hindi_title}
+                        </p>
+                      )}
+                      <p className="font-mono text-[12px] text-[var(--text-muted)] mt-1.5">
+                        Act No. {law.act_number ?? '—'} of {law.year ?? '—'}
+                      </p>
+                    </div>
+                    <StatusPill
+                      repealed={isRepealed}
+                      label={
+                        law.enforcement_status ??
+                        law.status ??
+                        (isRepealed ? 'Repealed' : 'In force')
+                      }
+                    />
+                  </div>
+
+                  {/* Quick meta grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <MetaCard
+                      icon={Globe2}
+                      label="Domain"
+                      value={law.domain}
+                    />
+                    <MetaCard
+                      icon={Building2}
+                      label="Ministry"
+                      value={law.ministry}
+                    />
+                    <MetaCard
+                      icon={Tag}
+                      label="Category"
+                      value={law.category}
+                    />
+                    <MetaCard
+                      icon={CalendarClock}
+                      label="Commenced"
+                      value={formatDate(law.commencement_date)}
+                    />
+                  </div>
+
+                  {/* Tag chips — defensive against non-array keyword/tag fields */}
+                  {(() => {
+                    const kw = toStringArray(law.keywords);
+                    const tg = toStringArray(law.tags);
+                    if (!kw.length && !tg.length) return null;
+                    return (
+                      <div className="flex flex-wrap gap-1.5">
+                        {kw.slice(0, 8).map((k) => (
+                          <span
+                            key={`kw-${k}`}
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--accent)]/8 text-[var(--accent)] border border-[var(--accent)]/15"
+                          >
+                            {k}
+                          </span>
+                        ))}
+                        {tg.slice(0, 6).map((t) => (
+                          <span
+                            key={`tag-${t}`}
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-primary)] text-[var(--text-muted)] border border-[var(--border-default)]"
+                          >
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* TAB CONTENT */}
+                {activeTab === 'overview' && (
+                  <OverviewTab law={law} totalSections={totalSections} totalChapters={totalChapters} />
+                )}
+
+                {activeTab === 'chapters' && (
+                  <ChaptersTab chapters={chapters} />
+                )}
+
+                {activeTab === 'sections' && (
+                  <SectionsTab chapters={chapters} flatSections={flatSections} />
+                )}
+
+                {activeTab === 'instruments' && (
+                  <InstrumentsTab
+                    instruments={instruments}
+                    loading={instrumentsLoading}
+                  />
+                )}
+
+                {activeTab === 'metadata' && <MetadataTab law={law} />}
+              </section>
             </div>
           </motion.div>
         </main>
@@ -710,3 +484,430 @@ export default function ActDetailPage() {
     </div>
   );
 }
+
+/* ─── Tab views ───────────────────────────────────────────────────── */
+
+function OverviewTab({
+  law,
+  totalChapters,
+  totalSections,
+}: {
+  law: ActDetail;
+  totalChapters: number;
+  totalSections: number;
+}) {
+  const summaryBlocks: { label: string; value?: string | null }[] = [
+    { label: 'Long title', value: law.long_title },
+    { label: 'Preamble', value: law.preamble },
+    { label: 'Statement of objects & reasons', value: law.statement_of_objects },
+    { label: 'Objectives', value: law.objectives },
+    { label: 'Introduction', value: law.introduction },
+    { label: 'Abstract', value: law.abstract },
+    { label: 'Applicability', value: law.applicability },
+    { label: 'Territorial extent', value: law.territorial_extent },
+    { label: 'Description', value: law.description },
+  ].filter((b) => b.value && b.value.trim().length > 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Counters */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <CountCard
+          label="Chapters"
+          value={totalChapters}
+          icon={Layers}
+          tone="maroon"
+        />
+        <CountCard
+          label="Sections"
+          value={totalSections}
+          icon={ScrollText}
+          tone="rust"
+        />
+        <CountCard
+          label="PDF pages"
+          value={law.pdf_page_count ?? 0}
+          icon={FileText}
+          tone="gold"
+        />
+      </div>
+
+      {summaryBlocks.length === 0 ? (
+        <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-5 text-center text-[var(--text-muted)] text-sm">
+          <Sparkles className="w-5 h-5 mx-auto mb-2 opacity-60" />
+          No narrative summary yet for this act.
+        </div>
+      ) : (
+        summaryBlocks.map((b) => (
+          <div
+            key={b.label}
+            className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-5"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-2">
+              {b.label}
+            </p>
+            <p className="text-[14px] leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
+              {b.value}
+            </p>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function ChaptersTab({ chapters }: { chapters: ChapterDetail[] }) {
+  if (chapters.length === 0) {
+    return (
+      <Empty
+        icon={Layers}
+        message="No chapter breakdown is available for this act yet."
+      />
+    );
+  }
+  return (
+    <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] divide-y divide-[var(--border-light)]">
+      {chapters.map((c, idx) => (
+        <Link
+          key={String(c.id ?? idx)}
+          href={`#chapter-${c.id ?? idx}`}
+          className="flex items-center gap-3 px-5 py-3.5 hover:bg-[var(--surface-hover)] transition-colors group"
+        >
+          <span className="font-mono text-xs bg-[var(--bg-primary)] text-[var(--text-secondary)] px-2 py-0.5 rounded border border-[var(--border-default)]">
+            Ch. {chapterNumber(c) || idx + 1}
+          </span>
+          <span className="flex-1 text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] truncate">
+            {chapterTitle(c)}
+          </span>
+          {(c.section_count ?? c.sections?.length) !== undefined && (
+            <span className="text-[11px] text-[var(--text-muted)] font-mono">
+              {c.section_count ?? c.sections?.length} §
+            </span>
+          )}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function SectionsTab({
+  chapters,
+  flatSections,
+}: {
+  chapters: ChapterDetail[];
+  flatSections: SectionDetail[];
+}) {
+  if (chapters.length > 0) {
+    return (
+      <div className="space-y-6">
+        {chapters.map((ch, ci) => (
+          <div
+            key={`ch-${ch.id ?? ci}`}
+            id={`chapter-${ch.id ?? ci}`}
+            className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-5"
+          >
+            <h2 className="text-base font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+              <span className="font-mono text-xs bg-[var(--bg-primary)] text-[var(--text-secondary)] px-2 py-0.5 rounded border border-[var(--border-default)]">
+                Ch. {chapterNumber(ch) || ci + 1}
+              </span>
+              {chapterTitle(ch)}
+            </h2>
+            <div>
+              {(ch.sections ?? []).length === 0 ? (
+                <p className="text-[12px] text-[var(--text-muted)] italic py-2">
+                  No sections extracted for this chapter.
+                </p>
+              ) : (
+                (ch.sections ?? []).map((s, si) => (
+                  <Accordion
+                    key={`s-${s.id ?? si}`}
+                    title={
+                      <>
+                        <span className="font-mono text-[12px] text-[var(--accent)] mr-2">
+                          §{sectionNumber(s) || si + 1}
+                        </span>
+                        <span className="text-[14px]">{sectionHeading(s)}</span>
+                      </>
+                    }
+                  >
+                    <SectionCard section={s} />
+                  </Accordion>
+                ))
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (flatSections.length === 0) {
+    return (
+      <Empty
+        icon={ScrollText}
+        message="Sections have not yet been extracted for this act."
+      />
+    );
+  }
+
+  return (
+    <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-5">
+      {flatSections.map((s, si) => (
+        <Accordion
+          key={`s-${s.id ?? si}`}
+          title={
+            <>
+              <span className="font-mono text-[12px] text-[var(--accent)] mr-2">
+                §{sectionNumber(s) || si + 1}
+              </span>
+              <span className="text-[14px]">{sectionHeading(s)}</span>
+            </>
+          }
+        >
+          <SectionCard section={s} />
+        </Accordion>
+      ))}
+    </div>
+  );
+}
+
+function InstrumentsTab({
+  instruments,
+  loading,
+}: {
+  instruments: Instrument[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-6 h-6 animate-spin text-[var(--accent)]" />
+      </div>
+    );
+  }
+  if (instruments.length === 0) {
+    return (
+      <Empty
+        icon={Gavel}
+        message="No rules, circulars or notifications are linked to this act yet."
+      />
+    );
+  }
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {instruments.map((inst, i) => {
+        const kind = instrumentKind(inst);
+        const title = instrumentTitle(inst);
+        const date =
+          (inst.issue_date as string) ??
+          (inst.effective_date as string) ??
+          (inst.enactment_date as string) ??
+          (inst.gazette_date as string);
+        const href =
+          (inst.pdf_url as string) ?? (inst.url as string) ?? null;
+        const body = (
+          <>
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--acts-rust-soft)] text-[var(--acts-rust-deep)] border border-[var(--acts-rust-tint)] uppercase">
+                {kind}
+              </span>
+              {inst.number && (
+                <span className="text-[11px] font-mono text-[var(--text-muted)]">
+                  {inst.number as string}
+                </span>
+              )}
+              {date && (
+                <span className="text-[11px] font-mono text-[var(--text-muted)]">
+                  · {formatDate(date)}
+                </span>
+              )}
+            </div>
+            <p className="text-sm font-medium text-[var(--text-primary)] line-clamp-2 mb-1">
+              {title}
+            </p>
+            {inst.ministry && (
+              <p className="text-xs text-[var(--text-muted)] truncate">
+                {inst.ministry as string}
+              </p>
+            )}
+          </>
+        );
+        return href ? (
+          <a
+            key={String(inst.id ?? i)}
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="block bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-4 hover:border-[var(--accent)]/40 hover:shadow-sm transition-all"
+          >
+            {body}
+            <span className="mt-2 inline-flex items-center gap-1 text-[11px] text-[var(--accent)]">
+              <ExternalLink className="w-3 h-3" /> Open
+            </span>
+          </a>
+        ) : (
+          <div
+            key={String(inst.id ?? i)}
+            className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] p-4"
+          >
+            {body}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MetadataTab({ law }: { law: ActDetail }) {
+  const rows: { label: string; value?: string | number | null }[] = [
+    { label: 'ID', value: law.id },
+    { label: 'Full name', value: law.full_name },
+    { label: 'Short name', value: law.short_name },
+    { label: 'Hindi title', value: law.hindi_title },
+    { label: 'Act number', value: law.act_number },
+    { label: 'Act type', value: law.act_type },
+    { label: 'Year', value: law.year },
+    { label: 'Domain', value: law.domain },
+    { label: 'Ministry', value: law.ministry },
+    { label: 'Department', value: law.department },
+    { label: 'Category', value: law.category },
+    { label: 'Jurisdiction', value: law.jurisdiction },
+    { label: 'Jurisdiction kind', value: law.jurisdiction_kind },
+    { label: 'State code', value: law.state_code },
+    { label: 'Enforcement status', value: law.enforcement_status },
+    { label: 'Repealed', value: law.is_repealed === true ? 'Yes' : law.is_repealed === false ? 'No' : null },
+    { label: 'Repealed by', value: law.repealed_by },
+    { label: 'Commencement date', value: formatDate(law.commencement_date) },
+    { label: 'Enactment date', value: formatDate(law.enactment_date) },
+    { label: 'Gazette date', value: formatDate(law.gazette_date) },
+    { label: 'Gazette number', value: law.gazette_number },
+    { label: 'Notification number', value: law.notification_number },
+    { label: 'PDF pages', value: law.pdf_page_count },
+    { label: 'Sync status', value: law.sync_status },
+    { label: 'Last synced', value: formatDate(law.last_synced_at) },
+  ].filter((r) => r.value !== null && r.value !== undefined && r.value !== '');
+
+  return (
+    <div className="bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] overflow-hidden">
+      <table className="w-full text-sm">
+        <tbody>
+          {rows.map((r, i) => (
+            <tr
+              key={r.label}
+              className={
+                i % 2 === 0 ? 'bg-[var(--bg-primary)]/40' : ''
+              }
+            >
+              <td className="px-5 py-2.5 text-[12px] font-medium uppercase tracking-wide text-[var(--text-muted)] w-1/3">
+                {r.label}
+              </td>
+              <td className="px-5 py-2.5 text-[var(--text-primary)] break-words">
+                {r.value}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ─── Shared bits ──────────────────────────────────────────────────── */
+
+function Empty({
+  icon: Icon,
+  message,
+}: {
+  icon: React.ElementType;
+  message: string;
+}) {
+  return (
+    <div className="text-center py-16 text-[var(--text-muted)]">
+      <Icon className="w-10 h-10 mx-auto mb-3 opacity-50" />
+      <p className="text-sm">{message}</p>
+    </div>
+  );
+}
+
+function MetaCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value?: string | null;
+}) {
+  return (
+    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)]/40 px-3 py-2.5">
+      <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)] mb-1 flex items-center gap-1">
+        <Icon className="w-3 h-3" /> {label}
+      </p>
+      <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
+        {value || '—'}
+      </p>
+    </div>
+  );
+}
+
+const TONE_BG: Record<string, string> = {
+  maroon:
+    'bg-[var(--acts-maroon-soft)] text-[var(--acts-maroon)] border-[var(--acts-maroon-tint)]',
+  rust:
+    'bg-[var(--acts-rust-soft)] text-[var(--acts-rust-deep)] border-[var(--acts-rust-tint)]',
+  gold:
+    'bg-[var(--acts-gold-soft)] text-[#7A6230] border-[var(--acts-gold-soft)]',
+};
+
+function CountCard({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number;
+  tone: keyof typeof TONE_BG;
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] px-4 py-3 flex items-center gap-3">
+      <span
+        className={`grid place-items-center w-9 h-9 rounded-lg border ${TONE_BG[tone]}`}
+      >
+        <Icon className="w-4 h-4" />
+      </span>
+      <div>
+        <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+          {label}
+        </p>
+        <p className="text-lg font-semibold text-[var(--text-primary)] font-mono leading-tight">
+          {value.toLocaleString()}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({
+  repealed,
+  label,
+}: {
+  repealed: boolean;
+  label: string;
+}) {
+  const Icon = repealed ? ShieldAlert : ShieldCheck;
+  // In-force = maroon (authority, validity). Repealed = rust (warm warning).
+  const cls = repealed
+    ? 'bg-[var(--acts-rust-soft)] text-[var(--acts-rust-deep)] border-[var(--acts-rust-tint)]'
+    : 'bg-[var(--acts-maroon-soft)] text-[var(--acts-maroon)] border-[var(--acts-maroon-tint)]';
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border ${cls}`}
+    >
+      <Icon className="w-3 h-3" />
+      <span className="capitalize">{label.replace(/_/g, ' ')}</span>
+    </span>
+  );
+}
+

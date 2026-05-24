@@ -1,0 +1,397 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  Plus, X, Loader2, FolderOpen, LogOut, AlertCircle,
+  ChevronRight, User, Hash, Building2, Sparkles, ArrowLeft,
+} from 'lucide-react'
+import Link from 'next/link'
+import { supabase } from '@/utils/supabase/client'
+import type { User as SbUser } from '@supabase/supabase-js'
+
+// TSR data + auth both live on the main lexram supabase. RLS on cases /
+// documents enforces auth.uid() = user_id, so every signed-in lexram user
+// automatically gets isolated TSR storage. See:
+//   supabase/migrations/20260522_tsr_cases.sql
+const authClient = supabase
+
+interface Case {
+  id:         string
+  case_name:  string
+  case_no:    string
+  bank_name:  string
+  status:     string
+}
+
+interface NewCaseForm {
+  case_name: string
+  case_no:   string
+  bank_name: string
+}
+
+const EMPTY_FORM: NewCaseForm = { case_name: '', case_no: '', bank_name: '' }
+
+const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  new:        { bg: '#fff7ec',         text: '#680318',  label: 'New'        },
+  processing: { bg: 'rgba(185,72,38,0.12)', text: '#8f3318',  label: 'Processing' },
+  complete:   { bg: '#D1FAE5',         text: '#065F46',  label: 'Complete'   },
+  error:      { bg: '#FEE2E2',         text: '#991B1B',  label: 'Error'      },
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_STYLES[status] ?? STATUS_STYLES.new
+  return (
+    <span
+      className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+      style={{ backgroundColor: s.bg, color: s.text }}
+    >
+      {s.label}
+    </span>
+  )
+}
+
+export default function DashboardSidebar() {
+  const router   = useRouter()
+  const pathname = usePathname()
+
+  const [user,         setUser]         = useState<SbUser | null>(null)
+  const [cases,        setCases]        = useState<Case[]>([])
+  const [loading,      setLoading]      = useState(true)
+
+  const [modalOpen,    setModalOpen]    = useState(false)
+  const [form,         setForm]         = useState<NewCaseForm>(EMPTY_FORM)
+  const [submitting,   setSubmitting]   = useState(false)
+  const [formError,    setFormError]    = useState<string | null>(null)
+
+  const fetchCases = useCallback(async (uid: string) => {
+    const { data, error } = await supabase
+      .from('tsr_clients')
+      .select('id, case_name, case_no, bank_name, status')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false })
+
+    if (!error && data) setCases(data)
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+
+    const init = async () => {
+      const { data: { session } } = await authClient.auth.getSession()
+      if (!session) { router.replace('/sign-in'); return }
+      if (!mounted) return
+      setUser(session.user)
+      await fetchCases(session.user.id)
+      setLoading(false)
+    }
+
+    init()
+
+    const { data: { subscription } } = authClient.auth.onAuthStateChange((_event, session) => {
+      if (!session) router.replace('/sign-in')
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [router, fetchCases])
+
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase
+      .channel('tsr-sidebar-cases')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'tsr_clients', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const newCase = payload.new as Case
+          setCases(prev =>
+            prev.some(c => c.id === newCase.id) ? prev : [newCase, ...prev]
+          )
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tsr_clients', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const updated = payload.new as Case
+          setCases(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c))
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'tsr_clients' },
+        (payload) => {
+          const deletedId = (payload.old as { id: string }).id
+          setCases(prev => prev.filter(c => c.id !== deletedId))
+        },
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [user])
+
+  const handleCreateCase = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+    setSubmitting(true)
+    setFormError(null)
+
+    const { data, error } = await supabase
+      .from('tsr_clients')
+      .insert({
+        user_id:   user.id,
+        case_name: form.case_name.trim(),
+        case_no:   form.case_no.trim(),
+        bank_name: form.bank_name.trim(),
+        status:    'new',
+      })
+      .select('id, case_name, case_no, bank_name, status')
+      .single()
+
+    if (error) {
+      setFormError(error.message)
+      setSubmitting(false)
+      return
+    }
+
+    if (data) {
+      setCases(prev => [data, ...prev])
+      closeModal()
+      router.push(`/dashboard/tsr/${data.id}`)
+
+    }
+
+    setSubmitting(false)
+  }
+
+  const openModal = () => {
+    setForm(EMPTY_FORM)
+    setFormError(null)
+    setModalOpen(true)
+  }
+  const closeModal = () => {
+    setModalOpen(false)
+    setForm(EMPTY_FORM)
+    setFormError(null)
+  }
+
+  const handleSignOut = async () => {
+    await authClient.auth.signOut()
+    router.replace('/sign-in')
+  }
+
+  const FIELDS: {
+    id: keyof NewCaseForm
+    label: string
+    placeholder: string
+    icon: typeof User
+  }[] = [
+    { id: 'case_name', label: 'Client Name',             placeholder: 'e.g. Rajesh Kumar',  icon: User      },
+    { id: 'case_no',   label: 'File Ref No',             placeholder: 'e.g. TSR/2024/001', icon: Hash      },
+    { id: 'bank_name', label: 'Name of the Institution', placeholder: 'e.g. Indian Bank',   icon: Building2 },
+  ]
+
+  return (
+    <>
+      <aside className="flex flex-col w-64 h-full border-r border-maroon/10 bg-cream-soft shrink-0">
+        <Link
+          href="/dashboard"
+          title="Back to Lexram dashboard"
+          className="flex items-center gap-2.5 px-5 py-5 border-b border-maroon/10 hover:bg-maroon/5 transition-colors group"
+        >
+          <span className="w-8 h-8 rounded-lg bg-maroon grid place-items-center text-cream font-display font-bold text-base shadow-md transition-transform group-hover:rotate-6">
+            <ArrowLeft className="w-4 h-4" />
+          </span>
+          <span className="font-display font-semibold text-base tracking-tight text-maroon">
+            LEXRAM <span className="text-rust">TSR</span>
+          </span>
+        </Link>
+
+        <div className="px-3 pt-4 pb-2">
+          <button
+            onClick={openModal}
+            className="flex items-center gap-2 w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold text-cream bg-maroon hover:bg-maroon-deep transition-all hover:-translate-y-0.5 shadow-[0_10px_24px_-12px_rgba(104,3,24,0.55)]"
+          >
+            <Plus className="w-4 h-4" />
+            New Client
+          </button>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+          <p className="text-[10px] font-bold text-rust uppercase tracking-[0.2em] px-2 pb-1.5 pt-2">
+            Clients
+          </p>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-4 h-4 animate-spin text-maroon/50" />
+            </div>
+          ) : cases.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center px-2">
+              <div className="w-12 h-12 rounded-2xl bg-maroon/10 grid place-items-center mb-1">
+                <FolderOpen className="w-5 h-5 text-maroon/60" />
+              </div>
+              <p className="text-xs text-ink/60 leading-snug">
+                No clients yet.<br />Click <strong className="text-maroon">+ New Client</strong> to start.
+              </p>
+            </div>
+          ) : (
+            cases.map(c => {
+              const isActive = pathname === `/dashboard/tsr/${c.id}`
+              return (
+                <Link
+                  key={c.id}
+                  href={`/dashboard/tsr/${c.id}`}
+                  className={`group flex items-start gap-2 w-full px-3 py-2.5 rounded-xl transition-all text-left ${
+                    isActive
+                      ? 'bg-maroon text-cream shadow-[0_10px_24px_-14px_rgba(104,3,24,0.55)]'
+                      : 'hover:bg-maroon/5'
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold truncate leading-tight ${isActive ? 'text-cream' : 'text-ink'}`}>
+                      {c.case_name}
+                    </p>
+                    <p className={`text-[11px] truncate mt-0.5 ${isActive ? 'text-cream/70' : 'text-ink/45'}`}>
+                      {c.case_no}
+                    </p>
+                    <div className="mt-1.5">
+                      <StatusBadge status={c.status} />
+                    </div>
+                  </div>
+                  <ChevronRight
+                    className={`w-3.5 h-3.5 mt-0.5 shrink-0 transition-opacity ${isActive ? 'opacity-80 text-cream' : 'opacity-0 group-hover:opacity-50 text-maroon'}`}
+                  />
+                </Link>
+              )
+            })
+          )}
+        </nav>
+
+        <div className="px-3 pb-4 pt-2 border-t border-maroon/10 mt-auto">
+          {user && (
+            <p className="text-[11px] text-ink/55 truncate px-2 mb-2">{user.email}</p>
+          )}
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-sm text-ink/60 hover:text-red-700 hover:bg-red-50 transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sign out
+          </button>
+        </div>
+      </aside>
+
+      <AnimatePresence>
+        {modalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-maroon-deep/45 backdrop-blur-sm"
+            onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="relative bg-cream-soft rounded-3xl shadow-[0_30px_80px_-20px_rgba(104,3,24,0.55)] w-full max-w-md p-8 border border-maroon/10"
+            >
+              <div
+                aria-hidden
+                className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-rust/20 blur-3xl pointer-events-none"
+              />
+
+              <div className="relative flex items-start justify-between mb-7">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-maroon/10 text-maroon text-[10px] font-bold tracking-[0.18em] uppercase mb-3">
+                    <Sparkles className="w-3 h-3 text-rust" />
+                    New Report
+                  </div>
+                  <h2 className="font-display text-2xl font-bold text-maroon leading-tight">
+                    Grant a Title Scrutiny Report
+                  </h2>
+                  <p className="text-sm text-ink/60 mt-1.5">
+                    Fill in the client details — we&apos;ll set up their file.
+                  </p>
+                </div>
+                <button
+                  onClick={closeModal}
+                  className="text-ink/40 hover:text-maroon transition-colors p-1.5 rounded-lg hover:bg-maroon/10 ml-4"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {formError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="flex items-start gap-2.5 p-3 mb-5 rounded-xl bg-red-50 border border-red-200"
+                  >
+                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700">{formError}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <form onSubmit={handleCreateCase} className="space-y-4">
+                {FIELDS.map(({ id, label, placeholder, icon: Icon }) => (
+                  <div key={id}>
+                    <label
+                      htmlFor={id}
+                      className="block text-xs font-semibold text-ink/70 mb-1.5 tracking-wide uppercase"
+                    >
+                      {label} <span className="text-rust normal-case">*</span>
+                    </label>
+                    <div className="relative">
+                      <Icon className="w-4 h-4 text-maroon/40 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        id={id}
+                        type="text"
+                        required
+                        value={form[id]}
+                        onChange={e => setForm(prev => ({ ...prev, [id]: e.target.value }))}
+                        placeholder={placeholder}
+                        disabled={submitting}
+                        className="w-full pl-10 pr-3.5 py-3 text-sm rounded-xl border border-maroon/15 bg-cream placeholder:text-ink/35 text-ink focus:outline-none focus:border-maroon focus:ring-2 focus:ring-maroon/20 disabled:opacity-60 transition-all"
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    disabled={submitting}
+                    className="flex-1 px-4 py-3 rounded-xl text-sm font-semibold text-ink/70 bg-cream hover:bg-cream-warm border border-maroon/15 hover:border-maroon/30 disabled:opacity-50 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting || !form.case_name.trim() || !form.case_no.trim() || !form.bank_name.trim()}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-cream bg-maroon hover:bg-maroon-deep disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[0_10px_24px_-12px_rgba(104,3,24,0.55)] hover:-translate-y-0.5"
+                  >
+                    {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {submitting ? 'Granting…' : 'Grant Report'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}

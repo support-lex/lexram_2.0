@@ -216,8 +216,8 @@ function SidebarContent({
   // IntersectionObserver sentinel at the bottom of the list comes into
   // view. Pinned + the search filter are NOT sliced (those lists are
   // intentional/short).
-  const INITIAL_VISIBLE = 30;
-  const VISIBLE_PAGE = 30;
+  const INITIAL_VISIBLE = 15;
+  const VISIBLE_PAGE = 20;
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   // Reset the slice whenever the search query changes (otherwise a new
   // filter would still show the previous count).
@@ -242,18 +242,64 @@ function SidebarContent({
 
   // Sentinel observer — when the loader row scrolls into the viewport,
   // grow the slice by another page. Cheap and matches Notion / ChatGPT.
+  //
+  // Two guards prevent the "cascade load everything on mount" bug we hit
+  // earlier (where a sidebar tall enough to fit all 15 rows kept the
+  // sentinel permanently visible, so every visibleCount bump immediately
+  // triggered the next one until the entire list rendered in one tick):
+  //
+  //   1. `userScrolledRef` — the sentinel is ignored until the user has
+  //      scrolled the container at least once. This stops the first burst
+  //      on mount.
+  //   2. `loadingMoreRef` — once a page load fires, we hold a 350 ms cool-
+  //      down before another can fire. Long enough for the new rows to
+  //      render and push the sentinel back below the fold under any
+  //      realistic row count.
+  //
+  // We also flip a real `loadingMore` state so the skeleton stays visible
+  // for the cooldown window — without it the "Loading more…" indicator
+  // would only flash for a single frame and the user wouldn't perceive
+  // any pagination at all.
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const scrollRootRef = useRef<HTMLDivElement | null>(null);
+  const userScrolledRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    const root = scrollRootRef.current;
+    if (!root) return;
+    const onScroll = () => {
+      if (root.scrollTop > 4) userScrolledRef.current = true;
+    };
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => root.removeEventListener("scroll", onScroll);
+  }, []);
+
   useEffect(() => {
     if (!hasMoreUnpinned) return;
     const node = loadMoreRef.current;
     if (!node) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        if (!userScrolledRef.current) return;
+        if (loadingMoreRef.current) return;
+        loadingMoreRef.current = true;
+        setLoadingMore(true);
+        // Brief artificial delay so the skeleton actually registers
+        // visually — a sub-frame pagination feels invisible.
+        setTimeout(() => {
           setVisibleCount((n) => n + VISIBLE_PAGE);
-        }
+          setLoadingMore(false);
+          // Extra cooldown after render to keep the cascade in check.
+          setTimeout(() => { loadingMoreRef.current = false; }, 150);
+        }, 350);
       },
-      { rootMargin: "200px 0px 0px 0px" },
+      {
+        root: scrollRootRef.current,
+        rootMargin: "0px 0px 200px 0px",
+      },
     );
     observer.observe(node);
     return () => observer.disconnect();
@@ -297,7 +343,7 @@ function SidebarContent({
       </div>
 
       {/* Session list with Pinned section */}
-      <div className="flex-1 overflow-y-auto px-2 pb-3 custom-scrollbar">
+      <div ref={scrollRootRef} className="flex-1 overflow-y-auto px-2 pb-3 custom-scrollbar">
         {sessionsLoading && filteredSessions.length === 0 ? (
           // Skeleton rows while the first /sessions fetch is in flight.
           // Avoids the empty-state flash that misled users into thinking
@@ -389,22 +435,24 @@ function SidebarContent({
             ))}
 
             {/* Infinite-scroll sentinel — when this enters the viewport
-                we grow the slice by another VISIBLE_PAGE. Shows a small
-                shimmer placeholder so the user gets feedback that more
-                threads are arriving. */}
+                AND the user has scrolled at least once, we grow the slice
+                by another VISIBLE_PAGE. The wording shifts between "Scroll
+                for more" and "Loading more…" so the user understands the
+                pagination model instead of seeing a perpetual "loading"
+                placeholder. */}
             {hasMoreUnpinned && (
-              <div ref={loadMoreRef} className="px-3 py-3" aria-busy="true">
+              <div ref={loadMoreRef} className="px-3 py-3" aria-busy={loadingMore}>
                 <div className="space-y-1.5">
                   {Array.from({ length: 3 }).map((_, i) => (
                     <div
                       key={i}
-                      className="h-3 rounded-full bg-[var(--border-default)]/60 lex-skeleton-shimmer"
+                      className={`h-3 rounded-full bg-[var(--border-default)]/60 ${loadingMore ? "lex-skeleton-shimmer" : "opacity-40"}`}
                       style={{ width: `${60 + (i * 10) % 30}%` }}
                     />
                   ))}
                 </div>
                 <div className="mt-2 text-center text-[10px] text-[var(--text-muted)]">
-                  Loading more · {unpinnedFlat.length - unpinnedSliced.length} left
+                  {loadingMore ? "Loading more…" : "Scroll for more"} · {unpinnedFlat.length - unpinnedSliced.length} left
                 </div>
               </div>
             )}

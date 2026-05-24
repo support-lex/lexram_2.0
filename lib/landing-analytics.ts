@@ -10,6 +10,7 @@ export type AnalyticsEvent =
   | "cta_start_research_click"
   | "cta_book_demo_click"
   | "cta_start_trial_click"
+  | "cta_login_click"
   | "cta_talk_sales_click"
   | "contact_form_submit"
   | "faq_toggle"

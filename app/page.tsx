@@ -159,19 +159,17 @@ function Hero() {
         </p>
         <div className="reveal-blur mt-12 flex flex-wrap gap-4" style={{ transitionDelay: "360ms" }}>
           <button
+            type="button"
             onClick={() => {
               track("cta_start_trial_click", { location: "hero" });
               go(SIGNUP);
             }}
-            className="group inline-flex items-center gap-3 bg-[#fff0df] text-[#680318] px-7 py-4 rounded-md font-semibold hover:bg-[#b94826] hover:text-[#fff0df] transition-all shadow-elegant"
+            className="lex-btn lex-btn--primary lex-btn--dark group"
           >
             Start Free Trial{" "}
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition" />
           </button>
-          <a
-            href="#research"
-            className="inline-flex items-center gap-3 border border-[#fff0df]/40 text-[#fff0df] px-7 py-4 rounded-md font-medium hover:bg-[#fff0df]/10 transition"
-          >
+          <a href="#research" className="lex-btn lex-btn--secondary lex-btn--dark">
             See how it works
           </a>
         </div>
@@ -340,28 +338,22 @@ function SectionCTA({
   return (
     <div className="fade-up mt-14 flex flex-wrap items-center gap-4">
       <button
+        type="button"
         onClick={() => {
           track(eventName, { location });
           go(primaryHref);
         }}
-        className={`group inline-flex items-center gap-3 px-7 py-4 rounded-md font-semibold transition shadow-elegant ${
-          dark
-            ? "bg-[#fff0df] text-[#680318] hover:bg-[#b94826] hover:text-[#fff0df]"
-            : "bg-[#680318] text-[#fff0df] hover:bg-[#b94826]"
-        }`}
+        className={`lex-btn lex-btn--primary group ${dark ? "lex-btn--dark" : ""}`}
       >
         {label} <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition" />
       </button>
       <button
+        type="button"
         onClick={() => {
           track("cta_book_demo_click", { location });
           go(secondaryHref);
         }}
-        className={`inline-flex items-center gap-2 px-5 py-4 rounded-md font-medium border transition ${
-          dark
-            ? "border-[#fff0df]/30 text-[#fff0df] hover:bg-[#fff0df]/10"
-            : "border-[#680318]/30 text-[#680318] hover:bg-[#680318]/5"
-        }`}
+        className={`lex-btn lex-btn--secondary ${dark ? "lex-btn--dark" : ""}`}
       >
         Book a demo
       </button>
@@ -741,18 +733,16 @@ function LexramEdge() {
 
         <div className="mt-14 fade-up flex flex-wrap items-center gap-4">
           <button
+            type="button"
             onClick={() => {
               track("cta_start_trial_click", { location: "lexram_edge" });
               go(SIGNUP);
             }}
-            className="group inline-flex items-center gap-3 bg-[#680318] text-[#fff0df] px-7 py-4 rounded-md font-semibold hover:bg-[#b94826] transition-all shadow-elegant"
+            className="lex-btn lex-btn--primary group"
           >
             Start Free Trial <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition" />
           </button>
-          <a
-            href="#pricing"
-            className="inline-flex items-center gap-3 border border-[#680318]/30 text-[#680318] px-6 py-4 rounded-md font-medium hover:bg-[#680318]/5 transition"
-          >
+          <a href="#pricing" className="lex-btn lex-btn--secondary">
             See pricing
           </a>
         </div>
@@ -1088,18 +1078,16 @@ function LexDraftEdge() {
         {/* Compact CTA */}
         <div className="mt-10 reveal-blur flex flex-wrap items-center justify-center gap-3">
           <button
+            type="button"
             onClick={() => {
               track("cta_start_trial_click", { location: "lexdraft_edge" });
               go(SIGNUP);
             }}
-            className="group inline-flex items-center gap-2 bg-[#fff0df] text-[#680318] px-5 py-2.5 rounded-md font-semibold hover:bg-[#b94826] hover:text-[#fff0df] transition-all shadow-elegant text-sm"
+            className="lex-btn lex-btn--primary lex-btn--dark lex-btn--sm group"
           >
             Start Free Trial <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition" />
           </button>
-          <a
-            href="#pricing"
-            className="inline-flex items-center gap-2 border border-[#fff0df]/30 text-[#fff0df] px-5 py-2.5 rounded-md font-medium hover:bg-[#fff0df]/10 transition text-sm"
-          >
+          <a href="#pricing" className="lex-btn lex-btn--secondary lex-btn--dark lex-btn--sm">
             See pricing
           </a>
         </div>
@@ -1975,10 +1963,7 @@ function CTA() {
             placeholder="your@chambers.in"
             className="flex-1 px-5 py-4 rounded-md bg-[#fff0df]/10 border border-[#fff0df]/20 text-[#fff0df] placeholder:text-[#fff0df]/50 focus:outline-none focus:border-[#b94826]"
           />
-          <button
-            type="submit"
-            className="px-6 py-4 rounded-md bg-[#fff0df] text-[#680318] font-semibold hover:bg-[#b94826] hover:text-[#fff0df] transition shadow-elegant"
-          >
+          <button type="submit" className="lex-btn lex-btn--primary lex-btn--dark">
             Start Free
           </button>
         </form>

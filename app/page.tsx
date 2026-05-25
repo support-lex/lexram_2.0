@@ -9,6 +9,7 @@ import {
   Calendar, TrendingUp, FileSearch, Layers,
   Mail, Phone, Clock, Send, MessageSquare,
   Image as ImageIcon,
+  Menu, X,
 } from "lucide-react";
 import { track } from "@/lib/landing-analytics";
 
@@ -178,46 +179,117 @@ function useScrollY() {
    Nav
    ============================================================ */
 function Nav() {
+  const [open, setOpen] = useState(false);
+
+  /* Close the mobile sheet whenever the user navigates via a link or
+     the route hash changes, otherwise the overlay traps focus on the
+     destination section. */
+  useEffect(() => {
+    if (!open) return;
+    const onHash = () => setOpen(false);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [open]);
+
+  const links = [
+    { href: "#research", label: "Research" },
+    { href: "#drafting", label: "Drafting" },
+    { href: "#blog",     label: "Blog" },
+    { href: "#pricing",  label: "Pricing" },
+    { href: "#faq",      label: "FAQ" },
+    { href: "#contact",  label: "Contact" },
+  ];
+
   return (
-    <header className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-[#fff0df]/70 border-b border-[#680318]/10">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <a href="#" className="flex items-center gap-2">
+    <header className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-[#fff0df]/80 border-b border-[#680318]/10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+        {/* Brand */}
+        <a href="#" className="flex items-center gap-2 shrink-0">
           <div className="w-8 h-8 rounded-md bg-gradient-warm grid place-items-center shadow-soft">
             <Scale className="w-4 h-4 text-[#fff0df]" />
           </div>
-          <span className="font-serif text-xl font-bold text-[#680318]">
+          <span className="font-serif text-lg sm:text-xl font-bold text-[#680318]">
             LexRam<span className="text-[#b94826]">.</span>ai
           </span>
         </a>
-        <nav className="hidden md:flex items-center gap-6 text-sm text-[#680318]/80">
-          <a href="#research"  className="hover:text-[#680318] transition">Research</a>
-          <a href="#drafting"  className="hover:text-[#680318] transition">Drafting</a>
-          {/* <a href="#resources" className="hover:text-[#680318] transition">Resources</a> */}
-          <a href="#blog"      className="hover:text-[#680318] transition">Blog</a>
-          <a href="#pricing"   className="hover:text-[#680318] transition">Pricing</a>
-          <a href="#faq"       className="hover:text-[#680318] transition">FAQ</a>
-          <a href="#contact"   className="hover:text-[#680318] transition">Contact</a>
+
+        {/* Desktop nav */}
+        <nav className="hidden lg:flex items-center gap-6 text-sm text-[#680318]/80">
+          {links.map((l) => (
+            <a key={l.href} href={l.href} className="hover:text-[#680318] transition">
+              {l.label}
+            </a>
+          ))}
         </nav>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              track("cta_start_trial_click", { location: "nav" });
-              go(SIGNUP);
-            }}
-            className="inline-flex items-center gap-2 bg-[#680318] text-[#fff0df] px-4 py-2 rounded-md text-sm font-medium hover:bg-[#b94826] transition shadow-soft"
-          >
-            Free Trial <ArrowRight className="w-4 h-4" />
-          </button>
+
+        {/* Desktop CTAs */}
+        <div className="hidden sm:flex items-center gap-2">
           <button
             onClick={() => {
               track("cta_login_click", { location: "nav" });
               go(LOGIN);
             }}
-            className="inline-flex items-center gap-2 border border-[#680318]/25 text-[#680318] px-4 py-2 rounded-md text-sm font-medium hover:border-[#b94826] hover:text-[#b94826] transition"
+            className="inline-flex items-center gap-2 border border-[#680318]/25 text-[#680318] px-3.5 lg:px-4 py-2 rounded-md text-sm font-medium hover:border-[#b94826] hover:text-[#b94826] transition"
           >
             Login
           </button>
+          <button
+            onClick={() => {
+              track("cta_start_trial_click", { location: "nav" });
+              go(SIGNUP);
+            }}
+            className="inline-flex items-center gap-2 bg-[#680318] text-[#fff0df] px-3.5 lg:px-4 py-2 rounded-md text-sm font-medium hover:bg-[#b94826] transition shadow-soft"
+          >
+            <span className="hidden md:inline">Free Trial</span>
+            <span className="md:hidden">Trial</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
+
+        {/* Mobile menu toggle (visible <sm and on md when desktop links hidden <lg) */}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? "Close menu" : "Open menu"}
+          aria-expanded={open}
+          className="lg:hidden inline-flex items-center justify-center w-10 h-10 rounded-md border border-[#680318]/20 text-[#680318] hover:border-[#b94826] hover:text-[#b94826] transition"
+        >
+          {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+      </div>
+
+      {/* Mobile drawer */}
+      <div
+        className={`lg:hidden overflow-hidden border-t border-[#680318]/10 bg-[#fff0df]/95 backdrop-blur-md transition-[max-height,opacity] duration-300 ease-out ${
+          open ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+        }`}
+      >
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col">
+          {links.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              onClick={() => setOpen(false)}
+              className="py-3 text-base font-medium text-[#680318]/85 border-b border-[#680318]/10 last:border-b-0 hover:text-[#b94826] transition"
+            >
+              {l.label}
+            </a>
+          ))}
+          <div className="mt-4 flex flex-col sm:hidden gap-2">
+            <button
+              onClick={() => { setOpen(false); track("cta_login_click", { location: "nav_mobile" }); go(LOGIN); }}
+              className="inline-flex items-center justify-center gap-2 border border-[#680318]/25 text-[#680318] px-4 py-2.5 rounded-md text-sm font-medium"
+            >
+              Login
+            </button>
+            <button
+              onClick={() => { setOpen(false); track("cta_start_trial_click", { location: "nav_mobile" }); go(SIGNUP); }}
+              className="inline-flex items-center justify-center gap-2 bg-[#680318] text-[#fff0df] px-4 py-2.5 rounded-md text-sm font-medium"
+            >
+              Free Trial <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </nav>
       </div>
     </header>
   );
@@ -242,34 +314,34 @@ function Hero() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(42,26,28,0.6)_100%)]" />
 
       <div
-        className="relative max-w-6xl mx-auto px-6 py-10 md:py-12 text-[#fff0df]"
+        className="relative max-w-6xl mx-auto px-4 sm:px-6 py-10 md:py-12 text-[#fff0df]"
         style={{
           transform: `translateY(${y * -0.15}px)`,
           opacity: Math.max(0, 1 - y / 600),
         }}
       >
-        <h1 className="reveal-up font-serif text-5xl md:text-7xl lg:text-8xl font-bold leading-[1.02] text-balance">
+        <h1 className="reveal-up font-serif text-[2.5rem] leading-[1.05] sm:text-5xl md:text-7xl lg:text-8xl md:leading-[1.02] font-bold text-balance">
           You argue the case.
           <br />
           <span className="italic text-[#fff0df]/90">We'll find</span>{" "}
           <span className="text-[#b94826]">the law.</span>
         </h1>
-        <p className="reveal-up mt-8 text-lg md:text-2xl text-[#fff0df]/80 max-w-2xl font-light leading-relaxed" style={{ transitionDelay: "180ms" }}>
+        <p className="reveal-up mt-6 sm:mt-8 text-base sm:text-lg md:text-2xl text-[#fff0df]/80 max-w-2xl font-light leading-relaxed" style={{ transitionDelay: "180ms" }}>
           From statute to submission — without leaving Lexram. Research judgements, draft pleadings, manage matters, trace titles, and grow your network — one platform, built on India's courts alone.
         </p>
-        <div className="reveal-blur mt-12 flex flex-wrap gap-4" style={{ transitionDelay: "360ms" }}>
+        <div className="reveal-blur mt-8 sm:mt-12 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4" style={{ transitionDelay: "360ms" }}>
           <button
             type="button"
             onClick={() => {
               track("cta_start_trial_click", { location: "hero" });
               go(SIGNUP);
             }}
-            className="lex-btn lex-btn--primary lex-btn--dark group"
+            className="lex-btn lex-btn--primary lex-btn--dark group justify-center sm:justify-start"
           >
             Start Free Trial{" "}
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition" />
           </button>
-          <a href="#research" className="lex-btn lex-btn--secondary lex-btn--dark">
+          <a href="#research" className="lex-btn lex-btn--secondary lex-btn--dark justify-center sm:justify-start">
             See how it works
           </a>
         </div>
@@ -319,7 +391,7 @@ function ParallaxBand({
       style={{ backgroundImage: `url(${image})` }}
     >
       <div className="absolute inset-0 bg-gradient-to-r from-[#680318]/90 via-[#680318]/60 to-transparent" />
-      <div className="relative max-w-6xl mx-auto px-6 text-[#fff0df]">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 text-[#fff0df]">
         <div className="text-xs tracking-[0.3em] text-[#b94826] mb-4">{kicker}</div>
         <h2 className="font-serif text-4xl md:text-6xl font-bold max-w-3xl text-balance leading-tight">
           {title}
@@ -505,11 +577,11 @@ function Research() {
   useReveal();
   return (
     <section id="research" className="py-10 md:py-12 bg-[#fff0df] relative">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
             <div className="text-xs tracking-[0.3em] text-[#b94826] mb-4">01 — RESEARCH · AI LEGAL RESEARCH ASSISTANT</div>
-            <h2 className="reveal-up font-serif text-4xl md:text-5xl font-bold text-[#680318] leading-tight" style={{ transitionDelay: "120ms" }}>
+            <h2 className="reveal-up font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#680318] leading-tight" style={{ transitionDelay: "120ms" }}>
               Find the right legal answer — <span className="italic">verified</span>, not hallucinated.
             </h2>
             <p className="reveal-up mt-6 text-lg text-[#680318]/70 leading-relaxed" style={{ transitionDelay: "240ms" }}>
@@ -732,8 +804,8 @@ function ResearchCapabilities() {
   return (
     <div className="mt-10">
       <div className="mb-10">
-        <div className="reveal-down text-xs tracking-[0.3em] text-[#b94826] mb-3">CAPABILITIES</div>
-        <h3 className="reveal-blur font-serif text-3xl md:text-4xl font-bold text-[#680318] leading-tight max-w-2xl" style={{ transitionDelay: "120ms" }}>
+        <div className="reveal-down text-xs tracking-[0.3em] text-[#b94826] mb-3">FEATURES</div>
+        <h3 className="reveal-blur font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#680318] leading-tight max-w-2xl" style={{ transitionDelay: "120ms" }}>
           Built like a workspace — not a search box.
         </h3>
       </div>
@@ -842,10 +914,10 @@ function LexramEdge() {
       <div aria-hidden className="absolute top-1/4 -left-32 w-[520px] h-[520px] bg-[#b94826] opacity-10 blur-[160px] rounded-full pointer-events-none lex-float" />
       <div aria-hidden className="absolute bottom-0 -right-32 w-[520px] h-[520px] bg-[#b94826] opacity-[0.08] blur-[180px] rounded-full pointer-events-none" />
 
-      <div className="relative max-w-7xl mx-auto px-6 text-[#680318]">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 text-[#680318]">
         <div className="max-w-3xl">
           <div className="text-xs tracking-[0.3em] text-[#b94826] mb-4">LEXRAM EDGE</div>
-          <h2 className="font-serif text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-balance">
+          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-balance">
             Every citation is real. <span className="italic text-[#b94826]">Every source is open.</span>
           </h2>
           <p className="mt-6 text-lg text-[#680318]/70 leading-relaxed max-w-2xl">
@@ -1065,11 +1137,11 @@ function Drafting() {
   return (
     <section id="drafting" className="py-10 md:py-12 bg-[#680318] text-[#fff0df] relative overflow-hidden">
       <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(185,72,38,0.25),transparent_60%)]" />
-      <div className="relative max-w-7xl mx-auto px-6">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
             <div className="text-xs tracking-[0.3em] text-[#b94826] mb-4">02 — DRAFTING · AI LEGAL DRAFTING ASSISTANT</div>
-            <h2 className="reveal-up font-serif text-4xl md:text-5xl font-bold text-[#fff0df] leading-tight" style={{ transitionDelay: "120ms" }}>
+            <h2 className="reveal-up font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#fff0df] leading-tight" style={{ transitionDelay: "120ms" }}>
               The first draft is <span className="italic text-[#b94826]">&ldquo;already&rdquo;</span> done.
             </h2>
             <p className="reveal-up mt-6 text-lg text-[#fff0df]/80 leading-relaxed" style={{ transitionDelay: "240ms" }}>
@@ -1341,7 +1413,7 @@ function DraftingCapabilities() {
     <div className="mt-10">
       <div className="mb-8">
         <div className="reveal-down text-xs tracking-[0.3em] text-[#b94826] mb-3">FEATURES</div>
-        <h3 className="reveal-blur font-serif text-3xl md:text-4xl font-bold text-[#fff0df] leading-tight max-w-2xl" style={{ transitionDelay: "120ms" }}>
+        <h3 className="reveal-blur font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#fff0df] leading-tight max-w-2xl" style={{ transitionDelay: "120ms" }}>
           A drafting workspace — not a blank page.
         </h3>
       </div>
@@ -1449,7 +1521,7 @@ function LexDraftEdge() {
       <div aria-hidden className="absolute top-1/3 -left-32 w-[420px] h-[420px] bg-[#b94826] opacity-15 blur-[160px] rounded-full pointer-events-none lex-float-x" />
       <div aria-hidden className="absolute bottom-0 -right-32 w-[420px] h-[420px] bg-[#b94826] opacity-10 blur-[180px] rounded-full pointer-events-none lex-float" />
 
-      <div className="relative max-w-6xl mx-auto px-6">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
         {/* Header */}
         <div className="max-w-3xl mb-10">
           <div className="text-[10px] tracking-[0.3em] text-[#b94826]">LEXRAM EDGE</div>
@@ -1634,10 +1706,10 @@ function Resources() {
   ];
   return (
     <section id="resources" className="py-10 md:py-12 bg-[#fff0df] relative">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="max-w-3xl">
           <div className="reveal-left text-xs tracking-[0.3em] text-[#b94826] mb-4">03 — RESOURCES</div>
-          <h2 className="reveal-up font-serif text-4xl md:text-5xl font-bold text-[#680318] leading-tight" style={{ transitionDelay: "120ms" }}>
+          <h2 className="reveal-up font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#680318] leading-tight" style={{ transitionDelay: "120ms" }}>
             A working library, not a <span className="italic">reference shelf</span>.
           </h2>
           <p className="reveal-up mt-6 text-lg text-[#680318]/70 leading-relaxed" style={{ transitionDelay: "240ms" }}>
@@ -1755,7 +1827,7 @@ function Blog() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(42,15,16,0.7)_100%)]" />
       </div>
 
-      <div className="relative max-w-4xl mx-auto px-6 text-center py-8">
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center py-8">
         <div className="text-xs tracking-[0.3em] text-[#b94826] mb-3">
           LEGAL BLOGS
         </div>
@@ -1834,10 +1906,10 @@ function Stats() {
       }}
     >
       <div className="absolute inset-0 bg-[#680318]/85" />
-      <div className="relative max-w-6xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-10 text-center">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-2 md:grid-cols-4 gap-10 text-center">
         {stats.map((s, i) => (
           <div key={i} className="reveal-zoom" style={{ transitionDelay: `${i * 120}ms` }}>
-            <div className="font-serif text-6xl md:text-7xl font-bold text-[#b94826]">{s.n}</div>
+            <div className="font-serif text-4xl sm:text-5xl md:text-7xl font-bold text-[#b94826]">{s.n}</div>
             <div className="mt-3 text-sm tracking-[0.2em] uppercase text-[#fff0df]/80">{s.l}</div>
           </div>
         ))}
@@ -1891,11 +1963,11 @@ function Stories() {
 
   return (
     <section id="testimonials" className="py-10 md:py-12 bg-[#fff0df]">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="reveal-down text-xs tracking-[0.3em] text-[#b94826] mb-4">TESTIMONIALS</div>
-          <h2 className="reveal-blur font-serif text-4xl md:text-5xl font-bold text-[#680318] text-balance" style={{ transitionDelay: "120ms" }}>
+          <h2 className="reveal-blur font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#680318] text-balance" style={{ transitionDelay: "120ms" }}>
             From the advocates who <span className="italic">use it every day</span>.
           </h2>
           <p className="reveal-up mt-5 text-[#680318]/70 max-w-xl mx-auto" style={{ transitionDelay: "240ms" }}>
@@ -1935,7 +2007,7 @@ function Stories() {
 
         {/* Horizontally-scrolling rail of testimonial cards.
             Mobile: snap-scroll with finger. Desktop: same rail + hint chevron + visible scrollbar. */}
-        <div className="relative -mx-6 px-6">
+        <div className="relative -mx-4 sm:-mx-6 px-4 sm:px-6">
           <div
             key={tab}
             className="quote-roll flex gap-5 overflow-x-auto snap-x snap-mandatory pb-4 [scrollbar-color:rgba(104,3,24,0.3)_transparent] [scrollbar-width:thin]"
@@ -1949,7 +2021,7 @@ function Stories() {
               return (
                 <figure
                   key={`${tab}-${i}`}
-                  className="group relative shrink-0 snap-start w-[300px] sm:w-[360px] lg:w-[400px] rounded-2xl bg-[#fff0df] border border-[#680318]/12 shadow-soft hover:shadow-elegant hover:-translate-y-0.5 transition-all overflow-hidden p-7"
+                  className="group relative shrink-0 snap-start w-[280px] sm:w-[340px] lg:w-[400px] rounded-2xl bg-[#fff0df] border border-[#680318]/12 shadow-soft hover:shadow-elegant hover:-translate-y-0.5 transition-all overflow-hidden p-5 sm:p-7"
                 >
                   {/* Top accent bar */}
                   <span aria-hidden className={`absolute left-0 top-0 h-[3px] w-16 ${topicTone.bar} group-hover:w-full transition-all duration-500`} />
@@ -1999,10 +2071,10 @@ function Pricing() {
   ];
   return (
     <section id="pricing" className="py-10 md:py-12 bg-[#fff0df]">
-      <div className="max-w-6xl mx-auto px-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="text-center mb-16">
           <div className="reveal-down text-xs tracking-[0.3em] text-[#b94826] mb-4">PRICING</div>
-          <h2 className="reveal-blur font-serif text-4xl md:text-5xl font-bold text-[#680318]" style={{ transitionDelay: "120ms" }}>
+          <h2 className="reveal-blur font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#680318]" style={{ transitionDelay: "120ms" }}>
             Built for solo practice. Priced for it too.
           </h2>
         </div>
@@ -2133,10 +2205,10 @@ function FAQ() {
 
   return (
     <section id="faq" className="py-10 md:py-12 bg-[#fff0df]">
-      <div className="max-w-5xl mx-auto px-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
         <div className="text-center mb-8">
           <div className="reveal-down text-xs tracking-[0.3em] text-[#b94826] mb-4">FAQ</div>
-          <h2 className="reveal-blur font-serif text-4xl md:text-5xl font-bold text-[#680318]" style={{ transitionDelay: "120ms" }}>
+          <h2 className="reveal-blur font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#680318]" style={{ transitionDelay: "120ms" }}>
             Questions, <span className="italic">answered</span>.
           </h2>
           <p className="reveal-up mt-5 text-[#680318]/70 max-w-xl mx-auto" style={{ transitionDelay: "240ms" }}>
@@ -2339,11 +2411,11 @@ function GetInTouch() {
       <div aria-hidden className="absolute top-1/4 -left-32 w-[520px] h-[520px] bg-[#b94826] opacity-15 blur-[160px] rounded-full pointer-events-none lex-float-x" />
       <div aria-hidden className="absolute bottom-0 -right-32 w-[520px] h-[520px] bg-[#b94826] opacity-10 blur-[180px] rounded-full pointer-events-none lex-float" />
 
-      <div className="relative max-w-7xl mx-auto px-6">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-10">
           <div className="text-xs tracking-[0.3em] text-[#b94826] mb-4">GET IN TOUCH</div>
-          <h2 className="font-serif text-4xl md:text-6xl font-bold text-[#fff0df] leading-[1.05] text-balance">
+          <h2 className="font-serif text-3xl sm:text-4xl md:text-6xl font-bold text-[#fff0df] leading-[1.05] text-balance">
             Have a question?
             <br />
             <span className="italic text-[#b94826]">We&apos;d love to hear from you.</span>
@@ -2481,7 +2553,7 @@ function CTA() {
   return (
     <section id="cta" className="relative py-10 md:py-12 overflow-hidden bg-[#680318]">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(185,72,38,0.4),transparent_70%)]" />
-      <div className="relative max-w-4xl mx-auto px-6 text-center text-[#fff0df]">
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center text-[#fff0df]">
         <Scale className="reveal-zoom w-12 h-12 mx-auto text-[#b94826] mb-6" />
         <h2 className="reveal-blur font-serif text-4xl md:text-6xl font-bold leading-tight text-balance" style={{ transitionDelay: "140ms" }}>
           You argue the case.
@@ -2524,7 +2596,7 @@ function CTA() {
 function Footer() {
   return (
     <footer className="bg-[#680318] text-[#fff0df]/70 py-16 border-t border-[#b94826]/20">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="grid md:grid-cols-4 gap-10">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-4">

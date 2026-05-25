@@ -634,6 +634,13 @@ html.lenis body { height: auto; }
   pointer-events: none;
   will-change: opacity, transform;
 }
+/* The popup is a hover affordance. On touch devices (no hover) it never
+   gets a chance to fire — and worse, can briefly flash during scroll. Hide
+   it entirely on coarse pointers so mobile users aren't bothered by a
+   floating "Click to preview" chip. */
+@media (hover: none), (pointer: coarse) {
+  [data-landing-v2] .cap-popup { display: none; }
+}
 [data-landing-v2] .group:hover > .cap-popup,
 [data-landing-v2] .group:focus-visible > .cap-popup {
   opacity: 1;

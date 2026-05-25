@@ -423,60 +423,76 @@ html.lenis body { height: auto; }
 .lenis.lenis-stopped { overflow: hidden; }
 .lenis.lenis-smooth iframe { pointer-events: none; }
 
-[data-landing-v2] .fade-up {
-  opacity: 0;
-  transform: translateY(30px);
-  transition: opacity 0.9s ease, transform 0.9s ease;
-}
-[data-landing-v2] .fade-up.in-view {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Reveal variants — applied on scroll via IntersectionObserver.
-   Each block can pick a distinct entrance; pair with inline transitionDelay
-   for staggered cascades. */
+/* Reveal animations — content is ALWAYS visible at rest (opacity: 1, transform: none).
+   A mount-once @keyframes runs from a slightly offset start back to rest, so
+   elements feel like they "settle in" but can NEVER end up invisible if the
+   IntersectionObserver misses them. Each variant gets its own @keyframes name
+   so the starting offset is directional. transitionDelay inline still works
+   because we use animation-delay too. */
+[data-landing-v2] .fade-up,
 [data-landing-v2] .reveal-up,
 [data-landing-v2] .reveal-down,
 [data-landing-v2] .reveal-left,
 [data-landing-v2] .reveal-right,
 [data-landing-v2] .reveal-zoom,
 [data-landing-v2] .reveal-tilt,
-[data-landing-v2] .reveal-rise {
-  opacity: 0;
-  transition: opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
-              transform 0.9s cubic-bezier(0.22, 1, 0.36, 1),
-              filter 0.9s ease;
-  will-change: opacity, transform;
-}
-[data-landing-v2] .reveal-up    { transform: translateY(36px); }
-[data-landing-v2] .reveal-down  { transform: translateY(-28px); }
-[data-landing-v2] .reveal-left  { transform: translateX(-44px); }
-[data-landing-v2] .reveal-right { transform: translateX(44px); }
-[data-landing-v2] .reveal-zoom  { transform: scale(0.9); }
-[data-landing-v2] .reveal-tilt  { transform: perspective(900px) rotateX(14deg) translateY(20px); transform-origin: top center; }
-[data-landing-v2] .reveal-rise  { transform: translateY(60px) scale(0.97); }
-
+[data-landing-v2] .reveal-rise,
 [data-landing-v2] .reveal-blur {
-  opacity: 0;
-  filter: blur(14px);
-  transition: opacity 0.9s ease, filter 0.9s ease;
-}
-
-[data-landing-v2] .reveal-up.in-view,
-[data-landing-v2] .reveal-down.in-view,
-[data-landing-v2] .reveal-left.in-view,
-[data-landing-v2] .reveal-right.in-view,
-[data-landing-v2] .reveal-zoom.in-view,
-[data-landing-v2] .reveal-tilt.in-view,
-[data-landing-v2] .reveal-rise.in-view {
   opacity: 1;
   transform: none;
+  filter: none;
+  animation-duration: 0.9s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
 }
-[data-landing-v2] .reveal-blur.in-view {
-  opacity: 1;
-  filter: blur(0);
+[data-landing-v2] .fade-up,
+[data-landing-v2] .reveal-up    { animation-name: lex-rev-up; }
+[data-landing-v2] .reveal-down  { animation-name: lex-rev-down; }
+[data-landing-v2] .reveal-left  { animation-name: lex-rev-left; }
+[data-landing-v2] .reveal-right { animation-name: lex-rev-right; }
+[data-landing-v2] .reveal-zoom  { animation-name: lex-rev-zoom; }
+[data-landing-v2] .reveal-tilt  { animation-name: lex-rev-tilt; }
+[data-landing-v2] .reveal-rise  { animation-name: lex-rev-rise; }
+[data-landing-v2] .reveal-blur  { animation-name: lex-rev-blur; }
+
+@keyframes lex-rev-up    { from { opacity: 0; transform: translateY(28px); }           to { opacity: 1; transform: none; } }
+@keyframes lex-rev-down  { from { opacity: 0; transform: translateY(-22px); }          to { opacity: 1; transform: none; } }
+@keyframes lex-rev-left  { from { opacity: 0; transform: translateX(-36px); }          to { opacity: 1; transform: none; } }
+@keyframes lex-rev-right { from { opacity: 0; transform: translateX(36px); }           to { opacity: 1; transform: none; } }
+@keyframes lex-rev-zoom  { from { opacity: 0; transform: scale(0.94); }                to { opacity: 1; transform: none; } }
+@keyframes lex-rev-tilt  { from { opacity: 0; transform: perspective(900px) rotateX(10deg) translateY(16px); transform-origin: top center; } to { opacity: 1; transform: none; } }
+@keyframes lex-rev-rise  { from { opacity: 0; transform: translateY(44px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes lex-rev-blur  { from { opacity: 0; filter: blur(10px); }                    to { opacity: 1; filter: none; } }
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  [data-landing-v2] [class*="reveal-"],
+  [data-landing-v2] .fade-up { animation: none !important; }
 }
+
+/* ── Ambient motion utilities ─────────────────────────────────────────────
+   For decorative blobs / icons / images that should breathe even after the
+   page has settled. */
+@keyframes lex-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+@keyframes lex-float-x {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(14px); }
+}
+@keyframes lex-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.18; }
+  50%      { transform: scale(1.08); opacity: 0.28; }
+}
+@keyframes lex-pulse-soft {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+.lex-float    { animation: lex-float    7s ease-in-out infinite; }
+.lex-float-x  { animation: lex-float-x  9s ease-in-out infinite; }
+.lex-breathe  { animation: lex-breathe  9s ease-in-out infinite; }
+.lex-pulse-soft { animation: lex-pulse-soft 2.4s ease-in-out infinite; }
 
 /* Ledger row — unique to the LexDraft database band.
    The row enters as a normal reveal; an ink-line underneath

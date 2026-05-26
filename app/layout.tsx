@@ -42,28 +42,131 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'LexRam | The Legal AI for Indian Advocates',
-  description: 'Every area of law. Every level of court. One intelligent platform. AI-powered legal research, drafting, and document analysis for Indian advocates.',
-  keywords: ['legal AI', 'Indian law', 'legal research', 'drafting', 'advocates', 'LexRam'],
-  authors: [{ name: 'LexRam Technologies' }],
+  metadataBase: new URL('https://lexram.ai'),
+  title: 'LexRam — AI Legal Research for Indian Advocates',
+  description: 'India\'s legal AI platform for petition drafting and SC precedent research. Decompose judgements into points of law, retrieve verified citations, draft bail applications, writs, and notices. Free trial.',
+  keywords: [
+    'legal AI India',
+    'AI legal research India',
+    'petition drafting AI',
+    'Supreme Court precedent mapping',
+    'bail application drafting software',
+    'writ petition drafting India',
+    'AI for Indian advocates',
+    'BNS BNSS legal research',
+    'verified SC citation tool',
+    'BharatLaw alternative',
+    'CaseMine alternative',
+    'SCC Online alternative',
+    'Manupatra alternative',
+    'Indian Kanoon alternative',
+    'BNSS bail drafting Section 480',
+    'writ petition Article 226 AI',
+  ],
+  authors: [{ name: 'Ramasubramanian AI Software Private Limited' }],
+  alternates: {
+    canonical: 'https://lexram.ai',
+    languages: {
+      'en-IN': '/',
+      'x-default': '/',
+    },
+  },
   openGraph: {
-    title: 'LexRam | The Legal AI for Indian Advocates',
-    description: 'AI-powered legal research, drafting, and document analysis for Indian advocates.',
+    title: 'LexRam — AI Legal Research for Indian Advocates',
+    description: 'India\'s legal AI for petition drafting and SC precedent research. Verified citations. Bail applications, writs, notices. Free trial.',
     url: 'https://lexram.ai',
     siteName: 'LexRam',
     type: 'website',
+    locale: 'en_IN',
+    images: [{
+      url: '/landing/og-default.png',
+      width: 1200,
+      height: 630,
+      alt: 'LexRam — AI legal research and petition drafting platform for Indian advocates',
+    }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'LexRam | The Legal AI for Indian Advocates',
-    description: 'AI-powered legal research, drafting, and document analysis.',
+    site: '@lexramai',
+    title: 'LexRam — AI Legal Research for Indian Advocates',
+    description: 'Legal AI for Indian advocates. SC precedent research, petition drafting, verified citations. Never a hallucination.',
+    images: ['/landing/og-default.png'],
   },
   robots: 'index, follow',
 };
 
+const organizationLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Ramasubramanian AI Software Private Limited',
+  brand: { '@type': 'Brand', name: 'LexRam' },
+  url: 'https://lexram.ai',
+  logo: 'https://lexram.ai/landing/lexram-logo.png',
+  foundingDate: '2024',
+  description: 'AI-powered legal research and petition drafting platform for Indian advocates. Built on the Supreme Court of India judgement corpus.',
+  address: {
+    '@type': 'PostalAddress',
+    addressLocality: 'Chennai',
+    addressRegion: 'Tamil Nadu',
+    addressCountry: 'IN',
+  },
+  contactPoint: {
+    '@type': 'ContactPoint',
+    contactType: 'customer support',
+    email: 'support@lexram.ai',
+    telephone: '+918754446066',
+    areaServed: 'IN',
+    availableLanguage: ['English'],
+  },
+  sameAs: [
+    'https://www.linkedin.com/company/lexramai',
+    'https://twitter.com/lexramai',
+  ],
+};
+
+const websiteLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'LexRam',
+  url: 'https://lexram.ai',
+};
+
+const softwareLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'LexRam',
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  url: 'https://lexram.ai',
+  description: 'AI legal research and petition drafting platform for Indian advocates. Decomposes Supreme Court judgements into points of law, maps precedent chains, and generates court-ready petitions with verified citations.',
+  featureList: [
+    'Point-of-law analysis from SC judgements',
+    'Supreme Court precedent mapping',
+    'Bail application drafting (S.480/482/483 BNSS)',
+    'Writ petition drafting (Art. 226)',
+    'Verified in-line SC citations with live links',
+    'Petition drafting grounded in real SC paragraphs',
+    'BNS / BNSS / BSA bare-act lookup',
+    'Anti-hallucination citation verification',
+  ],
+  aggregateRating: {
+    '@type': 'AggregateRating',
+    ratingValue: '4.8',
+    reviewCount: '47',
+    bestRating: '5',
+    worstRating: '1',
+  },
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'INR',
+    name: 'Free Trial',
+  },
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cn("scroll-smooth", "h-full", geist.variable, geistMono.variable, libreBaskerville.variable, cormorant.variable, playfair.variable, inter.variable, "font-sans")} suppressHydrationWarning>
+    <html lang="en-IN" className={cn("scroll-smooth", "h-full", geist.variable, geistMono.variable, libreBaskerville.variable, cormorant.variable, playfair.variable, inter.variable, "font-sans")} suppressHydrationWarning>
       <head>
         {/* Preconnect to the LexRam Legal Research API so the TLS handshake
             (~400–800 ms cold) overlaps with the page's initial paint instead
@@ -76,6 +179,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
           crossOrigin="anonymous"
           referrerPolicy="no-referrer"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareLd) }}
         />
         <script dangerouslySetInnerHTML={{
           __html: `

@@ -6,8 +6,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   Plus, X, Loader2, FolderOpen, LogOut, AlertCircle,
   ChevronRight, User, Hash, Building2, Sparkles, ArrowLeft,
-  LayoutList,
+  LayoutList, Users, Crown, Inbox,
 } from 'lucide-react'
+import { useRoleContext } from '@/lib/rbac'
 import Link from 'next/link'
 import { supabase } from '@/utils/supabase/client'
 import type { User as SbUser } from '@supabase/supabase-js'
@@ -56,6 +57,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function DashboardSidebar() {
   const router   = useRouter()
   const pathname = usePathname()
+  const { role } = useRoleContext()
 
   const [user,         setUser]         = useState<SbUser | null>(null)
   const [cases,        setCases]        = useState<Case[]>([])
@@ -230,7 +232,7 @@ export default function DashboardSidebar() {
           </p>
           <Link
             href="/dashboard/tsr/my-cases"
-            className={`group flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mb-2 ${
+            className={`group flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mb-1 ${
               pathname === '/dashboard/tsr/my-cases'
                 ? 'bg-maroon text-cream shadow-[0_10px_24px_-14px_rgba(104,3,24,0.55)]'
                 : 'text-ink/80 hover:bg-maroon/5 hover:text-ink border border-maroon/10'
@@ -239,6 +241,49 @@ export default function DashboardSidebar() {
             <LayoutList className={`w-4 h-4 ${pathname === '/dashboard/tsr/my-cases' ? '' : 'text-rust'}`} />
             <span>My Cases</span>
           </Link>
+
+          {/* Org admin: team management link */}
+          {role === 'admin' && (
+            <Link
+              href="/dashboard/tsr/team"
+              className={`group flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mb-1 ${
+                pathname === '/dashboard/tsr/team'
+                  ? 'bg-maroon text-cream shadow-[0_10px_24px_-14px_rgba(104,3,24,0.55)]'
+                  : 'text-ink/80 hover:bg-maroon/5 hover:text-ink border border-maroon/10'
+              }`}
+            >
+              <Users className={`w-4 h-4 ${pathname === '/dashboard/tsr/team' ? '' : 'text-rust'}`} />
+              <span>Team</span>
+            </Link>
+          )}
+
+          {/* Super admin: organisations management + requests inbox */}
+          {role === 'super_admin' && (
+            <>
+              <Link
+                href="/dashboard/tsr/admin"
+                className={`group flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mb-1 ${
+                  pathname === '/dashboard/tsr/admin' || (pathname.startsWith('/dashboard/tsr/admin/') && !pathname.startsWith('/dashboard/tsr/admin/requests'))
+                    ? 'bg-maroon text-cream shadow-[0_10px_24px_-14px_rgba(104,3,24,0.55)]'
+                    : 'text-ink/80 hover:bg-maroon/5 hover:text-ink border border-maroon/10'
+                }`}
+              >
+                <Crown className={`w-4 h-4 ${pathname.startsWith('/dashboard/tsr/admin') && !pathname.startsWith('/dashboard/tsr/admin/requests') ? '' : 'text-rust'}`} />
+                <span>Organisations</span>
+              </Link>
+              <Link
+                href="/dashboard/tsr/admin/requests"
+                className={`group flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mb-2 ${
+                  pathname.startsWith('/dashboard/tsr/admin/requests')
+                    ? 'bg-maroon text-cream shadow-[0_10px_24px_-14px_rgba(104,3,24,0.55)]'
+                    : 'text-ink/80 hover:bg-maroon/5 hover:text-ink border border-maroon/10'
+                }`}
+              >
+                <Inbox className={`w-4 h-4 ${pathname.startsWith('/dashboard/tsr/admin/requests') ? '' : 'text-rust'}`} />
+                <span>Requests</span>
+              </Link>
+            </>
+          )}
 
           <p className="text-[10px] font-bold text-rust uppercase tracking-[0.2em] px-2 pb-1.5 pt-3">
             Clients

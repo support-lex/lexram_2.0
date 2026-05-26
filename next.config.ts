@@ -23,16 +23,35 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   async redirects() {
     return [
-      {
-        source: '/dashboard/research-3',
-        destination: '/dashboard/research-2',
-        permanent: false,
-      },
-      {
-        source: '/dashboard/research-3/:path*',
-        destination: '/dashboard/research-2',
-        permanent: false,
-      },
+      // /pricing direct URL → homepage pricing anchor
+      { source: '/pricing', destination: '/#pricing', permanent: true },
+
+      // Marketing / SEO stub URLs surfaced by the landing page — point at the
+      // real product surfaces so deep-links and shared URLs don't 404.
+      { source: '/title-scrutiny-report',  destination: '/dashboard/tsr',         permanent: false },
+      { source: '/tsr-landing',            destination: '/dashboard/tsr',         permanent: true  },
+      { source: '/bare-acts-library',      destination: '/acts',                  permanent: true  },
+      { source: '/resources',              destination: '/acts',                  permanent: true  },
+
+      // Practice-area marketing tiles — until per-practice landings exist,
+      // anchor back to the #practice-areas grid on the homepage.
+      { source: '/practice',         destination: '/#practice-areas', permanent: false },
+      { source: '/practice/:slug',   destination: '/#practice-areas', permanent: false },
+
+      // Drafting-template marketing tiles → into the drafting tool.
+      { source: '/drafting',         destination: '/dashboard/research-2', permanent: false },
+      { source: '/drafting/:slug',   destination: '/dashboard/research-2', permanent: false },
+
+      // Comparison stubs — none of these pages exist yet; send to homepage.
+      { source: '/compare',          destination: '/#sc-precedent-research', permanent: false },
+      { source: '/compare/:slug',    destination: '/#sc-precedent-research', permanent: false },
+
+      // Security stubs
+      { source: '/security/:slug',   destination: '/#faq', permanent: false },
+
+      // Legacy dashboard redirect
+      { source: '/dashboard/research-3',        destination: '/dashboard/research-2', permanent: false },
+      { source: '/dashboard/research-3/:path*', destination: '/dashboard/research-2', permanent: false },
     ];
   },
   async rewrites() {

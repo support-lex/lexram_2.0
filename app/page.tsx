@@ -383,41 +383,41 @@ function Hero() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(42,26,28,0.5)_100%)]" />
 
       <div
-        className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-24 md:py-32 lg:py-40"
+        className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-20 sm:py-24 md:py-32 lg:py-40"
         style={{
           transform: `translateY(${y * -0.1}px)`,
           opacity: Math.max(0, 1 - y / 600),
         }}
       >
-        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
+        <div className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16">
           {/* ── Left: Brand message ─────────────────────────────── */}
           <div className="flex-1 text-center lg:text-left">
-            <span className="reveal-up inline-block mb-5 text-[11px] font-bold tracking-[0.3em] uppercase text-[#b94826]">
+            <span className="reveal-up inline-block mb-4 text-[10px] sm:text-[11px] font-bold tracking-[0.3em] uppercase text-[#b94826]">
               LexRam AI
             </span>
 
-            <h1 className="reveal-up font-serif text-[2.8rem] leading-[0.95] sm:text-5xl lg:text-7xl xl:text-8xl lg:leading-[0.95] font-bold text-[#fff0df] text-balance">
+            <h1 className="reveal-up font-serif text-[2.2rem] leading-[0.95] sm:text-4xl md:text-5xl lg:text-7xl xl:text-8xl lg:leading-[0.95] font-bold text-[#fff0df] text-balance">
               Indian AI
               <br />
               <span className="text-[#b94826] italic">Law Assistant</span>
             </h1>
 
-            <p className="reveal-up mt-7 text-lg md:text-xl text-[#fff0df]/60 max-w-lg mx-auto lg:mx-0 font-light leading-relaxed" style={{ transitionDelay: "120ms" }}>
+            <p className="reveal-up mt-5 sm:mt-7 text-base sm:text-lg md:text-xl text-[#fff0df]/60 max-w-lg mx-auto lg:mx-0 font-light leading-relaxed" style={{ transitionDelay: "120ms" }}>
               Research legal questions, draft pleadings, manage matters, trace titles, and grow your network — one platform, built on India&apos;s courts alone.
             </p>
 
-            <div className="reveal-blur mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start" style={{ transitionDelay: "240ms" }}>
+            <div className="reveal-blur mt-6 sm:mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start" style={{ transitionDelay: "240ms" }}>
               <button
                 type="button"
                 onClick={() => {
                   track("cta_start_trial_click", { location: "hero" });
                   go(SIGNUP);
                 }}
-                className="inline-flex items-center justify-center gap-2 bg-[#b94826] text-[#fff0df] px-6 py-3 rounded-lg text-sm font-semibold hover:bg-[#8f3318] transition-colors shadow-[0_10px_30px_-10px_rgba(185,72,38,0.5)]"
+                className="inline-flex items-center justify-center gap-2 bg-[#b94826] text-[#fff0df] px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg text-sm font-semibold hover:bg-[#8f3318] transition-colors shadow-[0_10px_30px_-10px_rgba(185,72,38,0.5)]"
               >
                 Start Free Trial <ArrowRight className="w-4 h-4" />
               </button>
-              <a href="#research" className="inline-flex items-center justify-center gap-2 border border-[#fff0df]/25 text-[#fff0df] px-6 py-3 rounded-lg text-sm font-medium hover:border-[#fff0df]/50 hover:bg-white/5 transition-all">
+              <a href="#research" className="inline-flex items-center justify-center gap-2 border border-[#fff0df]/25 text-[#fff0df] px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg text-sm font-medium hover:border-[#fff0df]/50 hover:bg-white/5 transition-all">
                 See how it works
               </a>
             </div>
@@ -427,21 +427,22 @@ function Hero() {
           <div className="flex-1 w-full max-w-xl reveal-up lg:reveal-right" style={{ transitionDelay: "160ms" }}>
             <div className="rounded-2xl border border-[#fff0df]/12 bg-[#fff0df]/[0.04] backdrop-blur-xl overflow-hidden shadow-[0_20px_60px_-20px_rgba(0,0,0,0.4)]">
               {/* Tab bar */}
-              <div className="flex items-center gap-1 p-1.5 border-b border-[#fff0df]/8">
+              <div className="flex items-center gap-0.5 sm:gap-1 p-1 sm:p-1.5 border-b border-[#fff0df]/8">
                 {tabs.map((label, i) => (
                   <button
                     key={label}
                     type="button"
                     onClick={() => handleTab(i)}
-                    className={`relative flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                    className={`relative flex-1 inline-flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold transition-all duration-300 ${
                       i === active
                         ? "bg-[#b94826] text-[#fff0df] shadow-[0_2px_10px_rgba(185,72,38,0.4)]"
                         : "text-[#fff0df]/50 hover:text-[#fff0df]/80 hover:bg-white/5"
                     }`}
                   >
-                    {label}
+                    <span className="hidden sm:inline">{label}</span>
+                    <span className="sm:hidden">{label === "Title Scrutiny" ? "TSR" : label}</span>
                     {label === "Title Scrutiny" && (
-                      <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded-full leading-none bg-[#fff0df] text-[#680318]">
+                      <span className="text-[8px] sm:text-[9px] font-bold tracking-wider px-1 sm:px-1.5 py-0.5 rounded-full leading-none bg-[#fff0df] text-[#680318]">
                         NEW
                       </span>
                     )}
@@ -450,30 +451,30 @@ function Hero() {
               </div>
 
               {/* Tab content */}
-              <div key={active} className="p-6 md:p-8 animate-in fade-in slide-in-from-bottom-2 duration-400">
-                <span className="inline-block text-[10px] font-bold tracking-[0.2em] uppercase text-[#b94826] mb-3">
+              <div key={active} className="p-4 sm:p-6 md:p-8 animate-in fade-in slide-in-from-bottom-2 duration-400">
+                <span className="inline-block text-[9px] sm:text-[10px] font-bold tracking-[0.2em] uppercase text-[#b94826] mb-2 sm:mb-3">
                   {c.badge}
                 </span>
-                <h3 className="font-serif text-2xl md:text-3xl font-bold text-[#fff0df] leading-tight text-balance">
+                <h3 className="font-serif text-xl sm:text-2xl md:text-3xl font-bold text-[#fff0df] leading-tight text-balance">
                   {c.accent}{" "}
                   <span className="text-[#b94826]">{c.accent2}</span>
                 </h3>
 
-                <p className="mt-4 text-sm md:text-base text-[#fff0df]/60 leading-relaxed">
+                <p className="mt-3 sm:mt-4 text-sm md:text-base text-[#fff0df]/60 leading-relaxed">
                   {c.desc}
                 </p>
 
                 {/* Bullet features */}
-                <ul className="mt-5 space-y-2.5">
+                <ul className="mt-4 sm:mt-5 space-y-2 sm:space-y-2.5">
                   {c.bullets.map((b, i) => (
-                    <li key={i} className="flex items-start gap-2.5 text-sm text-[#fff0df]/75">
-                      <CheckCircle2 className="w-4 h-4 text-[#b94826] mt-0.5 shrink-0" />
+                    <li key={i} className="flex items-start gap-2 sm:gap-2.5 text-xs sm:text-sm text-[#fff0df]/75">
+                      <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#b94826] mt-0.5 shrink-0" />
                       <span>{b}</span>
                     </li>
                   ))}
                 </ul>
 
-                <div className="mt-7 flex items-center gap-4">
+                <div className="mt-5 sm:mt-7 flex items-center gap-4">
                   <a href={c.ctaHref || "#research"} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#b94826] hover:text-[#fff0df] transition-colors">
                     {c.cta2} <ArrowRight className="w-3.5 h-3.5" />
                   </a>
@@ -3109,10 +3110,10 @@ function Footer() {
             <h4 className="font-serif text-[#fff0df] font-semibold mb-4">Company</h4>
             <ul className="space-y-2.5 text-sm">
               <li><a href="/about" className="hover:text-[#b94826] transition-colors">About Us</a></li>
-              <li><a href="/blog" className="hover:text-[#b94826] transition-colors">Blog</a></li>
+              <li><a href="/#blog" className="hover:text-[#b94826] transition-colors">Blog</a></li>
               <li><a href="/careers" className="hover:text-[#b94826] transition-colors">Careers</a></li>
-              <li><a href="/contact" className="hover:text-[#b94826] transition-colors">Contact</a></li>
-              <li><a href="#faq" className="hover:text-[#b94826] transition-colors">FAQ</a></li>
+              <li><a href="/#contact" className="hover:text-[#b94826] transition-colors">Contact</a></li>
+              <li><a href="/#faq" className="hover:text-[#b94826] transition-colors">FAQ</a></li>
             </ul>
           </div>
 
@@ -3153,7 +3154,7 @@ export default function LandingPage() {
   useLenis();
   useReveal();
   return (
-    <main data-landing-v2 className="bg-[#fff0df]">
+    <main data-landing-v2 className="bg-[#fff0df] overflow-x-hidden">
       <ScrollProgress />
       <Nav />
       <Hero />

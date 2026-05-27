@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Scale, ArrowRight, Menu, X, Shield, FileText, RefreshCcw, Cookie } from "lucide-react";
+import { Scale, ArrowRight, Menu, X, Shield, FileText, RefreshCcw, Cookie, Briefcase } from "lucide-react";
 import Link from "next/link";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -9,6 +9,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   FileText,
   RefreshCcw,
   Cookie,
+  Briefcase,
 };
 
 export default function LegalPageLayout({

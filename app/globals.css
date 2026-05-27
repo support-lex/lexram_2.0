@@ -511,6 +511,14 @@ body, aside, header, main {
 }
 
 /* ── 4C: [data-landing-v2] — Insights landing v2 (primary) ──────────────── */
+/* Landing page never scrolls horizontally — catches any child that
+   accidentally exceeds viewport width (reveal-right entry transforms,
+   marquee strips, breakout rails, etc.) and clips it cleanly. */
+html:has([data-landing-v2]),
+body:has([data-landing-v2]) {
+  overflow-x: clip;
+}
+
 [data-landing-v2] {
   --lex-maroon: #680318;
   --lex-rust:   #b94826;

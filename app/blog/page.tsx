@@ -1,9 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { BlogPost } from "@/types/blog";
 import BlogExplorer from "@/components/blog/BlogExplorer";
-import PageLayout from "@/components/layout/PageLayout";
-
-import "./blog.css";
 
 export const metadata = {
   title: "Blog | LexRam",
@@ -29,8 +26,6 @@ async function loadData(): Promise<{ posts: BlogPost[]; isAdmin: boolean }> {
 export default async function BlogPage() {
   const { posts, isAdmin } = await loadData();
   return (
-    <PageLayout fullWidth>
-      <BlogExplorer posts={posts} isAdmin={isAdmin} />
-    </PageLayout>
+    <BlogExplorer posts={posts} isAdmin={isAdmin} />
   );
 }

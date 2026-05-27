@@ -157,6 +157,15 @@ export default function CaseSelector({
       return
     }
 
+    // Unassigned is a display-only pick — it switches the filter view
+    // but must never PATCH the session's case_id (that would cross-
+    // contaminate private docs between sessions). Close the dropdown
+    // immediately without hitting the backend.
+    if (c.title === 'Unassigned') {
+      setOpen(false)
+      return
+    }
+
     setPendingSelect(c.id)
     try {
       await api.patch(`/sessions/${sessionId}/case`, { case_id: c.id })

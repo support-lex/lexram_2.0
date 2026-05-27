@@ -40,17 +40,17 @@ export default function ResetPasswordPage() {
     'w-full px-4 py-3 rounded-xl border border-[var(--border-default)] bg-white text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-accent)] focus:border-[var(--accent)] transition-all disabled:opacity-50';
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8">
+    <div className="min-h-screen bg-[#fff0df] flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-[0_10px_30px_-10px_rgba(104,3,24,0.18)] p-8">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-9 h-9 rounded-xl bg-[var(--bg-sidebar)] flex items-center justify-center">
-            <Scale className="w-4 h-4 text-white" />
+          <div className="w-9 h-9 rounded-xl bg-[#680318] flex items-center justify-center">
+            <Scale className="w-4 h-4 text-[#fff0df]" />
           </div>
-          <h1 className="font-serif text-2xl font-bold text-[var(--text-primary)]">Set new password</h1>
+          <h1 className="font-serif text-2xl font-bold text-[#680318]">Set new password</h1>
         </div>
-        <p className="text-sm text-[var(--text-secondary)] mb-6">
+        <p className="text-sm text-[#680318]/60 mb-6">
           Choose a strong password for your account.
         </p>
 
@@ -62,7 +62,7 @@ export default function ResetPasswordPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-[var(--text-secondary)]">New password</label>
+            <label className="block text-sm font-medium text-[#680318]/70">New password</label>
             <div className="relative">
               <input
                 type={showNew ? 'text' : 'password'}
@@ -85,7 +85,7 @@ export default function ResetPasswordPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-[var(--text-secondary)]">Confirm password</label>
+            <label className="block text-sm font-medium text-[#680318]/70">Confirm password</label>
             <div className="relative">
               <input
                 type={showConfirm ? 'text' : 'password'}
@@ -110,7 +110,7 @@ export default function ResetPasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[var(--bg-sidebar)] text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-[var(--bg-sidebar-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-[#680318] text-[#fff0df] px-4 py-3 rounded-xl text-sm font-medium hover:bg-[#b94826] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {loading ? 'Updating...' : 'Update Password'}
@@ -119,7 +119,7 @@ export default function ResetPasswordPage() {
 
         <Link
           href="/sign-in"
-          className="block text-center text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] mt-6 transition-colors"
+          className="block text-center text-sm text-[#b94826] hover:text-[#680318] mt-6 transition-colors"
         >
           Back to sign in
         </Link>

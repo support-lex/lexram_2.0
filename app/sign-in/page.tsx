@@ -20,7 +20,7 @@ export default function SignIn() {
       <SignInBranding />
 
       {/* Right Panel - Form */}
-      <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-24 bg-[var(--bg-primary)] relative">
+      <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-24 bg-[#fff0df] relative">
         <div className="lg:hidden absolute top-8 left-8">
           <Link
             href="/"

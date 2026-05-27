@@ -27,7 +27,7 @@ import { calculateReadingTime, createPost, updatePost } from "@/lib/blog/api";
 import type { BlogPost, BlogStatus } from "@/types/blog";
 import { BLOG_CATEGORIES } from "@/types/blog";
 
-import "../blog.css";
+
 
 const AUTOSAVE_DEBOUNCE_MS = 2500;
 

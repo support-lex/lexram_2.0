@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { BlogPost } from "@/types/blog";
 import BlogExplorer from "@/components/blog/BlogExplorer";
 
-import "./blog.css";
+
 
 export const metadata = {
   title: "Blog | LexRam",

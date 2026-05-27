@@ -344,8 +344,8 @@ export default function SignInForm() {
                 onClick={() => setSigninMethod('phone')}
                 className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
                   signinMethod === 'phone'
-                    ? 'bg-white text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                    ? 'bg-[#680318] text-[#fff0df] shadow-[0_10px_30px_-10px_rgba(104,3,24,0.18)]'
+                    : 'text-[#680318]/50 hover:text-[#680318]'
                 }`}
               >
                 Phone
@@ -355,8 +355,8 @@ export default function SignInForm() {
                 onClick={() => setSigninMethod('email')}
                 className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
                   signinMethod === 'email'
-                    ? 'bg-white text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                    ? 'bg-[#680318] text-[#fff0df] shadow-[0_10px_30px_-10px_rgba(104,3,24,0.18)]'
+                    : 'text-[#680318]/50 hover:text-[#680318]'
                 }`}
               >
                 Email
@@ -411,7 +411,7 @@ export default function SignInForm() {
                     );
                     switchMode('forgot');
                   }}
-                  className="text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                  className="text-sm font-medium text-[#b94826] hover:text-[#680318] transition-colors"
                 >
                   Forgot password?
                 </button>
@@ -431,7 +431,7 @@ export default function SignInForm() {
 
             <button
               type="submit" disabled={loading}
-              className="w-full bg-[var(--bg-sidebar)] text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-[var(--bg-sidebar-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-[#680318] text-[#fff0df] px-4 py-3 rounded-xl text-sm font-medium hover:bg-[#b94826] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Signing in...' : 'Sign In'}
@@ -494,7 +494,7 @@ export default function SignInForm() {
             </div>
 
             <button type="submit" disabled={loading}
-              className="w-full bg-[var(--bg-sidebar)] text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-[var(--bg-sidebar-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+              className="w-full bg-[#680318] text-[#fff0df] px-4 py-3 rounded-xl text-sm font-medium hover:bg-[#b94826] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Creating account...' : 'Create Account'}
             </button>
@@ -521,7 +521,7 @@ export default function SignInForm() {
             </div>
 
             <button type="submit" disabled={loading}
-              className="w-full bg-[var(--bg-sidebar)] text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-[var(--bg-sidebar-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+              className="w-full bg-[#680318] text-[#fff0df] px-4 py-3 rounded-xl text-sm font-medium hover:bg-[#b94826] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Sending OTP...' : 'Send OTP'}
             </button>
@@ -544,7 +544,7 @@ export default function SignInForm() {
 
             <button
               type="submit" disabled={loading || !otpComplete}
-              className="w-full bg-[var(--bg-sidebar)] text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-[var(--bg-sidebar-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-[#680318] text-[#fff0df] px-4 py-3 rounded-xl text-sm font-medium hover:bg-[#b94826] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Verifying...' : 'Verify OTP'}
@@ -574,12 +574,12 @@ export default function SignInForm() {
           {mode === 'signin' ? (
             <>Don&apos;t have an account?{' '}
               <button onClick={() => switchMode('signup')}
-                className="font-medium text-[var(--text-primary)] hover:underline">Create new account</button>
+                className="font-medium text-[#b94826] hover:text-[#680318] hover:underline">Create new account</button>
             </>
           ) : (
             <>Already have an account?{' '}
               <button onClick={() => switchMode('signin')}
-                className="font-medium text-[var(--text-primary)] hover:underline">Sign in</button>
+                className="font-medium text-[#b94826] hover:text-[#680318] hover:underline">Sign in</button>
             </>
           )}
         </p>

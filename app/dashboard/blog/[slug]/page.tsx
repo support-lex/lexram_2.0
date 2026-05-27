@@ -8,7 +8,7 @@ import type { BlogPost } from "@/types/blog";
 import BlogActions from "./BlogActions";
 import BlogContent from "./BlogContent";
 
-import "../blog.css";
+
 
 // Single post page must be dynamic — RLS makes draft visibility depend on
 // the requesting admin's session, and the view counter increments live.

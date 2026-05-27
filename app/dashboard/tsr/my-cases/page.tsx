@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown, ChevronRight, Download, ExternalLink,
-  FileText, Image as ImageIcon, Info, Loader2, Sparkles,
+  FileText, Image as ImageIcon, Info, Loader2, RefreshCw, Sparkles,
 } from "lucide-react";
 import {
   listMyCases, getDocumentViewUrl,
   type TsrCaseSummary, type TsrDocument,
 } from "@/lib/tsr-api";
-import { getMockCases } from "@/lib/tsr-mock";
+import NewReportModal from "../_components/NewReportModal";
 
 /* ── Formatting helpers ────────────────────────────────────────────────── */
 
@@ -66,14 +66,10 @@ function DocIcon({ name }: { name: string }) {
 
 /* ── Per-case row + collapsible documents table ─────────────────────────── */
 
-function DocumentRow({ caseId, doc, isMock }: { caseId: string; doc: TsrDocument; isMock: boolean }) {
+function DocumentRow({ caseId, doc }: { caseId: string; doc: TsrDocument }) {
   const [loading, setLoading] = useState(false);
 
   const onView = async () => {
-    if (isMock) {
-      alert(`Demo mode — "${doc.filename}" preview is disabled.\nWill open the real PDF once the backend is wired.`);
-      return;
-    }
     setLoading(true);
     try {
       const { url } = await getDocumentViewUrl(caseId, doc.id);
@@ -119,7 +115,7 @@ function DocumentRow({ caseId, doc, isMock }: { caseId: string; doc: TsrDocument
   );
 }
 
-function CaseRow({ row, isMock }: { row: TsrCaseSummary; isMock: boolean }) {
+function CaseRow({ row }: { row: TsrCaseSummary }) {
   const [open, setOpen] = useState(false);
   const hasReport = !!row.scrutiny_report;
   const Chevron = open ? ChevronDown : ChevronRight;
@@ -181,7 +177,7 @@ function CaseRow({ row, isMock }: { row: TsrCaseSummary; isMock: boolean }) {
                   </thead>
                   <tbody>
                     {row.documents.map((d) => (
-                      <DocumentRow key={d.id} caseId={row.id} doc={d} isMock={isMock} />
+                      <DocumentRow key={d.id} caseId={row.id} doc={d} />
                     ))}
                   </tbody>
                 </table>
@@ -200,35 +196,26 @@ export default function MyCasesPage() {
   const [cases,   setCases]   = useState<TsrCaseSummary[] | null>(null);
   const [error,   setError]   = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  /* True when the page is showing demo fixtures because the backend isn't
-     wired yet. Surface this with a banner so demos aren't mistaken for prod. */
-  const [usingMock, setUsingMock] = useState(false);
 
-  useEffect(() => {
+  const fetchData = () => {
+    setLoading(true);
+    setError(null);
     let cancelled = false;
     (async () => {
       try {
         const data = await listMyCases();
-        if (!cancelled) {
-          setCases(data);
-          setUsingMock(false);
-        }
+        if (!cancelled) setCases(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        console.warn("[my-cases] backend unavailable — falling back to demo data:", message);
-        if (!cancelled) {
-          setCases(getMockCases());
-          setUsingMock(true);
-          /* Stash the backend error so we can surface it inside the banner —
-             helps the team debug while still letting designers preview. */
-          setError(message);
-        }
+        if (!cancelled) setError(message);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  };
+
+  useEffect(() => fetchData(), []);
 
   const totalDocs   = useMemo(() => cases?.reduce((n, c) => n + c.document_count, 0) ?? 0, [cases]);
   const totalTokens = useMemo(() => cases?.reduce((n, c) => n + (c.token_usage?.total_tokens ?? 0), 0) ?? 0, [cases]);
@@ -236,18 +223,23 @@ export default function MyCasesPage() {
   return (
     <div className="min-h-full px-4 sm:px-6 py-8 sm:py-10 max-w-6xl mx-auto w-full bg-cream">
       {/* Header */}
-      <div className="mb-8">
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-maroon/10 text-maroon text-[10px] font-bold tracking-[0.18em] uppercase mb-3">
-          <Sparkles className="w-3 h-3 text-rust" />
-          History
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-maroon/10 text-maroon text-[10px] font-bold tracking-[0.18em] uppercase mb-3">
+            <Sparkles className="w-3 h-3 text-rust" />
+            My Reports
+          </div>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold leading-tight text-maroon">
+            My Reports
+          </h1>
+          <p className="text-sm sm:text-base text-ink/65 mt-2 max-w-2xl">
+            Every client file you&apos;ve created, with its documents and scrutiny status.
+            Click a row to expand the document list.
+          </p>
         </div>
-        <h1 className="font-display text-3xl sm:text-4xl font-bold leading-tight text-maroon">
-          My Cases
-        </h1>
-        <p className="text-sm sm:text-base text-ink/65 mt-2 max-w-2xl">
-          Every client file you've created, with its documents and scrutiny status.
-          Click a row to expand the document list.
-        </p>
+        <div className="shrink-0 pt-7">
+          <NewReportModal />
+        </div>
       </div>
 
       {/* Summary stat strip */}
@@ -266,26 +258,26 @@ export default function MyCasesPage() {
         </div>
       )}
 
-      {/* Demo-mode banner — shows when we couldn't reach the backend and are
-          rendering fixture data instead. Disappears the moment the backend is
-          live and returns a real response. */}
-      {!loading && usingMock && (
-        <div className="flex items-start gap-3 p-4 mb-6 rounded-xl bg-amber-50 border border-amber-200">
-          <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+      {/* Error banner */}
+      {!loading && error && (
+        <div className="flex items-start gap-3 p-4 mb-6 rounded-xl bg-red-50 border border-red-200">
+          <Info className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-amber-900">
-              Showing demo data
+            <p className="font-semibold text-red-900">Could not load cases</p>
+            <p className="text-sm text-red-800/90 mt-0.5 leading-relaxed">
+              {error.includes("Failed to fetch") || error.includes("NetworkError")
+                ? "The TSR backend is waking up (Render free tier cold start). This can take 30–60 seconds."
+                : error}
             </p>
-            <p className="text-sm text-amber-800/90 mt-0.5 leading-relaxed">
-              The <code className="px-1.5 py-0.5 rounded bg-amber-100 text-[12px] font-mono">/my-cases</code> backend endpoint isn&apos;t ready yet — once <code className="px-1.5 py-0.5 rounded bg-amber-100 text-[12px] font-mono">SUPABASE_JWT_SECRET</code> is set on Render and the service redeploys, real cases will populate automatically.
-            </p>
-            {error && (
-              <details className="mt-2 text-xs text-amber-800/75">
-                <summary className="cursor-pointer hover:text-amber-900 transition-colors">Backend response</summary>
-                <pre className="mt-1.5 text-[11px] font-mono whitespace-pre-wrap break-words bg-amber-100/60 rounded p-2">{error}</pre>
-              </details>
-            )}
           </div>
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-700 bg-red-100 hover:bg-red-200 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Retry
+          </button>
         </div>
       )}
 
@@ -324,7 +316,7 @@ export default function MyCasesPage() {
                 </tr>
               </thead>
               <tbody>
-                {cases.map((c) => <CaseRow key={c.id} row={c} isMock={usingMock} />)}
+                {cases.map((c) => <CaseRow key={c.id} row={c} />)}
               </tbody>
             </table>
           </div>

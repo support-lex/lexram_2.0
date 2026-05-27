@@ -81,7 +81,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     title: "TSR",
-    url: "/dashboard/tsr",
+    url: "/dashboard/tsr/my-cases",
     icon: <FileSearch className="size-4" strokeWidth={1.75} />,
     match: (p) => p.startsWith("/dashboard/tsr"),
   },
@@ -155,7 +155,7 @@ export function AppTopBar() {
   }, [hoveredIdx, activeIdx])
 
   return (
-    <header className="flex-shrink-0 h-16 border-b border-[#f0e6e8] bg-white/95 backdrop-blur-md relative z-40">
+    <header className="flex-shrink-0 h-12 border-b border-[#f0e6e8] bg-white/95 backdrop-blur-md relative z-40">
       {/* Subtle maroon shimmer line at the bottom of the topbar */}
       <div
         aria-hidden
@@ -173,17 +173,17 @@ export function AppTopBar() {
           className="flex items-center gap-2.5 shrink-0 group/logo"
         >
           <div
-            className="grid place-items-center size-9 rounded-full text-white shadow-[0_4px_14px_rgba(122,31,43,0.35)] transition-all duration-300 group-hover/logo:shadow-[0_6px_20px_rgba(122,31,43,0.55)] group-hover/logo:scale-105"
+            className="grid place-items-center size-7 rounded-full text-white shadow-[0_4px_14px_rgba(122,31,43,0.35)] transition-all duration-300 group-hover/logo:shadow-[0_6px_20px_rgba(122,31,43,0.55)] group-hover/logo:scale-105"
             style={{
               background: "linear-gradient(135deg, #7a1f2b 0%, #5e1721 100%)",
             }}
           >
             <Scale
-              className="size-5 transition-transform duration-500 group-hover/logo:rotate-[18deg]"
+              className="size-4 transition-transform duration-500 group-hover/logo:rotate-[18deg]"
               strokeWidth={2}
             />
           </div>
-          <span className="text-[20px] font-semibold tracking-tight text-[#7a1f2b] transition-colors group-hover/logo:text-[#5e1721]">
+          <span className="text-[16px] font-semibold tracking-tight text-[#7a1f2b] transition-colors group-hover/logo:text-[#5e1721]">
             Lexram
           </span>
         </Link>
@@ -198,7 +198,7 @@ export function AppTopBar() {
           {/* Active pill — slides between items */}
           <span
             aria-hidden
-            className="absolute top-1/2 -translate-y-1/2 h-10 rounded-full transition-[left,width,opacity] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] pointer-events-none shadow-[0_6px_20px_rgba(122,31,43,0.35)]"
+            className="absolute top-1/2 -translate-y-1/2 h-8 rounded-full transition-[left,width,opacity] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] pointer-events-none shadow-[0_6px_20px_rgba(122,31,43,0.35)]"
             style={{
               left: pillStyle.left,
               width: pillStyle.width,
@@ -209,7 +209,7 @@ export function AppTopBar() {
           {/* Hover pill — soft maroon tint that follows cursor */}
           <span
             aria-hidden
-            className="absolute top-1/2 -translate-y-1/2 h-10 rounded-full bg-[#7a1f2b]/8 transition-[left,width,opacity] duration-200 ease-out pointer-events-none"
+            className="absolute top-1/2 -translate-y-1/2 h-8 rounded-full bg-[#7a1f2b]/8 transition-[left,width,opacity] duration-200 ease-out pointer-events-none"
             style={{
               left: hoverPillStyle.left,
               width: hoverPillStyle.width,
@@ -229,7 +229,7 @@ export function AppTopBar() {
                 ref={(el) => { itemRefs.current[idx] = el }}
                 data-tour={`topbar-${tourSlug}`}
                 onMouseEnter={() => setHoveredIdx(idx)}
-                className={`relative z-10 flex items-center gap-2 px-4 h-10 rounded-full text-[15px] font-medium transition-colors duration-200 ${
+                className={`relative z-10 flex items-center gap-2 px-3 h-8 rounded-full text-[13px] font-medium transition-colors duration-200 ${
                   active
                     ? "text-white"
                     : "text-gray-600 hover:text-[#7a1f2b]"
@@ -255,9 +255,9 @@ export function AppTopBar() {
             data-tour="topbar-settings"
             aria-label="Settings"
             title="Settings"
-            className="hidden sm:grid place-items-center size-9 rounded-full text-gray-500 hover:text-[#7a1f2b] hover:bg-[#7a1f2b]/8 transition-all duration-200 hover:scale-110"
+            className="hidden sm:grid place-items-center size-7 rounded-full text-gray-500 hover:text-[#7a1f2b] hover:bg-[#7a1f2b]/8 transition-all duration-200 hover:scale-110"
           >
-            <Settings className="size-5" strokeWidth={1.75} />
+            <Settings className="size-4" strokeWidth={1.75} />
           </Link>
           <button
             type="button"
@@ -265,9 +265,9 @@ export function AppTopBar() {
             aria-label="Help · Replay tour"
             title="Replay tour"
             onClick={() => startTour(tourForPath(pathname))}
-            className="hidden sm:grid place-items-center size-9 rounded-full text-gray-500 hover:text-[#7a1f2b] hover:bg-[#7a1f2b]/8 transition-all duration-200 hover:scale-110"
+            className="hidden sm:grid place-items-center size-7 rounded-full text-gray-500 hover:text-[#7a1f2b] hover:bg-[#7a1f2b]/8 transition-all duration-200 hover:scale-110"
           >
-            <HelpCircle className="size-5" strokeWidth={1.75} />
+            <HelpCircle className="size-4" strokeWidth={1.75} />
           </button>
 
           <DropdownMenu>
@@ -284,11 +284,11 @@ export function AppTopBar() {
                 <img
                   src={avatarUrl}
                   alt={userName}
-                  className="size-8 rounded-full object-cover shadow-[0_2px_8px_rgba(122,31,43,0.3)] transition-transform duration-200 group-hover/user:scale-110"
+                  className="size-7 rounded-full object-cover shadow-[0_2px_8px_rgba(122,31,43,0.3)] transition-transform duration-200 group-hover/user:scale-110"
                 />
               ) : (
                 <span
-                  className="grid place-items-center size-8 rounded-full text-white text-[12px] font-semibold shadow-[0_2px_8px_rgba(122,31,43,0.3)] transition-transform duration-200 group-hover/user:scale-110"
+                  className="grid place-items-center size-7 rounded-full text-white text-[11px] font-semibold shadow-[0_2px_8px_rgba(122,31,43,0.3)] transition-transform duration-200 group-hover/user:scale-110"
                   style={{
                     background: "linear-gradient(135deg, #7a1f2b 0%, #5e1721 100%)",
                   }}

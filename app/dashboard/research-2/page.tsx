@@ -551,7 +551,7 @@ export default function Research2Page() {
 
       <div
         ref={containerRef}
-        className="lex-research-shell flex flex-col h-full max-h-full min-h-0 flex-1 overflow-hidden relative px-2 pt-2 pb-0.5 md:px-4 md:pt-4 md:pb-1"
+        className="lex-research-shell flex flex-col h-full max-h-full min-h-0 flex-1 overflow-hidden relative px-2 pt-0 pb-0.5 md:px-4 md:pt-0 md:pb-1"
       >
       {/* Inner row holds the 3 column cards. The disclaimer below lives
           OUTSIDE this row so it sits beneath the chat card, on the cream

@@ -595,15 +595,9 @@ function PanelContent({
                 {unassignedCases.length > 0 && (
                   <div
                     onClick={() => {
-                      if (activeIsUnassigned) return;
-                      const isTemp = !currentSessionId || currentSessionId.startsWith("temp_");
-                      // Picking the first id is fine because activeIsUnassigned
-                      // (derived from title) is what the tabs filter on — they
-                      // expand to ALL unassigned cases via inActiveBucket().
+                      if (activeIsUnassigned) { setDropOpen(false); return; }
+                      setDropOpen(false);
                       onCaseChange?.(unassignedCases[0].id);
-                      if (isTemp) {
-                        toast.success("Viewing Unassigned — your next message will create a fresh private case for this chat");
-                      }
                     }}
                     className={`group relative mx-1 mt-1 flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all ${
                       activeIsUnassigned

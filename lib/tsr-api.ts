@@ -21,11 +21,12 @@
 import { supabase as lexramSupabase } from "@/lib/supabase/client";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_TSR_API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
+  (typeof window !== "undefined"
+    ? "" // browser: use relative URL → hits Next.js proxy at /api/tsr/
+    : process.env.NEXT_PUBLIC_TSR_API_URL) ??
   "https://lex-doc-analyzer.onrender.com";
 
-// ── Token cache ─────────────────────────────────────────────────────────────
+// ── Token cache (browser only) ──────────────────────────────────────────────
 
 let cachedToken: string | null = null;
 let initialFetch: Promise<string | null> | null = null;
@@ -68,8 +69,12 @@ async function getAccessToken(): Promise<string | null> {
 
 export async function tsrApi(path: string, options: RequestInit = {}): Promise<Response> {
   const token = await getAccessToken();
+  const url =
+    API_BASE === ""
+      ? `/api/tsr${path}`                // browser: proxy through Next.js
+      : `${API_BASE}${path}`;            // server: direct call
 
-  return fetch(`${API_BASE}${path}`, {
+  return fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",

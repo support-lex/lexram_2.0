@@ -6,9 +6,8 @@ import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { BlogPost } from "@/types/blog";
 import BlogActions from "./BlogActions";
-import PageLayout from "@/components/layout/PageLayout";
 
-import "../blog.css";
+
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -57,7 +56,6 @@ export default async function BlogPostPage({ params }: PageProps) {
   const publishDate = post.published_at ? new Date(post.published_at) : new Date(post.created_at);
 
   return (
-    <PageLayout fullWidth>
     <article className="bg-[var(--bg-primary)] pb-24">
       {/* Cover */}
       {post.cover_image_url && (
@@ -164,7 +162,6 @@ export default async function BlogPostPage({ params }: PageProps) {
         </section>
       </div>
     </article>
-    </PageLayout>
   );
 }
 

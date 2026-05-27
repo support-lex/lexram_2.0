@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { BlogPost } from "@/types/blog";
 import AdminBlogTable from "@/components/blog/AdminBlogTable";
 
-import "../blog.css";
+
 
 export const metadata = {
   title: "Blog admin | LexRam",

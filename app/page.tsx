@@ -205,6 +205,7 @@ function Nav() {
   const links = [
     { href: "#research", label: "Research" },
     { href: "#drafting", label: "Drafting" },
+    { href: "/dashboard/tsr", label: "TSR" },
     { href: "#blog",     label: "Blog" },
     { href: "#pricing",  label: "Pricing" },
     { href: "#faq",      label: "FAQ" },
@@ -418,7 +419,7 @@ function Hero() {
                 Start Free Trial <ArrowRight className="w-4 h-4" />
               </button>
               <a href="#research" className="inline-flex items-center justify-center gap-2 border border-[#fff0df]/25 text-[#fff0df] px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg text-sm font-medium hover:border-[#fff0df]/50 hover:bg-white/5 transition-all">
-                See how it works
+                Explore
               </a>
             </div>
           </div>
@@ -825,6 +826,7 @@ function ResearchFeatures() {
   const items = [
     {
       n: "01",
+      icon: FileSearch,
       t: "Case Hub",
       d: "All your matters in one organised workspace — research threads, uploaded documents, and drafted pleadings, organised by case.",
       dd: "Case Hub is your central command for every matter you handle. Research threads, documents uploaded, and pleadings drafted are all pinned to their respective case — so nothing gets lost, nothing gets mixed up, and every matter stays exactly where you expect it.",
@@ -855,6 +857,7 @@ function ResearchFeatures() {
     },
     {
       n: "02",
+      icon: Search,
       t: "Multiple research sessions, one case",
       d: "All research threads for a case pinned together — hassle-free legal research, always in context.",
       dd: "Every research thread you open for a matter is automatically pinned to that case. No hunting across sessions or retracing your steps — all threads for one case live together, so your research stays coherent from the first query to the last.",
@@ -878,6 +881,7 @@ function ResearchFeatures() {
     },
     {
       n: "03",
+      icon: PenTool,
       t: "Drafting integrated",
       d: "Move from legal research to pleading draft in one platform — no tool switching, no lost context.",
       dd: "Drafting is built into the same workspace as your research. When you are ready to move from finding the law to filing the argument, the transition is a single step — no exports, no copy-paste, no switching between platforms.",
@@ -900,6 +904,7 @@ function ResearchFeatures() {
     },
     {
       n: "04",
+      icon: FileText,
       t: "Draft management",
       d: "Find every pleading draft under its case — no searching through individual research threads.",
       dd: "All pleadings and drafts created for a matter are collected directly inside that case, not scattered across individual research threads. When you need to retrieve or review a draft, you go to the case — and it is there.",
@@ -925,6 +930,7 @@ function ResearchFeatures() {
     },
     {
       n: "05",
+      icon: Layers,
       t: "Unlimited uploads",
       d: "Upload large legal case files — Lexram indexes and makes every document instantly searchable.",
       dd: "There is no limit on how much you can upload. Lexram reads, indexes, and makes your entire file bundle searchable the moment it is uploaded — whether it is a single FIR or a hundred-document case record.",
@@ -962,6 +968,7 @@ function ResearchFeatures() {
     },
     {
       n: "06",
+      icon: Clock,
       t: "Research History in Case Hub",
       d: "Your complete legal research history — preserved, organised, and searchable across every matter.",
       dd: "Your entire research history across all matters is preserved inside Lexram and remains fully searchable. Return to any case, any thread, or any prior research session at any point — nothing is lost when a matter goes dormant or resumes.",
@@ -999,6 +1006,7 @@ function ResearchFeatures() {
     },
     {
       n: "07",
+      icon: Mic,
       t: "Speech to text",
       d: "Voice-powered legal research — speak your query, Lexram transcribes and returns relevant answers instantly.",
       dd: "Speak your research query directly into the search bar — Lexram listens, transcribes it accurately, and returns relevant legal answers immediately. No typing required, no reformulation needed — your question is heard and acted on exactly as you asked it.",
@@ -1036,6 +1044,7 @@ function ResearchFeatures() {
         <div className="lg:sticky lg:top-24">
           {items.map((item, i) => {
             const isActive = active === i;
+            const Icon = item.icon;
             return (
               <button
                 key={i}
@@ -1043,30 +1052,21 @@ function ResearchFeatures() {
                 className="reveal-left group relative w-full text-left flex items-start gap-5 py-6 border-b border-[#680318]/10 transition-all"
                 style={{ transitionDelay: `${200 + i * 110}ms` }}
               >
-                {/* Hover popup */}
-                <div className="cap-popup absolute z-30 left-12 -top-3 md:left-auto md:right-2 md:-top-4 w-max max-w-[240px]">
-                  <div className="relative rounded-lg border border-[#680318]/15 bg-[#fff0df] shadow-elegant px-3.5 py-2.5">
-                    <div className="flex items-center gap-2 text-[10px] tracking-[0.25em] uppercase">
-                      <span className="font-mono text-[#b94826]">{item.n}</span>
-                      <span className="w-px h-3 bg-[#680318]/20" />
-                      <span className="text-[#680318]/70">Click to preview</span>
-                      <ArrowRight className="w-3 h-3 text-[#b94826]" />
-                    </div>
-                    <span aria-hidden className="absolute -bottom-1 left-6 md:left-auto md:right-6 w-2 h-2 rotate-45 bg-[#fff0df] border-r border-b border-[#680318]/15" />
-                  </div>
+                <span
+                  aria-hidden
+                  key={`mark-${i}-${isActive}`}
+                  className={`absolute left-0 top-7 h-7 w-[3px] rounded-r transition-all ${
+                    isActive ? "bg-[#b94826] cap-mark" : "bg-transparent"
+                  }`}
+                />
+                <div className={`w-10 h-10 rounded-lg grid place-items-center border shrink-0 transition-colors ${
+                  isActive
+                    ? "bg-[#b94826]/15 border-[#b94826]/40"
+                    : "bg-[#680318]/10 border-[#680318]/15"
+                }`}>
+                  <Icon className={`w-5 h-5 transition-colors ${isActive ? "text-[#b94826]" : "text-[#680318]"}`} />
                 </div>
-                <div className="relative pl-3">
-                  <span
-                    key={`mark-${i}-${isActive}`}
-                    className={`absolute left-0 top-1.5 h-6 w-[2px] rounded-r transition-all ${
-                      isActive ? "bg-[#b94826] cap-mark" : "bg-transparent"
-                    }`}
-                  />
-                  <span className={`text-xs font-mono pt-1 transition-colors ${isActive ? "text-[#b94826]" : "text-[#680318]/50"}`}>
-                    {item.n}
-                  </span>
-                </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className={`font-serif text-xl md:text-2xl font-bold transition-colors ${isActive ? "text-[#b94826]" : "text-[#680318]"}`}>
                     {item.t}
                   </div>
@@ -1185,20 +1185,16 @@ function LexramEdge() {
                   type="button"
                   onClick={() => setActive(i)}
                   aria-pressed={isActive}
-                  className={`w-full text-left flex items-start gap-5 px-3 py-5 border-b border-[#680318]/10 transition-all ${
+                  className={`relative w-full text-left flex items-start gap-5 px-3 py-5 border-b border-[#680318]/10 transition-all ${
                     isActive ? "" : "opacity-70 hover:opacity-100"
                   }`}
                 >
-                  <div className="relative pt-1">
-                    <span
-                      className={`absolute -left-3 top-1.5 h-7 w-[3px] rounded-r transition-all ${
-                        isActive ? "bg-[#b94826]" : "bg-transparent"
-                      }`}
-                    />
-                    <span className={`text-xs font-mono transition-colors ${isActive ? "text-[#b94826]" : "text-[#680318]/50"}`}>
-                      {f.n}
-                    </span>
-                  </div>
+                  <span
+                    aria-hidden
+                    className={`absolute left-0 top-6 h-7 w-[3px] rounded-r transition-all ${
+                      isActive ? "bg-[#b94826]" : "bg-transparent"
+                    }`}
+                  />
                   <div className={`w-10 h-10 rounded-lg grid place-items-center border shrink-0 transition-colors ${
                     isActive
                       ? "bg-[#b94826]/15 border-[#b94826]/40"
@@ -1312,40 +1308,11 @@ function LexramEdge() {
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-
-            {/* Mini reassurance / quick proof points to fill remaining sticky height */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { k: "1950", v: "Coverage from" },
-                { k: "100%",  v: "Verified citations" },
-                { k: "0",     v: "Hallucinations" },
-              ].map((s) => (
-                <div key={s.v} className="rounded-xl border border-[#680318]/10 bg-[#fff0df]/60 px-3 py-3 text-center">
-                  <div className="font-serif text-xl font-bold text-[#b94826] leading-none">{s.k}</div>
-                  <div className="text-[10px] tracking-[0.18em] uppercase text-[#680318]/65 mt-1.5">{s.v}</div>
-                </div>
-              ))}
-            </div>
           </div>
-        </div>
-
-        <div className="mt-12 flex flex-wrap items-center gap-4">
-          <button
-            type="button"
-            onClick={() => {
-              track("cta_start_trial_click", { location: "lexram_edge" });
-              go(SIGNUP);
-            }}
-            className="lex-btn lex-btn--primary group"
-          >
-            Start Free Trial <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition" />
-          </button>
-          <a href="#pricing" className="lex-btn lex-btn--secondary">
-            See pricing
-          </a>
         </div>
       </div>
     </section>
+
   );
 }
 
@@ -1510,6 +1477,7 @@ function DraftingCapabilities() {
   const items = [
     {
       n: "01",
+      icon: Layers,
       t: "Multi-document upload",
       d: "Upload multiple legal documents — Lexram reads across all of them and drafts one coherent response.",
       dd: "Upload your entire document set at once. Lexram reads across every file simultaneously and builds a single, coherent response that draws from the full bundle — not just the document you opened last. No manual collation, no missed context.",
@@ -1547,6 +1515,7 @@ function DraftingCapabilities() {
     },
     {
       n: "02",
+      icon: ImageIcon,
       t: "Scan to draft",
       d: "Scan physical legal documents — Lexram indexes and drafts a structured response instantly.",
       dd: "Scan a physical document and Lexram takes it from there. It indexes the scanned content, extracts what matters, and builds a structured draft response directly from it — turning paper records into actionable pleadings without any manual reading.",
@@ -1581,6 +1550,7 @@ function DraftingCapabilities() {
     },
     {
       n: "03",
+      icon: FileText,
       t: "Draft management",
       d: "Find every pleading draft under its case — no searching through individual research threads.",
       dd: "All pleadings and drafts created for a matter are collected directly inside that case, not scattered across individual research threads. When you need to retrieve or review a draft, you go to the case — and it is there.",
@@ -1606,6 +1576,7 @@ function DraftingCapabilities() {
     },
     {
       n: "04",
+      icon: FileSearch,
       t: "Fact extraction engine",
       d: "Maps who, what, when — parties, sections, citations and events — automatically, every time.",
       dd: "Lexram does not just read your documents — it maps every key element: parties, sections, citations, and events. The extracted facts are structured exactly as the responding court or forum expects them, so your draft is organised correctly from the ground up, every time.",
@@ -1632,6 +1603,7 @@ function DraftingCapabilities() {
     },
     {
       n: "05",
+      icon: BookOpen,
       t: "Response document builder",
       d: "Structured exactly as the responding court or forum expects — every time.",
       dd: "Every response document Lexram builds follows the structure the specific court or forum requires. Format, sequence, and presentation are aligned to what the tribunal expects — so you are not reformatting after drafting, you are filing from it.",
@@ -1661,6 +1633,7 @@ function DraftingCapabilities() {
     },
     {
       n: "06",
+      icon: PenTool,
       t: "Edit at 2 stages",
       d: "Draft plan and final draft are both fully editable — full advocate control at every stage.",
       dd: "Lexram gives you two distinct points of control — the draft plan before any clause is written, and the final draft once it is generated. Both are fully editable, so you can shape the argument at the structural level and refine it at the language level.",
@@ -1689,6 +1662,7 @@ function DraftingCapabilities() {
     },
     {
       n: "07",
+      icon: Bookmark,
       t: "Research integration",
       d: "One-click legal research to draft integration — real citations only, zero hallucinations.",
       dd: "The research you have already done pulls directly into your draft with a single click. Every citation that comes in is real and verifiable — no fake case names, no invented references — so your pleading is grounded in law you have already reviewed and stand behind.",
@@ -1725,6 +1699,7 @@ function DraftingCapabilities() {
         <div className="lg:sticky lg:top-24">
           {items.map((item, i) => {
             const isActive = active === i;
+            const Icon = item.icon;
             return (
               <button
                 key={i}
@@ -1732,30 +1707,21 @@ function DraftingCapabilities() {
                 className="reveal-left group relative w-full text-left flex items-start gap-5 py-6 border-b border-[#fff0df]/12 transition-all"
                 style={{ transitionDelay: `${200 + i * 110}ms` }}
               >
-                {/* Hover popup */}
-                <div className="cap-popup absolute z-30 left-12 -top-3 md:left-auto md:right-2 md:-top-4 w-max max-w-[240px]">
-                  <div className="relative rounded-lg border border-[#fff0df]/15 bg-[#fff0df] shadow-elegant px-3.5 py-2.5">
-                    <div className="flex items-center gap-2 text-[10px] tracking-[0.25em] uppercase">
-                      <span className="font-mono text-[#b94826]">{item.n}</span>
-                      <span className="w-px h-3 bg-[#680318]/20" />
-                      <span className="text-[#680318]/70">Click to preview</span>
-                      <ArrowRight className="w-3 h-3 text-[#b94826]" />
-                    </div>
-                    <span aria-hidden className="absolute -bottom-1 left-6 md:left-auto md:right-6 w-2 h-2 rotate-45 bg-[#fff0df] border-r border-b border-[#680318]/15" />
-                  </div>
+                <span
+                  aria-hidden
+                  key={`mark-${i}-${isActive}`}
+                  className={`absolute left-0 top-7 h-7 w-[3px] rounded-r transition-all ${
+                    isActive ? "bg-[#b94826] cap-mark" : "bg-transparent"
+                  }`}
+                />
+                <div className={`w-10 h-10 rounded-lg grid place-items-center border shrink-0 transition-colors ${
+                  isActive
+                    ? "bg-[#b94826]/25 border-[#b94826]/50"
+                    : "bg-[#fff0df]/[0.06] border-[#fff0df]/15"
+                }`}>
+                  <Icon className={`w-5 h-5 transition-colors ${isActive ? "text-[#b94826]" : "text-[#fff0df]"}`} />
                 </div>
-                <div className="relative pl-3">
-                  <span
-                    key={`mark-${i}-${isActive}`}
-                    className={`absolute left-0 top-1.5 h-6 w-[2px] rounded-r transition-all ${
-                      isActive ? "bg-[#b94826] cap-mark" : "bg-transparent"
-                    }`}
-                  />
-                  <span className={`text-xs font-mono pt-1 transition-colors ${isActive ? "text-[#b94826]" : "text-[#fff0df]/50"}`}>
-                    {item.n}
-                  </span>
-                </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className={`font-serif text-xl md:text-2xl font-bold transition-colors ${isActive ? "text-[#b94826]" : "text-[#fff0df]"}`}>
                     {item.t}
                   </div>
@@ -1871,20 +1837,16 @@ function LexDraftEdge() {
                   type="button"
                   onClick={() => setActive(i)}
                   aria-pressed={isActive}
-                  className={`w-full text-left flex items-start gap-5 px-3 py-5 border-b border-[#fff0df]/12 transition-all ${
+                  className={`relative w-full text-left flex items-start gap-5 px-3 py-5 border-b border-[#fff0df]/12 transition-all ${
                     isActive ? "" : "opacity-65 hover:opacity-100"
                   }`}
                 >
-                  <div className="relative pt-1">
-                    <span
-                      className={`absolute -left-3 top-1.5 h-7 w-[3px] rounded-r transition-all ${
-                        isActive ? "bg-[#b94826]" : "bg-transparent"
-                      }`}
-                    />
-                    <span className={`text-xs font-mono transition-colors ${isActive ? "text-[#b94826]" : "text-[#fff0df]/50"}`}>
-                      {f.n}
-                    </span>
-                  </div>
+                  <span
+                    aria-hidden
+                    className={`absolute left-0 top-6 h-7 w-[3px] rounded-r transition-all ${
+                      isActive ? "bg-[#b94826]" : "bg-transparent"
+                    }`}
+                  />
                   <div className={`w-10 h-10 rounded-lg grid place-items-center border shrink-0 transition-colors ${
                     isActive
                       ? "bg-[#b94826]/25 border-[#b94826]/50"
@@ -1997,38 +1959,7 @@ function LexDraftEdge() {
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-
-            {/* Mini proof-points strip */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { k: "2",   v: "Edit stages" },
-                { k: "0",   v: "Fake citations" },
-                { k: "1-click", v: "Research insert" },
-              ].map((s) => (
-                <div key={s.v} className="rounded-xl border border-[#fff0df]/12 bg-[#fff0df]/[0.04] backdrop-blur-sm px-3 py-3 text-center">
-                  <div className="font-serif text-xl font-bold text-[#b94826] leading-none">{s.k}</div>
-                  <div className="text-[10px] tracking-[0.18em] uppercase text-[#fff0df]/60 mt-1.5">{s.v}</div>
-                </div>
-              ))}
-            </div>
           </div>
-        </div>
-
-        {/* CTA */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              track("cta_start_trial_click", { location: "lexdraft_edge" });
-              go(SIGNUP);
-            }}
-            className="lex-btn lex-btn--primary lex-btn--dark lex-btn--sm group"
-          >
-            Start Free Trial <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition" />
-          </button>
-          <a href="#pricing" className="lex-btn lex-btn--secondary lex-btn--dark lex-btn--sm">
-            See pricing
-          </a>
         </div>
       </div>
     </section>
@@ -2855,7 +2786,7 @@ function GetInTouchField({
         onChange={(e) => onChange(e.target.value)}
         required={required}
         placeholder={placeholder}
-        className="w-full px-4 py-3 rounded-md bg-white border border-[#680318]/15 text-[#680318] placeholder:text-[#680318]/35 focus:outline-none focus:border-[#b94826] focus:bg-white transition"
+        className="w-full px-4 py-3 rounded-md bg-[#F9E4C9] border border-[#680318]/15 text-[#680318] placeholder:text-[#680318]/35 focus:outline-none focus:border-[#b94826] focus:bg-[#F9E4C9] transition"
       />
     </label>
   );
@@ -2985,7 +2916,7 @@ function GetInTouch() {
                   value={form.message}
                   onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
                   placeholder="Tell us about your practice and what you'd like to see from Lexram…"
-                  className="w-full px-4 py-3 rounded-md bg-white border border-[#680318]/15 text-[#680318] placeholder:text-[#680318]/35 focus:outline-none focus:border-[#b94826] focus:bg-white transition resize-none"
+                  className="w-full px-4 py-3 rounded-md bg-[#F9E4C9] border border-[#680318]/15 text-[#680318] placeholder:text-[#680318]/35 focus:outline-none focus:border-[#b94826] focus:bg-[#F9E4C9] transition resize-none"
                 />
               </label>
             </div>
@@ -3166,8 +3097,8 @@ export default function LandingPage() {
       {/* <Resources /> — temporarily hidden; re-enable when section is finalised */}
       <Blog />
       <Stats />
-      <Stories />
       <MarketComparison />
+      <Stories />
       <Pricing />
       <FAQ />
       <GetInTouch />

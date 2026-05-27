@@ -1,7 +1,13 @@
-// User-facing: submit a new org-join request.
+// User-facing: submit a new org-join request (4-section onboarding form).
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCtx } from "@/lib/auth-helpers";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+
+function trimOrNull(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  return t.length > 0 ? t : null;
+}
 
 export async function POST(req: NextRequest) {
   const ctx = await getSessionCtx();
@@ -19,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   const sb = supabaseAdmin();
 
-  /* Don't allow two pending requests at once — keep the queue tidy. */
+  /* One pending request at a time per user. */
   const { count: pendingCount } = await sb
     .from("tsr_org_requests")
     .select("*", { count: "exact", head: true })
@@ -29,21 +35,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "You already have a pending request. Wait for Lexram to review it." }, { status: 409 });
   }
 
+  /* Normalise + clamp the AI / operational fields. Anything we don't
+     recognise is silently dropped. */
+  const primaryBanks = Array.isArray(body.primary_banks_served)
+    ? (body.primary_banks_served as unknown[]).filter((x) => typeof x === "string").slice(0, 30) as string[]
+    : [];
+
+  const allowedVolumes = new Set(["0-50", "50-200", "200-500", "500+"]);
+  const rawVolume = typeof body.estimated_monthly_volume === "string" ? body.estimated_monthly_volume : "";
+  const estimated_monthly_volume = allowedVolumes.has(rawVolume) ? rawVolume : null;
+
+  const allowedLanguages = new Set(["English", "Bilingual (English + Tamil)", "Bilingual (English + Hindi)", "Other"]);
+  const rawLang = typeof body.default_language === "string" ? body.default_language : "";
+  const default_language = allowedLanguages.has(rawLang) ? rawLang : "English";
+
+  const insertPayload = {
+    requested_by: ctx.user_id,
+    organization_name,
+    organization_type: trimOrNull(body.organization_type),
+    entity_type:       trimOrNull(body.entity_type),
+    office_website:    trimOrNull(body.office_website),
+    contact_name,
+    contact_email,
+    contact_phone:     trimOrNull(body.contact_phone),
+    address:           trimOrNull(body.address),
+    gstin:             trimOrNull(body.gstin),
+    organization_pan:  trimOrNull(body.organization_pan),
+    billing_email:     trimOrNull(body.billing_email)?.toLowerCase() ?? null,
+    primary_banks_served: primaryBanks,
+    default_language,
+    estimated_monthly_volume,
+    team_size:    Math.max(1, Math.min(500, Number(body.team_size ?? 1))),
+    team_details: Array.isArray(body.team_details) ? body.team_details : [],
+    notes:        trimOrNull(body.notes),
+  };
+
   const { data, error } = await sb
     .from("tsr_org_requests")
-    .insert({
-      requested_by:      ctx.user_id,
-      organization_name,
-      organization_type: typeof body.organization_type === "string" ? body.organization_type.trim() || null : null,
-      contact_name,
-      contact_email,
-      contact_phone:     typeof body.contact_phone === "string" ? body.contact_phone.trim() || null : null,
-      address:           typeof body.address === "string" ? body.address.trim() || null : null,
-      gstin:             typeof body.gstin === "string" ? body.gstin.trim() || null : null,
-      team_size:         Math.max(1, Math.min(500, Number(body.team_size ?? 1))),
-      team_details:      Array.isArray(body.team_details) ? body.team_details : [],
-      notes:             typeof body.notes === "string" ? body.notes.trim() || null : null,
-    })
+    .insert(insertPayload)
     .select("*")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

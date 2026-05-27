@@ -189,13 +189,51 @@ function RequestCard({
 
       {expanded && (
         <div className="px-5 md:px-6 pb-5 border-t border-maroon/10">
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm mt-4">
-            <Pair label="Contact"        v={`${request.contact_name} <${request.contact_email}>`} />
-            <Pair label="Phone"          v={request.contact_phone ?? "—"} icon={Phone} />
-            <Pair label="GSTIN"          v={request.gstin ?? "—"} />
-            <Pair label="Address"        v={request.address ?? "—"} />
-            <Pair label="Team size"      v={`${request.team_size} planned`} />
-            <Pair label="Submitted"      v={fmtDate(request.created_at)} />
+          {/* 1. Identity */}
+          <SectionLabel>Organisation identity</SectionLabel>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm mt-2">
+            <Pair label="Entity type"  v={request.entity_type ?? request.organization_type ?? "—"} />
+            <Pair label="Firm size"    v={`${request.team_size} people`} />
+            <Pair label="Website"      v={request.office_website ?? "—"} />
+            <Pair label="Submitted"    v={fmtDate(request.created_at)} />
+          </dl>
+
+          {/* 2. Compliance */}
+          <SectionLabel className="mt-5">Compliance &amp; invoicing</SectionLabel>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm mt-2">
+            <Pair label="Organisation PAN" v={request.organization_pan ?? "—"} />
+            <Pair label="GSTIN"            v={request.gstin ?? "—"} />
+            <Pair label="Billing email"    v={request.billing_email ?? "—"} />
+            <Pair label="Address"          v={request.address ?? "—"} className="sm:col-span-2" />
+          </dl>
+
+          {/* 3. AI & Operational */}
+          <SectionLabel className="mt-5">AI &amp; operational configuration</SectionLabel>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm mt-2">
+            <Pair label="Default language"          v={request.default_language ?? "English"} />
+            <Pair label="Estimated monthly volume"  v={request.estimated_monthly_volume ?? "—"} />
+            <Pair label="Bank template" v={request.bank_template_url ? "Uploaded ↗" : "Not yet sent"} />
+            <Pair label="Banks served"
+                  v={(request.primary_banks_served ?? []).length === 0
+                       ? "—"
+                       : `${request.primary_banks_served.length} selected`} />
+          </dl>
+          {(request.primary_banks_served ?? []).length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {request.primary_banks_served.map((b) => (
+                <span key={b} className="text-[10px] tracking-wider uppercase px-2 py-0.5 rounded-full bg-maroon/8 text-maroon">
+                  {b}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* 4. Admin POC */}
+          <SectionLabel className="mt-5">Authorised signatory / admin POC</SectionLabel>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm mt-2">
+            <Pair label="Name"     v={request.contact_name} />
+            <Pair label="Email"    v={request.contact_email} />
+            <Pair label="Phone"    v={request.contact_phone ?? "—"} icon={Phone} />
           </dl>
 
           {request.notes && (
@@ -253,14 +291,22 @@ function RequestCard({
   );
 }
 
-function Pair({ label, v, icon: Icon }: { label: string; v: string; icon?: React.ComponentType<{ className?: string }> }) {
+function Pair({ label, v, icon: Icon, className }: { label: string; v: string; icon?: React.ComponentType<{ className?: string }>; className?: string }) {
   return (
-    <div>
+    <div className={className}>
       <dt className="text-[10px] tracking-[0.18em] uppercase text-ink/55 inline-flex items-center gap-1.5">
         {Icon && <Icon className="w-3 h-3" />}
         {label}
       </dt>
       <dd className="text-ink/85 mt-0.5 break-words">{v}</dd>
+    </div>
+  );
+}
+
+function SectionLabel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`text-[10px] tracking-[0.22em] uppercase text-rust font-bold ${className}`}>
+      {children}
     </div>
   );
 }

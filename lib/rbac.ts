@@ -182,38 +182,63 @@ export interface OrgRequestTeamMember {
   role?:  string;
 }
 
+export type EntityType =
+  | "Sole Proprietorship"
+  | "Partnership"
+  | "LLP"
+  | "Private Limited"
+  | "Public Limited"
+  | "Other";
+
+export type MonthlyVolumeRange = "0-50" | "50-200" | "200-500" | "500+";
+
 export interface OrgRequest {
   id:                string;
   requested_by:      string;
-  organization_name: string;
-  organization_type: string | null;
-  contact_name:      string;
-  contact_email:     string;
-  contact_phone:     string | null;
-  address:           string | null;
-  gstin:             string | null;
-  team_size:         number;
-  team_details:      OrgRequestTeamMember[];
-  notes:             string | null;
-  status:            OrgRequestStatus;
-  reviewed_by:       string | null;
-  reviewed_at:       string | null;
-  decision_reason:   string | null;
-  approved_org_id:   string | null;
-  created_at:        string;
+  organization_name:        string;
+  organization_type:        string | null;
+  entity_type:              EntityType | string | null;
+  office_website:           string | null;
+  contact_name:             string;
+  contact_email:            string;
+  contact_phone:            string | null;
+  address:                  string | null;
+  gstin:                    string | null;
+  organization_pan:         string | null;
+  billing_email:            string | null;
+  primary_banks_served:     string[];
+  bank_template_url:        string | null;
+  default_language:         string;
+  estimated_monthly_volume: string | null;
+  team_size:                number;
+  team_details:             OrgRequestTeamMember[];
+  notes:                    string | null;
+  status:                   OrgRequestStatus;
+  reviewed_by:              string | null;
+  reviewed_at:              string | null;
+  decision_reason:          string | null;
+  approved_org_id:          string | null;
+  created_at:               string;
 }
 
 export interface CreateOrgRequestPayload {
-  organization_name: string;
-  organization_type?: string;
-  contact_name:       string;
-  contact_email:      string;
-  contact_phone?:     string;
-  address?:           string;
-  gstin?:             string;
-  team_size:          number;
-  team_details:       OrgRequestTeamMember[];
-  notes?:             string;
+  organization_name:         string;
+  organization_type?:        string;
+  entity_type?:              EntityType | string;
+  office_website?:           string;
+  contact_name:              string;
+  contact_email:             string;
+  contact_phone?:            string;
+  address?:                  string;
+  gstin?:                    string;
+  organization_pan?:         string;
+  billing_email?:            string;
+  primary_banks_served?:     string[];
+  default_language?:         string;
+  estimated_monthly_volume?: MonthlyVolumeRange | string;
+  team_size:                 number;
+  team_details:              OrgRequestTeamMember[];
+  notes?:                    string;
 }
 
 /** Hook for a user to read THEIR own request (most recent). */

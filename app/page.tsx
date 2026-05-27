@@ -6,7 +6,7 @@ import {
   Search, FileText, Scale, Shield, Sparkles, BookOpen, Gavel,
   CheckCircle2, ArrowRight, Quote, Plus, Minus, Star, Zap,
   Library, PenTool, Users, Download, Bookmark,
-  Calendar, TrendingUp, FileSearch, Layers,
+  Calendar, TrendingUp, FileSearch, Layers, Mic,
   Mail, Phone, Clock, Send, MessageSquare,
   Image as ImageIcon,
   Menu, X,
@@ -36,7 +36,18 @@ const go = (href: string) => {
 function useReveal() {
   useEffect(() => {
     const selector =
-      '[data-landing-v2] .fade-up, [data-landing-v2] .reveal-up, [data-landing-v2] .reveal-down, [data-landing-v2] .reveal-left, [data-landing-v2] .reveal-right, [data-landing-v2] .reveal-zoom, [data-landing-v2] .reveal-blur, [data-landing-v2] .reveal-tilt, [data-landing-v2] .reveal-rise, [data-landing-v2] .zig-row, [data-landing-v2] .paper-lift';
+      '[data-landing-v2] .fade-up, [data-landing-v2] .reveal-up, [data-landing-v2] .reveal-down, [data-landing-v2] .reveal-left, [data-landing-v2] .reveal-right, [data-landing-v2] .reveal-zoom, [data-landing-v2] .reveal-blur, [data-landing-v2] .reveal-tilt, [data-landing-v2] .reveal-rise, [data-landing-v2] .zig-row, [data-landing-v2] .paper-lift, [data-landing-v2] [data-reveal-section]';
+
+    /* Auto-tag every <section> that's a direct child of the landing wrapper
+       (and the <footer>) so they get the section-level fade-up. Skip the
+       first section (Hero) — it already manages its own intro animation
+       and we don't want to delay the page's first paint. */
+    const sections = document.querySelectorAll('[data-landing-v2] > section, [data-landing-v2] > footer');
+    sections.forEach((sec, i) => {
+      if (i === 0) return; // Hero stays as-is
+      sec.setAttribute('data-reveal-section', '');
+    });
+
     const els = document.querySelectorAll(selector);
     const io = new IntersectionObserver(
       (entries) => {
@@ -300,8 +311,66 @@ function Nav() {
    ============================================================ */
 function Hero() {
   const y = useScrollY();
+  const tabs = ["Title Scrutiny", "Research", "Drafting"];
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (paused) return;
+    const t = setInterval(() => setActive((p) => (p + 1) % tabs.length), 4000);
+    return () => clearInterval(t);
+  }, [paused]);
+
+  const handleTab = (i: number) => {
+    setActive(i);
+    setPaused(true);
+    setTimeout(() => setPaused(false), 8000);
+  };
+
+  const content = [
+    {
+      badge: "NEW",
+      title: "Title Scrutiny Reports",
+      accent: "Bank-ready property reports",
+      accent2: "built from your documents.",
+      tagline: "Upload. Verify. Lend.",
+      desc: "Upload the property file. Lexram maps the ownership chain, flags encumbrances, and delivers a report lenders can act on.",
+      bullets: ["30-year ownership chain mapped", "Encumbrance check across sub-registrar records", "Bank-ready format — accepted by SBI, HDFC, ICICI"],
+      cta: "Start a Report",
+      cta2: "See a sample report",
+      ctaHref: "/dashboard/tsr",
+    },
+    {
+      badge: "RESEARCH",
+      title: "Deep Legal Research",
+      accent: "Get verified",
+      accent2: "Supreme Court precedents.",
+      tagline: "Trained on India's courts, not the internet.",
+      desc: "LexRam decomposes your query into discrete points of law and returns the Supreme Court paragraphs that support and conflict with each proposition.",
+      bullets: ["Conflicting judgement detector", "Bench strength indicator", "Every citation links to the original judgement"],
+      cta: "Start Research",
+      cta2: "See how it works",
+      ctaHref: "#research",
+    },
+    {
+      badge: "DRAFTING",
+      title: "AI-Assisted Drafting",
+      accent: "Court-ready petitions,",
+      accent2: "verified citations.",
+      tagline: "Upload your facts. Get a draft built on precedent.",
+      desc: "Upload your FIR, charge-sheet, or court order. Lexram identifies every legal ground and drafts a court-ready petition.",
+      bullets: ["Auto-detects applicable sections under BNS, BNSS, BSA", "Pulls supporting SC paragraphs per ground", "Editable draft with live citation preview"],
+      cta: "Start Drafting",
+      cta2: "Explore tools",
+      ctaHref: "#drafting",
+    },
+  ];
+
+  const c = content[active];
+
   return (
-    <section className="relative min-h-screen overflow-hidden flex items-center pt-16">
+    <section className="relative min-h-screen overflow-hidden flex items-center">
+      {/* Background layers */}
       <div
         aria-hidden
         className="absolute inset-0 w-full h-full bg-cover bg-center"
@@ -310,43 +379,110 @@ function Hero() {
           transform: `translate3d(0, ${y * 0.3}px, 0) scale(1.1)`,
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#680318]/85 via-[#680318]/70 to-[#680318]/90" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(42,26,28,0.6)_100%)]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#680318]/92 via-[#680318]/78 to-[#680318]/92" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(42,26,28,0.5)_100%)]" />
 
       <div
-        className="relative max-w-6xl mx-auto px-4 sm:px-6 py-10 md:py-12 text-[#fff0df]"
+        className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-24 md:py-32 lg:py-40"
         style={{
-          transform: `translateY(${y * -0.15}px)`,
+          transform: `translateY(${y * -0.1}px)`,
           opacity: Math.max(0, 1 - y / 600),
         }}
       >
-        <h1 className="reveal-up font-serif text-[2.5rem] leading-[1.05] sm:text-5xl md:text-7xl lg:text-8xl md:leading-[1.02] font-bold text-balance">
-          You argue the case.
-          <br />
-          <span className="italic text-[#fff0df]/90">We'll find</span>{" "}
-          <span className="text-[#b94826]">the law.</span>
-        </h1>
-        <p className="reveal-up mt-6 sm:mt-8 text-base sm:text-lg md:text-2xl text-[#fff0df]/80 max-w-2xl font-light leading-relaxed" style={{ transitionDelay: "180ms" }}>
-          From statute to submission — without leaving Lexram. Research judgements, draft pleadings, manage matters, trace titles, and grow your network — one platform, built on India's courts alone.
-        </p>
-        <div className="reveal-blur mt-8 sm:mt-12 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4" style={{ transitionDelay: "360ms" }}>
-          <button
-            type="button"
-            onClick={() => {
-              track("cta_start_trial_click", { location: "hero" });
-              go(SIGNUP);
-            }}
-            className="lex-btn lex-btn--primary lex-btn--dark group justify-center sm:justify-start"
-          >
-            Start Free Trial{" "}
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition" />
-          </button>
-          <a href="#research" className="lex-btn lex-btn--secondary lex-btn--dark justify-center sm:justify-start">
-            See how it works
-          </a>
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
+          {/* ── Left: Brand message ─────────────────────────────── */}
+          <div className="flex-1 text-center lg:text-left">
+            <span className="reveal-up inline-block mb-5 text-[11px] font-bold tracking-[0.3em] uppercase text-[#b94826]">
+              LexRam AI
+            </span>
+
+            <h1 className="reveal-up font-serif text-[2.8rem] leading-[0.95] sm:text-5xl lg:text-7xl xl:text-8xl lg:leading-[0.95] font-bold text-[#fff0df] text-balance">
+              Indian AI
+              <br />
+              <span className="text-[#b94826] italic">Law Assistant</span>
+            </h1>
+
+            <p className="reveal-up mt-7 text-lg md:text-xl text-[#fff0df]/60 max-w-lg mx-auto lg:mx-0 font-light leading-relaxed" style={{ transitionDelay: "120ms" }}>
+              Research legal questions, draft pleadings, manage matters, trace titles, and grow your network — one platform, built on India&apos;s courts alone.
+            </p>
+
+            <div className="reveal-blur mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start" style={{ transitionDelay: "240ms" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  track("cta_start_trial_click", { location: "hero" });
+                  go(SIGNUP);
+                }}
+                className="inline-flex items-center justify-center gap-2 bg-[#b94826] text-[#fff0df] px-6 py-3 rounded-lg text-sm font-semibold hover:bg-[#8f3318] transition-colors shadow-[0_10px_30px_-10px_rgba(185,72,38,0.5)]"
+              >
+                Start Free Trial <ArrowRight className="w-4 h-4" />
+              </button>
+              <a href="#research" className="inline-flex items-center justify-center gap-2 border border-[#fff0df]/25 text-[#fff0df] px-6 py-3 rounded-lg text-sm font-medium hover:border-[#fff0df]/50 hover:bg-white/5 transition-all">
+                See how it works
+              </a>
+            </div>
+          </div>
+
+          {/* ── Right: Feature tabs card ────────────────────────── */}
+          <div className="flex-1 w-full max-w-xl reveal-up lg:reveal-right" style={{ transitionDelay: "160ms" }}>
+            <div className="rounded-2xl border border-[#fff0df]/12 bg-[#fff0df]/[0.04] backdrop-blur-xl overflow-hidden shadow-[0_20px_60px_-20px_rgba(0,0,0,0.4)]">
+              {/* Tab bar */}
+              <div className="flex items-center gap-1 p-1.5 border-b border-[#fff0df]/8">
+                {tabs.map((label, i) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => handleTab(i)}
+                    className={`relative flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                      i === active
+                        ? "bg-[#b94826] text-[#fff0df] shadow-[0_2px_10px_rgba(185,72,38,0.4)]"
+                        : "text-[#fff0df]/50 hover:text-[#fff0df]/80 hover:bg-white/5"
+                    }`}
+                  >
+                    {label}
+                    {label === "Title Scrutiny" && (
+                      <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded-full leading-none bg-[#fff0df] text-[#680318]">
+                        NEW
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab content */}
+              <div key={active} className="p-6 md:p-8 animate-in fade-in slide-in-from-bottom-2 duration-400">
+                <span className="inline-block text-[10px] font-bold tracking-[0.2em] uppercase text-[#b94826] mb-3">
+                  {c.badge}
+                </span>
+                <h3 className="font-serif text-2xl md:text-3xl font-bold text-[#fff0df] leading-tight text-balance">
+                  {c.accent}{" "}
+                  <span className="text-[#b94826]">{c.accent2}</span>
+                </h3>
+
+                <p className="mt-4 text-sm md:text-base text-[#fff0df]/60 leading-relaxed">
+                  {c.desc}
+                </p>
+
+                {/* Bullet features */}
+                <ul className="mt-5 space-y-2.5">
+                  {c.bullets.map((b, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-sm text-[#fff0df]/75">
+                      <CheckCircle2 className="w-4 h-4 text-[#b94826] mt-0.5 shrink-0" />
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-7 flex items-center gap-4">
+                  <a href={c.ctaHref || "#research"} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#b94826] hover:text-[#fff0df] transition-colors">
+                    {c.cta2} <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
     </section>
   );
 }
@@ -356,14 +492,16 @@ function Hero() {
    ============================================================ */
 function TrustStrip() {
   const items = [
-    "SUPREME COURT OF INDIA", "MADRAS HIGH COURT", "DELHI HIGH COURT",
-    "BOMBAY HIGH COURT", "DPDP ACT COMPLIANT", "DISTRICT COURTS",
-    "CENTRAL STATUTES", "VERIFIED CITATIONS",
+    "AI Legal Drafting", "LexDraft", "AI Legal Research",
+    "Case Hub", "Precedent Map", "Concept Map",
+    "Zero Hallucinations", "Verified Citations", "No Assumptions",
+    "Customised Pleadings", "No Open Source", "Supreme Court Judgements",
+    "Central Statutes", "Research Sessions",
   ];
   return (
     <section className="py-10 bg-[#680318] text-[#fff0df]/80 overflow-hidden border-y border-[#b94826]/30">
       <div className="reveal-down text-center text-xs tracking-[0.3em] mb-6 text-[#fff0df]/60">
-        AI POWERED LEGAL TOOLS FOR
+        Special tools with advanced Unique Features
       </div>
       <div className="relative">
         <div className="flex marquee whitespace-nowrap">
@@ -633,8 +771,6 @@ function Research() {
                 type="button"
                 onClick={() => {
                   track("cta_start_research_click", { location: "research_to_testimonials" });
-                  /* Set hash so Stories switches to the Research tab, then
-                     smooth-scroll the target into view. */
                   history.replaceState(null, "", "#testimonials-research");
                   window.dispatchEvent(new HashChangeEvent("hashchange"));
                   document.getElementById("testimonials")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -664,23 +800,33 @@ function Research() {
           <ParallaxHeroImage src={researchImg} alt="Legal research" />
         </div>
 
-        <ResearchCapabilities />
+        <ResearchFeatures />
       </div>
     </section>
   );
 }
 
 /* ============================================================
-   Research capabilities — interactive index + preview
+   Research features — interactive index + preview (old format)
    ============================================================ */
-function ResearchCapabilities() {
+function ResearchFeatures() {
   const [active, setActive] = useState(0);
+  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+
+  const toggleExpand = (i: number) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      return next;
+    });
+  };
 
   const items = [
     {
       n: "01",
-      t: "Case hub",
-      d: "All your matters, research threads, and saved judgements in one organised workspace.",
+      t: "Case Hub",
+      d: "All your matters in one organised workspace — research threads, uploaded documents, and drafted pleadings, organised by case.",
+      dd: "Case Hub is your central command for every matter you handle. Research threads, documents uploaded, and pleadings drafted are all pinned to their respective case — so nothing gets lost, nothing gets mixed up, and every matter stays exactly where you expect it.",
       visual: (
         <div className="space-y-2">
           {[
@@ -708,8 +854,32 @@ function ResearchCapabilities() {
     },
     {
       n: "02",
+      t: "Multiple research sessions, one case",
+      d: "All research threads for a case pinned together — hassle-free legal research, always in context.",
+      dd: "Every research thread you open for a matter is automatically pinned to that case. No hunting across sessions or retracing your steps — all threads for one case live together, so your research stays coherent from the first query to the last.",
+      visual: (
+        <div className="space-y-4">
+          <div className="text-[10px] tracking-[0.25em] uppercase text-[#680318]/55">Case · Sharma v. State of Tamil Nadu</div>
+          <div className="space-y-2">
+            {[
+              { q: "section 302 IPC culpable homicide",       n: "14 results", date: "Today 14:32" },
+              { q: "circumstantial evidence last seen theory", n: "8 results",  date: "Today 11:15" },
+              { q: "discovery under section 27 Evidence Act",  n: "6 results",  date: "Yesterday" },
+            ].map((s, i) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-md border border-[#680318]/10 bg-[#fff0df]/30">
+                <span className="text-xs text-[#680318]/70 flex-1 truncate">{s.q}</span>
+                <span className="text-[10px] text-[#680318]/55">{s.n}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      n: "03",
       t: "Drafting integrated",
-      d: "Move from research to pleading without switching tools.",
+      d: "Move from legal research to pleading draft in one platform — no tool switching, no lost context.",
+      dd: "Drafting is built into the same workspace as your research. When you are ready to move from finding the law to filing the argument, the transition is a single step — no exports, no copy-paste, no switching between platforms.",
       visual: (
         <div className="space-y-4">
           <div className="text-[10px] tracking-[0.25em] uppercase text-[#680318]/55">Draft · Bail application ¶ 4</div>
@@ -728,9 +898,35 @@ function ResearchCapabilities() {
       ),
     },
     {
-      n: "03",
-      t: "Upload files, any volume",
-      d: "Lexram reads, indexes, and makes them searchable instantly.",
+      n: "04",
+      t: "Draft management",
+      d: "Find every pleading draft under its case — no searching through individual research threads.",
+      dd: "All pleadings and drafts created for a matter are collected directly inside that case, not scattered across individual research threads. When you need to retrieve or review a draft, you go to the case — and it is there.",
+      visual: (
+        <div className="space-y-3">
+          <div className="text-[10px] tracking-[0.25em] uppercase text-[#680318]/55">Case · Sharma v. State of Tamil Nadu · Drafts</div>
+          {[
+            { name: "bail_application_v2.docx", date: "Jun 15, 2024", label: "Latest" },
+            { name: "anticipatory_bail_v1.docx", date: "Jun 12, 2024", label: "Filed" },
+            { name: "discharge_petition_v3.docx", date: "Jun 08, 2024", label: "Draft" },
+          ].map((d, i) => (
+            <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-md border border-[#680318]/10 bg-[#fff0df]/30">
+              <FileText className="w-4 h-4 text-[#680318]/60 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] text-[#680318] font-medium truncate">{d.name}</div>
+                <div className="text-[10px] text-[#680318]/55">{d.date}</div>
+              </div>
+              <span className="text-[10px] tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#b94826]/10 text-[#b94826] border border-[#b94826]/20">{d.label}</span>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      n: "05",
+      t: "Unlimited uploads",
+      d: "Upload large legal case files — Lexram indexes and makes every document instantly searchable.",
+      dd: "There is no limit on how much you can upload. Lexram reads, indexes, and makes your entire file bundle searchable the moment it is uploaded — whether it is a single FIR or a hundred-document case record.",
       visual: (
         <div className="space-y-4">
           <div className="rounded-lg border border-dashed border-[#680318]/25 bg-[#fff0df]/30 p-6 text-center">
@@ -764,9 +960,10 @@ function ResearchCapabilities() {
       ),
     },
     {
-      n: "04",
-      t: "Navigate cases anytime",
-      d: "Your entire research history is preserved and searchable.",
+      n: "06",
+      t: "Research History in Case Hub",
+      d: "Your complete legal research history — preserved, organised, and searchable across every matter.",
+      dd: "Your entire research history across all matters is preserved inside Lexram and remains fully searchable. Return to any case, any thread, or any prior research session at any point — nothing is lost when a matter goes dormant or resumes.",
       visual: (
         <div className="space-y-4">
           <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-[#680318]/15 bg-[#fff0df]/40">
@@ -795,6 +992,29 @@ function ResearchCapabilities() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      n: "07",
+      t: "Speech to text",
+      d: "Voice-powered legal research — speak your query, Lexram transcribes and returns relevant answers instantly.",
+      dd: "Speak your research query directly into the search bar — Lexram listens, transcribes it accurately, and returns relevant legal answers immediately. No typing required, no reformulation needed — your question is heard and acted on exactly as you asked it.",
+      visual: (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-[#680318]/10 bg-[#fff0df]/40 p-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-[#b94826]/15 grid place-items-center mx-auto mb-3 animate-pulse">
+              <Mic className="w-6 h-6 text-[#b94826]" />
+            </div>
+            <div className="text-sm font-medium text-[#680318]">Listening…</div>
+            <div className="mt-3 text-sm text-[#680318]/80 font-serif italic">
+              &ldquo;section 138 NI Act bounce defence limitation period&rdquo;
+            </div>
+            <div className="mt-4 flex items-center justify-center gap-2 text-[10px] text-[#680318]/55">
+              <CheckCircle2 className="w-3 h-3 text-[#b94826]" />
+              Voice transcribed — searching now
+            </div>
           </div>
         </div>
       ),
@@ -852,6 +1072,22 @@ function ResearchCapabilities() {
                   <div className="text-sm leading-relaxed text-[#680318]/70 mt-2">
                     {item.d}
                   </div>
+                  {expandedItems.has(i) && (
+                    <div className="mt-3 text-sm leading-relaxed text-[#680318]/55 animate-in fade-in slide-in-from-top-1 duration-300">
+                      {item.dd}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); toggleExpand(i); }}
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#b94826] hover:text-[#680318] transition-colors"
+                  >
+                    {expandedItems.has(i) ? (
+                      <>Show less <Minus className="w-3 h-3" /></>
+                    ) : (
+                      <>+ more <Plus className="w-3 h-3" /></>
+                    )}
+                  </button>
                 </div>
                 <ArrowRight
                   className={`w-4 h-4 mt-2 text-[#b94826] transition-all shrink-0 ${
@@ -1184,7 +1420,7 @@ function Drafting() {
               <SectionCTA
                 label="Start Drafting"
                 tone="dark"
-                primaryHref={RESEARCH}
+                primaryHref={`${RESEARCH}?mode=draft`}
                 eventName="cta_start_research_click"
                 location="drafting_section"
               />

@@ -1,0 +1,51 @@
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  turbopack: {},
+  reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  images: {
+    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        port: '',
+        pathname: '/**',
+      },
+    ],
+  },
+  devIndicators: false,
+  async redirects() {
+    return [
+      {
+        source: '/dashboard/research-3',
+        destination: '/dashboard/research-2',
+        permanent: false,
+      },
+      {
+        source: '/dashboard/research-3/:path*',
+        destination: '/dashboard/research-2',
+        permanent: false,
+      },
+    ];
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/backend/:path*',
+        destination: 'http://165.232.176.24:8000/:path*',
+      },
+      {
+        source: '/legal-api/:path*',
+        destination: 'http://157.245.106.223:8124/:path*',
+      },
+    ];
+  },
+};
+
+module.exports = nextConfig;

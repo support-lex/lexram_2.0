@@ -9,6 +9,7 @@ import {
   RefreshCw, Search, Shield, Users, Zap,
 } from "lucide-react";
 import { useRoleContext, fmtTokens } from "@/lib/rbac";
+import { getDocumentViewUrl } from "@/lib/tsr-api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -28,11 +29,11 @@ interface SuperAdminCase {
   bank_name:            string;
   status:               string;
   total_documents:      number;
-  total_pages_all_docs: number;
-  tokens_input:         number;
-  tokens_output:        number;
-  tokens_thinking:      number;
-  tokens_total:         number;
+  total_pages_all_docs: number | null;
+  tokens_input:         number | null;
+  tokens_output:        number | null;
+  tokens_thinking:      number | null;
+  tokens_total:         number | null;
   documents:            SuperAdminDocument[];
 }
 
@@ -82,7 +83,21 @@ function fmtMB(mb: number): string {
 
 // ── Level 3: Document row ──────────────────────────────────────────────────
 
-function DocumentRow({ doc }: { doc: SuperAdminDocument }) {
+function DocumentRow({ doc, caseId }: { doc: SuperAdminDocument; caseId: string }) {
+  const [loading, setLoading] = useState(false);
+
+  const onView = async () => {
+    setLoading(true);
+    try {
+      const { url } = await getDocumentViewUrl(caseId, doc.id);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      alert(`Could not load document: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <tr className="border-t border-maroon/8 hover:bg-cream-warm/30 transition-colors">
       <td className="pl-14 pr-4 py-2.5">
@@ -103,19 +118,16 @@ function DocumentRow({ doc }: { doc: SuperAdminDocument }) {
           : <span className="text-ink/35">—</span>}
       </td>
       <td className="px-4 py-2.5 text-right">
-        {doc.view_url ? (
-          <a
-            href={doc.view_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-maroon hover:text-rust transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            View Doc
-          </a>
-        ) : (
-          <span className="text-xs text-ink/35">No URL</span>
-        )}
+        <button
+          onClick={onView}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-maroon hover:text-rust disabled:opacity-50 transition-colors"
+        >
+          {loading
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : <ExternalLink className="w-3.5 h-3.5" />}
+          View Doc
+        </button>
       </td>
     </tr>
   );
@@ -153,7 +165,7 @@ function CaseRow({ c }: { c: SuperAdminCase }) {
         {/* Pages */}
         <td className="px-4 py-3">
           <span className="text-sm font-semibold text-ink tabular-nums">
-            {c.total_pages_all_docs.toLocaleString("en-IN")}
+            {(c.total_pages_all_docs ?? 0).toLocaleString("en-IN")}
           </span>
         </td>
         {/* Token breakdown */}
@@ -161,21 +173,21 @@ function CaseRow({ c }: { c: SuperAdminCase }) {
           <div className="flex flex-col gap-0.5 min-w-[130px]">
             <div className="flex items-center justify-between gap-4">
               <span className="text-[10px] text-ink/45 uppercase tracking-wider w-8">In</span>
-              <span className="text-[11px] font-medium text-ink tabular-nums">{fmtTokens(c.tokens_input)}</span>
+              <span className="text-[11px] font-medium text-ink tabular-nums">{fmtTokens(c.tokens_input ?? 0)}</span>
             </div>
             <div className="flex items-center justify-between gap-4">
               <span className="text-[10px] text-ink/45 uppercase tracking-wider w-8">Out</span>
-              <span className="text-[11px] font-medium text-ink tabular-nums">{fmtTokens(c.tokens_output)}</span>
+              <span className="text-[11px] font-medium text-ink tabular-nums">{fmtTokens(c.tokens_output ?? 0)}</span>
             </div>
-            {c.tokens_thinking > 0 && (
+            {(c.tokens_thinking ?? 0) > 0 && (
               <div className="flex items-center justify-between gap-4">
                 <span className="text-[10px] text-ink/45 uppercase tracking-wider w-8">Think</span>
-                <span className="text-[11px] font-medium text-rust tabular-nums">{fmtTokens(c.tokens_thinking)}</span>
+                <span className="text-[11px] font-medium text-rust tabular-nums">{fmtTokens(c.tokens_thinking ?? 0)}</span>
               </div>
             )}
             <div className="flex items-center justify-between gap-4 border-t border-maroon/10 pt-0.5 mt-0.5">
               <span className="text-[10px] font-bold text-maroon/60 uppercase tracking-wider w-8">Total</span>
-              <span className="text-[11px] font-bold text-maroon tabular-nums">{fmtTokens(c.tokens_total)}</span>
+              <span className="text-[11px] font-bold text-maroon tabular-nums">{fmtTokens(c.tokens_total ?? 0)}</span>
             </div>
           </div>
         </td>
@@ -200,7 +212,7 @@ function CaseRow({ c }: { c: SuperAdminCase }) {
                 </thead>
                 <tbody>
                   {c.documents.map((d) => (
-                    <DocumentRow key={d.id} doc={d} />
+                    <DocumentRow key={d.id} doc={d} caseId={c.id} />
                   ))}
                 </tbody>
               </table>
@@ -304,10 +316,12 @@ export default function SuperAdminDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/superadmin/dashboard", { credentials: "include" });
+      const res = await fetch("/api/tsr/superadmin/dashboard", { credentials: "include" });
       if (res.status === 401 || res.status === 403) {
-        router.replace("/dashboard");
-        return;
+        throw new Error(
+          "Access denied (403). Your session token predates the super_admin role grant. " +
+          "Sign out and sign back in to refresh your JWT, then reload this page."
+        );
       }
       if (!res.ok) {
         const text = await res.text().catch(() => `HTTP ${res.status}`);
@@ -522,7 +536,7 @@ export default function SuperAdminDashboardPage() {
       <p className="text-center text-[11px] text-ink/35 mt-6">
         Data from{" "}
         <code className="font-mono bg-maroon/5 px-1.5 py-0.5 rounded text-ink/50">
-          GET /api/superadmin/dashboard
+          GET /api/tsr/superadmin/dashboard
         </code>{" "}
         — expand rows to drill down.
       </p>

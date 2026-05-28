@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/utils/supabase/client'
+import TsrPaymentModal, { type TsrPaymentRecord } from '../_components/TsrPaymentModal'
+import InvoiceView, { type Payment as InvoicePayment } from '@/components/InvoiceView'
 
 interface CaseData {
   id:               string
@@ -206,6 +208,16 @@ export default function CaseWorkspacePage() {
 
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // Payment gating for the "Run OCR Pipeline" (= generate scrutiny report) action.
+  // - existingPayment: latest successful payment for THIS case (one-time per case).
+  // - paymentModalOpen: shows the Cashfree payment modal before kicking off the pipeline.
+  // - invoicePayment: drives the InvoiceView modal that appears post-payment.
+  const [existingPayment, setExistingPayment] = useState<TsrPaymentRecord | null>(null)
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [invoicePayment, setInvoicePayment] = useState<TsrPaymentRecord | null>(null)
+  const [userEmail, setUserEmail] = useState<string>('')
+  const [userFullName, setUserFullName] = useState<string>('')
+
   useEffect(() => {
     if (!id) return
     let mounted = true
@@ -222,6 +234,32 @@ export default function CaseWorkspacePage() {
       setPageLoading(false)
     }
     load()
+    return () => { mounted = false }
+  }, [id])
+
+  // Look up the latest successful payment for this case + the signed-in user's
+  // identity, both needed for the invoice + payment-gate logic.
+  useEffect(() => {
+    if (!id) return
+    let mounted = true
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!mounted) return
+      const meta = (user?.user_metadata ?? {}) as Record<string, string | undefined>
+      const fullName = [meta.first_name, meta.last_name].filter(Boolean).join(' ').trim()
+      setUserEmail(user?.email ?? '')
+      setUserFullName(fullName)
+
+      const { data: payRow } = await supabase
+        .from('tsr_payments')
+        .select('*')
+        .eq('case_id', id)
+        .eq('status', 'success')
+        .order('paid_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (mounted && payRow) setExistingPayment(payRow as TsrPaymentRecord)
+    })()
     return () => { mounted = false }
   }, [id])
 
@@ -332,6 +370,26 @@ export default function CaseWorkspacePage() {
       throw new Error(`Server error ${res.status}: ${errText}`)
     }
     return res.json()
+  }
+
+  // Opens the payment modal unless the user has already paid for this case's
+  // report. Already-paid users skip straight to the pipeline.
+  const handleStartReport = () => {
+    if (droppedFiles.length === 0) return
+    if (existingPayment) {
+      handleRunPipeline()
+      return
+    }
+    setPaymentModalOpen(true)
+  }
+
+  // Called by TsrPaymentModal once Cashfree confirms + our server records
+  // status='success'. Shows the invoice modal and kicks off the pipeline.
+  const handlePaymentSuccess = (payment: TsrPaymentRecord) => {
+    setExistingPayment(payment)
+    setInvoicePayment(payment)
+    setPaymentModalOpen(false)
+    handleRunPipeline()
   }
 
   const handleRunPipeline = async () => {
@@ -611,8 +669,27 @@ export default function CaseWorkspacePage() {
     </div>
   )
 
+  const PaymentChrome = () => (
+    <>
+      <TsrPaymentModal
+        open={paymentModalOpen}
+        caseId={caseData!.id}
+        caseName={caseData!.case_name}
+        onSuccess={handlePaymentSuccess}
+        onClose={() => setPaymentModalOpen(false)}
+      />
+      <InvoiceView
+        payment={invoicePayment ? mapTsrPaymentToInvoice(invoicePayment) : null}
+        userEmail={userEmail}
+        userName={userFullName}
+        onClose={() => setInvoicePayment(null)}
+      />
+    </>
+  )
+
   if (!hasReport) {
     return (
+      <>
       <div className="min-h-full px-6 py-10 max-w-3xl mx-auto w-full bg-cream">
         <CaseHeader />
 
@@ -745,29 +822,34 @@ export default function CaseWorkspacePage() {
 
             <div className="mt-8 flex flex-col items-center gap-3">
               <button
-                onClick={handleRunPipeline}
+                onClick={handleStartReport}
                 disabled={droppedFiles.length === 0}
                 className="group flex items-center gap-2.5 px-9 py-4 rounded-2xl text-cream font-semibold text-sm bg-maroon hover:bg-maroon-deep transition-all hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 shadow-[0_18px_40px_-16px_rgba(104,3,24,0.55)]"
               >
                 <Sparkles className="w-4 h-4 transition-transform group-hover:scale-110" />
-                Run OCR Pipeline
+                {existingPayment ? 'Run OCR Pipeline' : 'Pay & Generate Report'}
                 {droppedFiles.length > 0 && (
                   <span className="ml-1 bg-cream/20 text-cream text-xs font-bold px-2 py-0.5 rounded-full">
                     {droppedFiles.length}
                   </span>
                 )}
               </button>
-              {droppedFiles.length === 0 && (
+              {droppedFiles.length === 0 ? (
                 <p className="text-xs text-ink/45">Upload at least one document to enable the pipeline.</p>
-              )}
+              ) : !existingPayment ? (
+                <p className="text-xs text-ink/45">A one-time per-report payment is required before AI processing begins.</p>
+              ) : null}
             </div>
           </>
         )}
       </div>
+      <PaymentChrome />
+      </>
     )
   }
 
   return (
+    <>
     <div className="min-h-full px-6 py-10 max-w-4xl mx-auto w-full bg-cream">
       <CaseHeader />
 
@@ -894,5 +976,26 @@ export default function CaseWorkspacePage() {
         )}
       </div>
     </div>
+    <PaymentChrome />
+    </>
   )
+}
+
+/** Adapt a tsr_payments row to the shared InvoiceView Payment shape. */
+function mapTsrPaymentToInvoice(p: TsrPaymentRecord): InvoicePayment {
+  return {
+    id: p.id,
+    order_id: p.order_id,
+    user_id: p.user_id,
+    amount_inr: p.amount_inr,
+    amount: p.amount_inr,
+    status: p.status,
+    currency: p.currency,
+    user_email: p.user_email ?? undefined,
+    user_phone: p.user_phone ?? undefined,
+    cashfree_payment_id: p.cashfree_payment_id ?? undefined,
+    cashfree_order_id: p.order_id,
+    created_at: p.created_at,
+    paid_at: p.paid_at ?? undefined,
+  }
 }

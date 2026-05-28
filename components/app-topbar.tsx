@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useCurrentUser, getDisplayName } from "@/hooks/use-current-user"
 import { useNetworkAvatar } from "@/hooks/use-network-avatar"
+import { useIsSuperAdmin } from "@/hooks/use-is-super-admin"
 import { logoutUsecase } from "@/modules/auth/usecase/auth.usecase"
 import {
   LayoutGrid,
@@ -28,6 +29,7 @@ import {
   BellIcon,
   LogOutIcon,
   Sparkles,
+  ShieldCheck,
 } from "lucide-react"
 import { useTour } from "@/components/tour/TourProvider"
 import { TOURS } from "@/lib/tour/tour-config"
@@ -93,6 +95,14 @@ const NAV_ITEMS: NavItem[] = [
   },
 ]
 
+/** Injected at render time when the signed-in user is a super_admin. */
+const SUPER_ADMIN_NAV_ITEM: NavItem = {
+  title: "Super Admin",
+  url: "/dashboard/super-admin",
+  icon: <ShieldCheck className="size-4" strokeWidth={1.75} />,
+  match: (p) => p.startsWith("/dashboard/super-admin"),
+}
+
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return "U"
@@ -103,11 +113,20 @@ function getInitials(name: string): string {
 export function AppTopBar() {
   const pathname = usePathname()
   const currentUser = useCurrentUser()
+  const isSuperAdmin = useIsSuperAdmin()
   const { start: startTour } = useTour()
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const [hoveredIdx, setHoveredIdx] = React.useState<number | null>(null)
   const navRef = React.useRef<HTMLElement>(null)
   const itemRefs = React.useRef<(HTMLAnchorElement | null)[]>([])
+
+  // Inject the super-admin nav item only when the JWT says the user is one.
+  // Server-side access control still gates the dashboard via 403, so this is
+  // purely about which links to show in the topbar.
+  const navItems = React.useMemo<NavItem[]>(
+    () => (isSuperAdmin ? [...NAV_ITEMS, SUPER_ADMIN_NAV_ITEM] : NAV_ITEMS),
+    [isSuperAdmin],
+  )
   const [pillStyle, setPillStyle] = React.useState<{ left: number; width: number; opacity: number }>(
     { left: 0, width: 0, opacity: 0 }
   )
@@ -125,7 +144,7 @@ export function AppTopBar() {
   const initials = getInitials(userName)
   const avatarUrl = useNetworkAvatar()
 
-  const activeIdx = NAV_ITEMS.findIndex((item) => item.match(pathname))
+  const activeIdx = navItems.findIndex((item) => item.match(pathname))
 
   // Animated active pill — measures the active link and slides under it
   React.useLayoutEffect(() => {
@@ -217,11 +236,11 @@ export function AppTopBar() {
             }}
           />
 
-          {NAV_ITEMS.map((item, idx) => {
+          {navItems.map((item, idx) => {
             const active = idx === activeIdx
             // Slug used by the tour to target individual nav items
             const tourSlug =
-              item.title.toLowerCase().split(" ")[0] // "research", "dashboard", "case", "matters"
+              item.title.toLowerCase().split(" ")[0] // "research", "dashboard", "case", "matters", "super"
             return (
               <Link
                 key={item.url}
@@ -424,7 +443,7 @@ export function AppTopBar() {
       {/* Mobile nav drawer */}
       {mobileOpen && (
         <div className="md:hidden absolute left-0 right-0 top-full bg-white border-b border-[#f0e6e8] shadow-[0_8px_24px_rgba(122,31,43,0.08)] py-2 px-3 z-40 animate-in fade-in slide-in-from-top-2 duration-200">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = item.match(pathname)
             return (
               <Link

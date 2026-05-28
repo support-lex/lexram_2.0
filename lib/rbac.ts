@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase as lexramSupabase } from "@/lib/supabase/client";
 
 export type Role = "super_admin" | "admin" | "member" | "no_role";
@@ -71,47 +71,87 @@ export function useRoleContext(): RoleContext {
   const [state, setState] = useState<Omit<RoleContext, "refresh">>({
     role: "no_role", loading: true, user_id: null, email: null, org: null, membership: null,
   });
+  // `inflight` — guards against concurrent load() calls. Without it,
+  // onAuthStateChange (which fires multiple times during normal session
+  // refresh: INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED, ...)
+  // re-triggered load() while a previous load() was still mid-flight,
+  // flipping loading=true via the spread setState and never resetting it.
+  // Result: a permanently-stuck spinner with stale role/org populated —
+  // exactly what we saw on the case page after a tab switch.
+  const inflight = useRef(false);
+  // `mounted` — every setState in the async path is gated on this. Prevents
+  // "setState on unmounted component" warnings and stale writes when the
+  // user navigates away mid-load.
+  const mounted = useRef(true);
 
   const load = async () => {
-    setState((s) => ({ ...s, loading: true }));
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session?.user) {
-      setState({ role: "no_role", loading: false, user_id: null, email: null, org: null, membership: null });
-      return;
+    if (inflight.current) return;
+    inflight.current = true;
+    try {
+      if (!mounted.current) return;
+      setState((s) => ({ ...s, loading: true }));
+
+      const { data: { session } } = await sb.auth.getSession();
+      if (!mounted.current) return;
+      if (!session?.user) {
+        setState({ role: "no_role", loading: false, user_id: null, email: null, org: null, membership: null });
+        return;
+      }
+      const user = session.user;
+      const isSuper = (user.app_metadata as Record<string, unknown>)?.role === "super_admin";
+
+      const { data: m } = await sb
+        .from("organization_members")
+        .select("role, status, org_id, organizations:org_id ( id, name, slug, plan, status, seat_limit, admin_email, admin_name, account_type, created_at )")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!mounted.current) return;
+
+      type Row = {
+        role: MemberRole; status: MemberStatus; org_id: string;
+        organizations: Organization | Organization[] | null;
+      };
+      const row = m as Row | null;
+      const orgRaw = row?.organizations ?? null;
+      const org: Organization | null = Array.isArray(orgRaw) ? (orgRaw[0] ?? null) : orgRaw;
+
+      const role: Role = isSuper
+        ? "super_admin"
+        : row ? (row.role === "admin" ? "admin" : "member") : "no_role";
+
+      setState({
+        role, loading: false,
+        user_id: user.id, email: user.email ?? null,
+        org, membership: row ? { role: row.role, status: row.status } : null,
+      });
+    } catch (err) {
+      console.warn("[useRoleContext] load failed:", err);
+      if (mounted.current) setState((s) => ({ ...s, loading: false }));
+    } finally {
+      inflight.current = false;
     }
-    const user = session.user;
-    const isSuper = (user.app_metadata as Record<string, unknown>)?.role === "super_admin";
-
-    const { data: m } = await sb
-      .from("organization_members")
-      .select("role, status, org_id, organizations:org_id ( id, name, slug, plan, status, seat_limit, admin_email, admin_name, account_type, created_at )")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    type Row = {
-      role: MemberRole; status: MemberStatus; org_id: string;
-      organizations: Organization | Organization[] | null;
-    };
-    const row = m as Row | null;
-    const orgRaw = row?.organizations ?? null;
-    const org: Organization | null = Array.isArray(orgRaw) ? (orgRaw[0] ?? null) : orgRaw;
-
-    const role: Role = isSuper
-      ? "super_admin"
-      : row ? (row.role === "admin" ? "admin" : "member") : "no_role";
-
-    setState({
-      role, loading: false,
-      user_id: user.id, email: user.email ?? null,
-      org, membership: row ? { role: row.role, status: row.status } : null,
-    });
   };
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => { if (!cancelled) await load(); })();
-    const { data: { subscription } } = sb.auth.onAuthStateChange(() => { if (!cancelled) load(); });
-    return () => { cancelled = true; subscription.unsubscribe(); };
+    mounted.current = true;
+    load();
+    // Only re-load on SIGNED_OUT and USER_UPDATED. We deliberately skip
+    // SIGNED_IN — Supabase emits it on every page mount when a cached
+    // session exists, not only on a real sign-in. Re-loading on it caused a
+    // second concurrent load() that hung waiting on Supabase's auth-token
+    // Web Lock (held by other supabase.auth.getUser() callers elsewhere in
+    // the app), which left ctx.loading=true forever with stale role/org
+    // populated — that's the "Stuck loading your workspace" diagnostic.
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event) => {
+      if (!mounted.current) return;
+      if (event === "SIGNED_OUT" || event === "USER_UPDATED") {
+        load();
+      }
+    });
+    return () => {
+      mounted.current = false;
+      subscription.unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -253,15 +293,22 @@ export function useMyOrgRequest(enabled: boolean) {
     // when `enabled` flips false → true (e.g. once useRoleContext settles).
     setState((s) => ({ ...s, loading: true }));
     (async () => {
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session?.user) { if (!cancelled) setState({ request: null, loading: false }); return; }
-      const { data } = await sb
-        .from("tsr_org_requests")
-        .select("*")
-        .eq("requested_by", session.user.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (!cancelled) setState({ request: (data?.[0] as OrgRequest | undefined) ?? null, loading: false });
+      try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (cancelled) return;
+        if (!session?.user) { setState({ request: null, loading: false }); return; }
+        const { data } = await sb
+          .from("tsr_org_requests")
+          .select("*")
+          .eq("requested_by", session.user.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (cancelled) return;
+        setState({ request: (data?.[0] as OrgRequest | undefined) ?? null, loading: false });
+      } catch (err) {
+        console.warn("[useMyOrgRequest] load failed:", err);
+        if (!cancelled) setState({ request: null, loading: false });
+      }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -238,27 +238,36 @@ export default function CaseWorkspacePage() {
   }, [id])
 
   // Look up the latest successful payment for this case + the signed-in user's
-  // identity, both needed for the invoice + payment-gate logic.
+  // identity for the invoice. Uses getSession() (cache-only, no Web Lock) to
+  // avoid colliding with the dashboard layout's getUser() — two concurrent
+  // getUser() calls race the auth-token lock and one rejects with "Lock was
+  // released because another request stole it", which unmounts the page.
   useEffect(() => {
     if (!id) return
     let mounted = true
     ;(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!mounted) return
-      const meta = (user?.user_metadata ?? {}) as Record<string, string | undefined>
-      const fullName = [meta.first_name, meta.last_name].filter(Boolean).join(' ').trim()
-      setUserEmail(user?.email ?? '')
-      setUserFullName(fullName)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!mounted) return
+        const user = session?.user
+        const meta = (user?.user_metadata ?? {}) as Record<string, string | undefined>
+        const fullName = [meta.first_name, meta.last_name].filter(Boolean).join(' ').trim()
+        setUserEmail(user?.email ?? '')
+        setUserFullName(fullName)
 
-      const { data: payRow } = await supabase
-        .from('tsr_payments')
-        .select('*')
-        .eq('case_id', id)
-        .eq('status', 'success')
-        .order('paid_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      if (mounted && payRow) setExistingPayment(payRow as TsrPaymentRecord)
+        const { data: payRow } = await supabase
+          .from('tsr_payments')
+          .select('*')
+          .eq('case_id', id)
+          .eq('status', 'success')
+          .order('paid_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (mounted && payRow) setExistingPayment(payRow as TsrPaymentRecord)
+      } catch (err) {
+        // Defensive: a transient supabase lock/auth hiccup must not blank the page.
+        console.warn('[tsr/[id]] payment+user lookup failed:', err)
+      }
     })()
     return () => { mounted = false }
   }, [id])

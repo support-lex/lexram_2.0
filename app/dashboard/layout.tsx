@@ -34,12 +34,21 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
   // Client-side auth check via Supabase. Middleware enforces this server-side
   // already; this just toggles the in-page UI (sidebar / bottom sheet).
+  //
+  // Uses getSession() (cache-only) instead of getUser() (server-verified) so
+  // it does NOT acquire Supabase's auth-token Web Lock. getUser() here used
+  // to serialise against every other getSession()/getUser() in the dashboard
+  // subtree, and a held lock could starve hooks like useRoleContext mid-load,
+  // leaving them stuck on loading=true. The middleware (server-side) is
+  // already the authoritative auth gate, so trusting the cached JWT here is
+  // safe — if the token is invalid, the next server request will redirect.
   useEffect(() => {
     const sb = supabase();
     const isPublicPage = isPublicDashboardPath(pathname);
 
-    sb.auth.getUser().then(async ({ data }) => {
-      const signedIn = !!data.user;
+    sb.auth.getSession().then(async ({ data }) => {
+      const user = data.session?.user ?? null;
+      const signedIn = !!user;
       if (!signedIn && !isPublicPage) {
         router.replace(`/sign-in?redirect=${encodeURIComponent(pathname)}`);
         return;
@@ -47,7 +56,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
       // Hard verification gate: phone OTP is the ONLY signal that counts.
       // If the session exists but the phone is not confirmed, kick the user
       // back to /sign-in so they can finish OTP verification there.
-      if (signedIn && !data.user!.phone_confirmed_at && !isPublicPage) {
+      if (signedIn && !user!.phone_confirmed_at && !isPublicPage) {
         await sb.auth.signOut();
         router.replace('/sign-in?reason=unverified');
         return;

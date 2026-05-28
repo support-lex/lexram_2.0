@@ -36,12 +36,17 @@ interface CreateOrderResponse {
   payment_session_id: string;
   amount_inr:         number;
   currency:           string;
+  /** Set true by /api/tsr/payments when NEXT_PUBLIC_CASHFREE_MODE=sandbox — the
+   *  row is already marked 'success' server-side, so the client must skip the
+   *  Cashfree checkout step and treat the order as immediately paid. */
+  sandbox?:           boolean;
 }
 
 export default function TsrPaymentModal({ open, caseId, caseName, onSuccess, onClose }: TsrPaymentModalProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [amount, setAmount] = useState<number | null>(null);
+  const isSandbox = process.env.NEXT_PUBLIC_CASHFREE_MODE === "sandbox";
 
   // Price is driven by the user's org account_type — individual ₹1,000, enterprise ₹500.
   // We resolve it as soon as the modal opens so the "Amount due" reads accurately
@@ -58,21 +63,30 @@ export default function TsrPaymentModal({ open, caseId, caseName, onSuccess, onC
     }
     let cancelled = false;
     (async () => {
-      const sb = supabase();
-      const { data: { user } } = await sb.auth.getUser();
-      if (!user) return;
-      const { data: m } = await sb
-        .from("organization_members")
-        .select("organizations:org_id ( account_type )")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      type OrgLite = { account_type: "individual" | "organization" };
-      const orgRaw = (m as { organizations: OrgLite | OrgLite[] | null } | null)?.organizations ?? null;
-      const org = Array.isArray(orgRaw) ? orgRaw[0] ?? null : orgRaw;
-      if (cancelled) return;
-      // Default to the enterprise price for super_admins or any unexpected state
-      // — keeps the UI honest until the server returns the authoritative figure.
-      setAmount(org?.account_type === "individual" ? 1000 : 500);
+      try {
+        const sb = supabase();
+        // getSession() reads from localStorage cache — does NOT acquire the
+        // auth-token Web Lock, so this won't race the dashboard layout's
+        // getUser() and crash the case page with "Lock was stolen".
+        const { data: { session } } = await sb.auth.getSession();
+        const user = session?.user;
+        if (!user) return;
+        const { data: m } = await sb
+          .from("organization_members")
+          .select("organizations:org_id ( account_type )")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        type OrgLite = { account_type: "individual" | "organization" };
+        const orgRaw = (m as { organizations: OrgLite | OrgLite[] | null } | null)?.organizations ?? null;
+        const org = Array.isArray(orgRaw) ? orgRaw[0] ?? null : orgRaw;
+        if (cancelled) return;
+        // Default to the enterprise price for super_admins or any unexpected state
+        // — keeps the UI honest until the server returns the authoritative figure.
+        setAmount(org?.account_type === "individual" ? 1000 : 500);
+      } catch (err) {
+        // Modal price lookup must never crash the host page.
+        console.warn("[TsrPaymentModal] price lookup failed:", err);
+      }
     })();
     return () => { cancelled = true; };
   }, [open]);
@@ -104,7 +118,26 @@ export default function TsrPaymentModal({ open, caseId, caseName, onSuccess, onC
       const order = (await orderRes.json()) as CreateOrderResponse;
       setAmount(order.amount_inr);
 
-      // Open Cashfree checkout.
+      // Sandbox path: server already wrote a row with status='success'. Skip
+      // Cashfree entirely and just fetch the final record so the parent can
+      // render the invoice + start the pipeline.
+      if (order.sandbox) {
+        const confirmRes = await fetch(`/api/tsr/payments/${order.payment_id}/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({}),
+        });
+        if (!confirmRes.ok) {
+          const err = await confirmRes.json().catch(() => ({ error: `HTTP ${confirmRes.status}` }));
+          throw new Error(err.error ?? `HTTP ${confirmRes.status}`);
+        }
+        const payment = (await confirmRes.json()) as TsrPaymentRecord;
+        onSuccess(payment);
+        return;
+      }
+
+      // Production path: open Cashfree checkout with the minted session.
       const { load } = await import("@cashfreepayments/cashfree-js");
       const cashfree = await load({ mode: "production" });
       const result = await (cashfree as unknown as {
@@ -191,13 +224,22 @@ export default function TsrPaymentModal({ open, caseId, caseName, onSuccess, onC
                       <Sparkles className="w-2.5 h-2.5" /> Generate Report
                     </div>
                     <h2 className="font-display text-xl font-bold text-maroon mt-1 leading-tight truncate">
-                      Pay to generate scrutiny report
+                      {isSandbox ? "Test payment to generate scrutiny report" : "Pay to generate scrutiny report"}
                     </h2>
                     {caseName && (
                       <p className="text-xs text-ink/60 mt-0.5 truncate">For case: <strong className="text-ink/85">{caseName}</strong></p>
                     )}
                   </div>
                 </div>
+
+                {isSandbox && (
+                  <div className="mb-5 flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200">
+                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800">
+                      <strong>Sandbox mode.</strong> No real money will be charged. Payment is simulated server-side and the row is recorded with a <code className="px-1 bg-amber-100 rounded">test_</code> order id.
+                    </p>
+                  </div>
+                )}
 
                 <div className="rounded-2xl border border-maroon/15 bg-cream-soft p-5">
                   <p className="text-[11px] font-bold tracking-[0.2em] uppercase text-rust">Amount due</p>
@@ -239,10 +281,10 @@ export default function TsrPaymentModal({ open, caseId, caseName, onSuccess, onC
                   {busy ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Opening secure checkout…
+                      {isSandbox ? "Simulating payment…" : "Opening secure checkout…"}
                     </>
                   ) : (
-                    <>Pay &amp; Generate Report</>
+                    <>{isSandbox ? "Simulate Payment & Generate Report" : "Pay & Generate Report"}</>
                   )}
                 </button>
 

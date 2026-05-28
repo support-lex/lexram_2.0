@@ -249,6 +249,9 @@ export function useMyOrgRequest(enabled: boolean) {
   useEffect(() => {
     if (!enabled) { setState({ request: null, loading: false }); return; }
     let cancelled = false;
+    // Flip loading=true before the fetch so callers can render a spinner
+    // when `enabled` flips false → true (e.g. once useRoleContext settles).
+    setState((s) => ({ ...s, loading: true }));
     (async () => {
       const { data: { session } } = await sb.auth.getSession();
       if (!session?.user) { if (!cancelled) setState({ request: null, loading: false }); return; }

@@ -32,6 +32,7 @@ let cachedToken: string | null = null;
 let initialFetch: Promise<string | null> | null = null;
 let listenerAttached = false;
 
+<<<<<<< HEAD
 const TOKEN_TIMEOUT_MS = 15_000;
 const FETCH_TIMEOUT_MS = 45_000;
 
@@ -41,6 +42,8 @@ function timeout<T>(ms: number, label: string): Promise<T> {
   );
 }
 
+=======
+>>>>>>> tsr
 /**
  * Returns the current Supabase access token, lazily fetching the session on
  * first call. Subsequent calls return the cached value (no auth lock contention).
@@ -62,7 +65,11 @@ async function getAccessToken(): Promise<string | null> {
       listenerAttached = true;
     }
 
+<<<<<<< HEAD
     const sessionPromise = sb.auth.getSession().then(({ data }) => {
+=======
+    initialFetch = sb.auth.getSession().then(({ data }) => {
+>>>>>>> tsr
       cachedToken = data.session?.access_token ?? null;
       initialFetch = null;
       return cachedToken;
@@ -70,11 +77,14 @@ async function getAccessToken(): Promise<string | null> {
       initialFetch = null;
       return null;
     });
+<<<<<<< HEAD
 
     initialFetch = Promise.race([
       sessionPromise,
       timeout<string | null>(TOKEN_TIMEOUT_MS, "getSession()"),
     ]);
+=======
+>>>>>>> tsr
   }
   return initialFetch;
 }
@@ -88,6 +98,7 @@ export async function tsrApi(path: string, options: RequestInit = {}): Promise<R
       ? `/api/tsr${path}`                // browser: proxy through Next.js
       : `${API_BASE}${path}`;            // server: direct call
 
+<<<<<<< HEAD
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -104,6 +115,16 @@ export async function tsrApi(path: string, options: RequestInit = {}): Promise<R
   } finally {
     clearTimeout(timer);
   }
+=======
+  return fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+  });
+>>>>>>> tsr
 }
 
 /** Throw on non-2xx, otherwise return parsed JSON. */

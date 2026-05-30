@@ -13,11 +13,15 @@ export function useCurrentUser(): StoredUser | null {
 
   useEffect(() => {
     const sb = supabase();
+<<<<<<< HEAD
     // getSession() is cache-only — it does NOT acquire Supabase's auth-token
     // Web Lock. getUser() does, and on the dashboard subtree (where this
     // hook mounts via the topbar on every route) it raced other callers and
     // could stall siblings like useRoleContext for the full lock timeout.
     sb.auth.getSession().then(({ data }) => setUser(userFromSupabase(data.session?.user ?? null)));
+=======
+    sb.auth.getUser().then(({ data }) => setUser(userFromSupabase(data.user)));
+>>>>>>> tsr
 
     const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
       setUser(userFromSupabase(session?.user ?? null));

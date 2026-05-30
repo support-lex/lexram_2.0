@@ -6,4 +6,11 @@ coverage/
 .env*
 !.env.example
 
+<<<<<<< HEAD
+=======
+# Build artifacts
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+>>>>>>> tsr
 .vercel

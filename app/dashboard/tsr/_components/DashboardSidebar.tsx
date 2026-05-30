@@ -5,7 +5,11 @@ import { useRouter, usePathname } from 'next/navigation'
 import {
   Loader2, FolderOpen,
   ChevronRight,
+<<<<<<< HEAD
   LayoutList, Users, Crown, Inbox,
+=======
+  LayoutList, Users, Crown, Inbox, BarChart3,
+>>>>>>> tsr
 } from 'lucide-react'
 import { useRoleContext } from '@/lib/rbac'
 import Link from 'next/link'
@@ -160,23 +164,47 @@ export default function DashboardSidebar() {
             </Link>
           )}
 
+<<<<<<< HEAD
           {/* Super admin: organisations management + requests inbox */}
+=======
+          {/* Super admin: organisations management + requests inbox + dashboard */}
+>>>>>>> tsr
           {role === 'super_admin' && (
             <>
               <Link
                 href="/dashboard/tsr/admin"
                 className={`group flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mb-1 ${
+<<<<<<< HEAD
                   pathname === '/dashboard/tsr/admin' || (pathname.startsWith('/dashboard/tsr/admin/') && !pathname.startsWith('/dashboard/tsr/admin/requests'))
+=======
+                  pathname === '/dashboard/tsr/admin' ||
+                  (pathname.startsWith('/dashboard/tsr/admin/') &&
+                    !pathname.startsWith('/dashboard/tsr/admin/requests') &&
+                    !pathname.startsWith('/dashboard/tsr/admin/dashboard'))
+>>>>>>> tsr
                     ? 'bg-maroon text-cream shadow-[0_10px_24px_-14px_rgba(104,3,24,0.55)]'
                     : 'text-ink/80 hover:bg-maroon/5 hover:text-ink border border-maroon/10'
                 }`}
               >
+<<<<<<< HEAD
                 <Crown className={`w-4 h-4 ${pathname.startsWith('/dashboard/tsr/admin') && !pathname.startsWith('/dashboard/tsr/admin/requests') ? '' : 'text-rust'}`} />
+=======
+                <Crown className={`w-4 h-4 ${
+                  pathname.startsWith('/dashboard/tsr/admin') &&
+                  !pathname.startsWith('/dashboard/tsr/admin/requests') &&
+                  !pathname.startsWith('/dashboard/tsr/admin/dashboard')
+                    ? '' : 'text-rust'}`}
+                />
+>>>>>>> tsr
                 <span>Organisations</span>
               </Link>
               <Link
                 href="/dashboard/tsr/admin/requests"
+<<<<<<< HEAD
                 className={`group flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mb-2 ${
+=======
+                className={`group flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mb-1 ${
+>>>>>>> tsr
                   pathname.startsWith('/dashboard/tsr/admin/requests')
                     ? 'bg-maroon text-cream shadow-[0_10px_24px_-14px_rgba(104,3,24,0.55)]'
                     : 'text-ink/80 hover:bg-maroon/5 hover:text-ink border border-maroon/10'
@@ -185,6 +213,20 @@ export default function DashboardSidebar() {
                 <Inbox className={`w-4 h-4 ${pathname.startsWith('/dashboard/tsr/admin/requests') ? '' : 'text-rust'}`} />
                 <span>Requests</span>
               </Link>
+<<<<<<< HEAD
+=======
+              <Link
+                href="/dashboard/tsr/admin/dashboard"
+                className={`group flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mb-2 ${
+                  pathname.startsWith('/dashboard/tsr/admin/dashboard')
+                    ? 'bg-maroon text-cream shadow-[0_10px_24px_-14px_rgba(104,3,24,0.55)]'
+                    : 'text-ink/80 hover:bg-maroon/5 hover:text-ink border border-maroon/10'
+                }`}
+              >
+                <BarChart3 className={`w-4 h-4 ${pathname.startsWith('/dashboard/tsr/admin/dashboard') ? '' : 'text-rust'}`} />
+                <span>Dashboard</span>
+              </Link>
+>>>>>>> tsr
             </>
           )}
 

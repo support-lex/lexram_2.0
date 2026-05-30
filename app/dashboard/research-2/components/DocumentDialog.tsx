@@ -63,6 +63,10 @@ interface DocumentDialogProps {
 }
 
 const ACCEPT = ".pdf,.txt,.md,.doc,.docx,.xls,.xlsx";
+<<<<<<< HEAD
+=======
+const MAX_BYTES = 50 * 1024 * 1024;
+>>>>>>> tsr
 
 // ─── File type → icon + tint ────────────────────────────────────────────
 type TypeMeta = { Icon: typeof FileText; iconClass: string; wellClass: string };
@@ -316,6 +320,13 @@ export default function DocumentDialog({
       setError(null);
       let successCount = 0;
       for (const file of fileArray) {
+<<<<<<< HEAD
+=======
+        if (file.size > MAX_BYTES) {
+          setError(`${file.name} exceeds the 50 MB upload limit.`);
+          continue;
+        }
+>>>>>>> tsr
         try {
           await documentRepository.upload(targetCaseId, file);
           successCount += 1;
@@ -468,7 +479,11 @@ export default function DocumentDialog({
               {dragActive ? "Release to upload" : "Drag and drop case files"}
             </p>
             <p className="text-[12px] text-slate-500 mt-1">
+<<<<<<< HEAD
               PDF, DOCX, or Excel
+=======
+              PDF, DOCX, or Excel up to 50MB
+>>>>>>> tsr
             </p>
             <button
               type="button"

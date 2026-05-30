@@ -1,5 +1,6 @@
 "use client";
 
+<<<<<<< HEAD
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
@@ -21,10 +22,19 @@ import { useMyOrgRequest, useRoleContext } from "@/lib/rbac";
 
 const STUCK_AFTER_MS = 8000;
 
+=======
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import DashboardSidebar from "./_components/DashboardSidebar";
+import { useMyOrgRequest, useRoleContext } from "@/lib/rbac";
+
+>>>>>>> tsr
 export default function TsrLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const ctx = useRoleContext();
+<<<<<<< HEAD
   const [stuck, setStuck] = useState(false);
 
   const isOnboardingChoice = pathname === "/dashboard/tsr/onboarding";
@@ -73,6 +83,28 @@ export default function TsrLayout({ children }: { children: React.ReactNode }) {
 
   // Onboarding pages: render full-bleed (no sidebar).
   if (isAnyOnboarding) {
+=======
+
+  // Anything under /dashboard/tsr/onboarding (and its sub-pages) is allowed to render.
+  const isOnboardingRoute = pathname.startsWith("/dashboard/tsr/onboarding");
+  const { request, loading: reqLoading } = useMyOrgRequest(!ctx.loading && !isOnboardingRoute);
+
+  useEffect(() => {
+    if (isOnboardingRoute) return;
+    if (ctx.loading || reqLoading) return;
+    // User already has an org — let them through
+    if (ctx.role !== "no_role") return;
+    // No org yet: pending enterprise request or fresh user
+    if (request && request.status !== "approved") {
+      router.replace("/dashboard/tsr/onboarding/pending");
+    } else {
+      router.replace("/dashboard/tsr/onboarding");
+    }
+  }, [isOnboardingRoute, ctx.loading, reqLoading, ctx.role, request, router]);
+
+  // Onboarding routes render without the sidebar so the choice screen stands alone.
+  if (isOnboardingRoute) {
+>>>>>>> tsr
     return (
       <main className="flex-1 overflow-auto" style={{ backgroundColor: "var(--bg-primary)" }}>
         {children}
@@ -80,6 +112,7 @@ export default function TsrLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
+<<<<<<< HEAD
   // Stuck watchdog — exposes the loading state instead of an infinite spinner.
   if (stuck) {
     return (
@@ -122,6 +155,10 @@ user_id:        ${ctx.user_id ?? "—"}`}
 
   // Spinner while we figure out where the user belongs.
   if (ctx.loading || reqLoading || !hasMembership) {
+=======
+  // Non-onboarding TSR routes show a spinner while the redirect is in flight.
+  if (ctx.loading || reqLoading) {
+>>>>>>> tsr
     return (
       <div className="flex-1 grid place-items-center min-h-full" style={{ backgroundColor: "var(--bg-primary)" }}>
         <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--accent)" }} />

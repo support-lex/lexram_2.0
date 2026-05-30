@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { supabase as lexramSupabase } from "@/lib/supabase/client";
 
 export type Role = "super_admin" | "admin" | "member" | "no_role";
@@ -64,98 +64,187 @@ export interface RoleContext {
   refresh:    () => Promise<void>;
 }
 
-// ── Role hook ───────────────────────────────────────────────────────────────
+// ── Role hook — MODULE-LEVEL shared store ──────────────────────────────────
+//
+// Why module-level?
+//   useRoleContext is called by several components that mount together on a
+//   single TSR page (the TSR layout, DashboardSidebar, plus admin/team pages
+//   that compose with the layout). The previous implementation gave each
+//   caller its OWN useState + its OWN supabase query, so the same
+//   organization_members JOIN ran 2–3 times in parallel on every TSR navigation
+//   — adding several seconds of redundant network latency and triggering
+//   Supabase auth-lock contention.
+//
+//   The store below holds one shared snapshot. All useRoleContext callers
+//   subscribe via useSyncExternalStore and re-render together; load() runs at
+//   most ONCE in flight regardless of caller count.
+//
+//   localStorage stale-while-revalidate: the last successful snapshot is
+//   persisted under ROLE_CACHE_KEY. On any subsequent visit we hydrate
+//   instantly from cache (loading=false from the first paint) and revalidate
+//   in the background. The cache is cleared on SIGNED_OUT so user A's data
+//   never leaks to user B.
 
-export function useRoleContext(): RoleContext {
-  const sb = lexramSupabase();
-  const [state, setState] = useState<Omit<RoleContext, "refresh">>({
-    role: "no_role", loading: true, user_id: null, email: null, org: null, membership: null,
-  });
-  // `inflight` — guards against concurrent load() calls. Without it,
-  // onAuthStateChange (which fires multiple times during normal session
-  // refresh: INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED, ...)
-  // re-triggered load() while a previous load() was still mid-flight,
-  // flipping loading=true via the spread setState and never resetting it.
-  // Result: a permanently-stuck spinner with stale role/org populated —
-  // exactly what we saw on the case page after a tab switch.
-  const inflight = useRef(false);
-  // `mounted` — every setState in the async path is gated on this. Prevents
-  // "setState on unmounted component" warnings and stale writes when the
-  // user navigates away mid-load.
-  const mounted = useRef(true);
+const ROLE_CACHE_KEY = "lexram:role-ctx:v1";
 
-  const load = async () => {
-    if (inflight.current) return;
-    inflight.current = true;
-    try {
-      if (!mounted.current) return;
-      setState((s) => ({ ...s, loading: true }));
+type RoleSnapshot = Omit<RoleContext, "refresh">;
 
-      const { data: { session } } = await sb.auth.getSession();
-      if (!mounted.current) return;
-      if (!session?.user) {
-        setState({ role: "no_role", loading: false, user_id: null, email: null, org: null, membership: null });
+const initialSnapshot: RoleSnapshot = {
+  role: "no_role", loading: true, user_id: null, email: null, org: null, membership: null,
+};
+
+function readRoleCache(): RoleSnapshot | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(ROLE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { ts: number; snap: RoleSnapshot };
+    // Discard cache older than 24h — guards against schema drift.
+    if (!parsed.ts || Date.now() - parsed.ts > 24 * 60 * 60 * 1000) return null;
+    return { ...parsed.snap, loading: false };
+  } catch {
+    return null;
+  }
+}
+
+function writeRoleCache(snap: RoleSnapshot) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      ROLE_CACHE_KEY,
+      JSON.stringify({ ts: Date.now(), snap: { ...snap, loading: false } }),
+    );
+  } catch { /* quota / SSR — ignore */ }
+}
+
+function clearRoleCache() {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.removeItem(ROLE_CACHE_KEY); } catch { /* ignore */ }
+}
+
+const roleStore = {
+  state: (typeof window === "undefined" ? null : readRoleCache()) ?? initialSnapshot,
+  listeners: new Set<() => void>(),
+  authSubscribed: false,
+  inflight: null as Promise<void> | null,
+  initialised: false,
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
+  },
+
+  getSnapshot(): RoleSnapshot {
+    return this.state;
+  },
+
+  setState(next: RoleSnapshot) {
+    this.state = next;
+    this.listeners.forEach((l) => l());
+  },
+
+  async load(): Promise<void> {
+    if (this.inflight) return this.inflight;
+    const sb = lexramSupabase();
+    this.inflight = (async () => {
+      try {
+        // Keep showing the cached snapshot while we revalidate — only flip
+        // loading=true when we have *nothing* to show.
+        if (this.state === initialSnapshot) {
+          this.setState({ ...this.state, loading: true });
+        }
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session?.user) {
+          const empty: RoleSnapshot = {
+            role: "no_role", loading: false, user_id: null, email: null, org: null, membership: null,
+          };
+          this.setState(empty);
+          clearRoleCache();
+          return;
+        }
+        const user = session.user;
+        const isSuper = (user.app_metadata as Record<string, unknown>)?.role === "super_admin";
+
+        const { data: m } = await sb
+          .from("organization_members")
+          .select("role, status, org_id, organizations:org_id ( id, name, slug, plan, status, seat_limit, admin_email, admin_name, account_type, created_at )")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        type Row = {
+          role: MemberRole; status: MemberStatus; org_id: string;
+          organizations: Organization | Organization[] | null;
+        };
+        const row = m as Row | null;
+        const orgRaw = row?.organizations ?? null;
+        const org: Organization | null = Array.isArray(orgRaw) ? (orgRaw[0] ?? null) : orgRaw;
+        const role: Role = isSuper
+          ? "super_admin"
+          : row ? (row.role === "admin" ? "admin" : "member") : "no_role";
+
+        const next: RoleSnapshot = {
+          role, loading: false,
+          user_id: user.id, email: user.email ?? null,
+          org, membership: row ? { role: row.role, status: row.status } : null,
+        };
+        this.setState(next);
+        writeRoleCache(next);
+      } catch (err) {
+        console.warn("[roleStore] load failed:", err);
+        // Don't strand the UI in loading state — show whatever cache we have.
+        this.setState({ ...this.state, loading: false });
+      } finally {
+        this.inflight = null;
+      }
+    })();
+    return this.inflight;
+  },
+
+  ensureAuthSubscription() {
+    if (this.authSubscribed || typeof window === "undefined") return;
+    this.authSubscribed = true;
+    const sb = lexramSupabase();
+    sb.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        clearRoleCache();
+        this.setState({
+          role: "no_role", loading: false, user_id: null, email: null, org: null, membership: null,
+        });
         return;
       }
-      const user = session.user;
-      const isSuper = (user.app_metadata as Record<string, unknown>)?.role === "super_admin";
-
-      const { data: m } = await sb
-        .from("organization_members")
-        .select("role, status, org_id, organizations:org_id ( id, name, slug, plan, status, seat_limit, admin_email, admin_name, account_type, created_at )")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (!mounted.current) return;
-
-      type Row = {
-        role: MemberRole; status: MemberStatus; org_id: string;
-        organizations: Organization | Organization[] | null;
-      };
-      const row = m as Row | null;
-      const orgRaw = row?.organizations ?? null;
-      const org: Organization | null = Array.isArray(orgRaw) ? (orgRaw[0] ?? null) : orgRaw;
-
-      const role: Role = isSuper
-        ? "super_admin"
-        : row ? (row.role === "admin" ? "admin" : "member") : "no_role";
-
-      setState({
-        role, loading: false,
-        user_id: user.id, email: user.email ?? null,
-        org, membership: row ? { role: row.role, status: row.status } : null,
-      });
-    } catch (err) {
-      console.warn("[useRoleContext] load failed:", err);
-      if (mounted.current) setState((s) => ({ ...s, loading: false }));
-    } finally {
-      inflight.current = false;
-    }
-  };
-
-  useEffect(() => {
-    mounted.current = true;
-    load();
-    // Only re-load on SIGNED_OUT and USER_UPDATED. We deliberately skip
-    // SIGNED_IN — Supabase emits it on every page mount when a cached
-    // session exists, not only on a real sign-in. Re-loading on it caused a
-    // second concurrent load() that hung waiting on Supabase's auth-token
-    // Web Lock (held by other supabase.auth.getUser() callers elsewhere in
-    // the app), which left ctx.loading=true forever with stale role/org
-    // populated — that's the "Stuck loading your workspace" diagnostic.
-    const { data: { subscription } } = sb.auth.onAuthStateChange((event) => {
-      if (!mounted.current) return;
-      if (event === "SIGNED_OUT" || event === "USER_UPDATED") {
-        load();
+      if (event === "USER_UPDATED") {
+        this.load();
       }
     });
-    return () => {
-      mounted.current = false;
-      subscription.unsubscribe();
-    };
+  },
+};
+
+// SSR snapshot — useSyncExternalStore requires a stable reference per render.
+function getServerSnapshot(): RoleSnapshot {
+  return initialSnapshot;
+}
+
+export function useRoleContext(): RoleContext {
+  const snap = useSyncExternalStore(
+    (cb) => roleStore.subscribe(cb),
+    () => roleStore.getSnapshot(),
+    getServerSnapshot,
+  );
+
+  useEffect(() => {
+    roleStore.ensureAuthSubscription();
+    // Kick off a load if we've never run one. Cached-hydrated snapshots
+    // still trigger a background revalidate so the data stays current.
+    if (!roleStore.initialised) {
+      roleStore.initialised = true;
+      roleStore.load();
+    } else if (snap === initialSnapshot) {
+      roleStore.load();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { ...state, refresh: load };
+  return { ...snap, refresh: () => roleStore.load() };
 }
 
 // ── API helpers ─────────────────────────────────────────────────────────────

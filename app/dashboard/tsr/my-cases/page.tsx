@@ -265,7 +265,7 @@ export default function MyCasesPage() {
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-red-900">Could not load cases</p>
             <p className="text-sm text-red-800/90 mt-0.5 leading-relaxed">
-              {error.includes("Failed to fetch") || error.includes("NetworkError")
+              {error.includes("Failed to fetch") || error.includes("NetworkError") || error.includes("timed out") || error.includes("AbortError")
                 ? "The TSR backend is waking up (Render free tier cold start). This can take 30–60 seconds."
                 : error}
             </p>

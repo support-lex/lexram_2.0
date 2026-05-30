@@ -32,6 +32,15 @@ let cachedToken: string | null = null;
 let initialFetch: Promise<string | null> | null = null;
 let listenerAttached = false;
 
+const TOKEN_TIMEOUT_MS = 15_000;
+const FETCH_TIMEOUT_MS = 45_000;
+
+function timeout<T>(ms: number, label: string): Promise<T> {
+  return new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+  );
+}
+
 /**
  * Returns the current Supabase access token, lazily fetching the session on
  * first call. Subsequent calls return the cached value (no auth lock contention).
@@ -53,7 +62,7 @@ async function getAccessToken(): Promise<string | null> {
       listenerAttached = true;
     }
 
-    initialFetch = sb.auth.getSession().then(({ data }) => {
+    const sessionPromise = sb.auth.getSession().then(({ data }) => {
       cachedToken = data.session?.access_token ?? null;
       initialFetch = null;
       return cachedToken;
@@ -61,6 +70,11 @@ async function getAccessToken(): Promise<string | null> {
       initialFetch = null;
       return null;
     });
+
+    initialFetch = Promise.race([
+      sessionPromise,
+      timeout<string | null>(TOKEN_TIMEOUT_MS, "getSession()"),
+    ]);
   }
   return initialFetch;
 }
@@ -74,14 +88,22 @@ export async function tsrApi(path: string, options: RequestInit = {}): Promise<R
       ? `/api/tsr${path}`                // browser: proxy through Next.js
       : `${API_BASE}${path}`;            // server: direct call
 
-  return fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Throw on non-2xx, otherwise return parsed JSON. */

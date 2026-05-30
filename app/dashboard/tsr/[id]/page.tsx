@@ -11,11 +11,8 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/utils/supabase/client'
-<<<<<<< HEAD
 import TsrPaymentModal, { type TsrPaymentRecord } from '../_components/TsrPaymentModal'
 import InvoiceView, { type Payment as InvoicePayment } from '@/components/InvoiceView'
-=======
->>>>>>> tsr
 
 interface CaseData {
   id:               string
@@ -211,7 +208,6 @@ export default function CaseWorkspacePage() {
 
   const [isDeleting, setIsDeleting] = useState(false)
 
-<<<<<<< HEAD
   // Payment gating for the "Run OCR Pipeline" (= generate scrutiny report) action.
   // - existingPayment: latest successful payment for THIS case (one-time per case).
   // - paymentModalOpen: shows the Cashfree payment modal before kicking off the pipeline.
@@ -222,8 +218,7 @@ export default function CaseWorkspacePage() {
   const [userEmail, setUserEmail] = useState<string>('')
   const [userFullName, setUserFullName] = useState<string>('')
 
-=======
->>>>>>> tsr
+
   useEffect(() => {
     if (!id) return
     let mounted = true
@@ -243,7 +238,6 @@ export default function CaseWorkspacePage() {
     return () => { mounted = false }
   }, [id])
 
-<<<<<<< HEAD
   // Look up the latest successful payment for this case + the signed-in user's
   // identity for the invoice. Uses getSession() (cache-only, no Web Lock) to
   // avoid colliding with the dashboard layout's getUser() — two concurrent
@@ -279,8 +273,7 @@ export default function CaseWorkspacePage() {
     return () => { mounted = false }
   }, [id])
 
-=======
->>>>>>> tsr
+
   useEffect(() => {
     if (!id) return
     const channel = supabase
@@ -390,7 +383,6 @@ export default function CaseWorkspacePage() {
     return res.json()
   }
 
-<<<<<<< HEAD
   // Opens the payment modal unless the user has already paid for this case's
   // report. Already-paid users skip straight to the pipeline.
   const handleStartReport = () => {
@@ -411,8 +403,7 @@ export default function CaseWorkspacePage() {
     handleRunPipeline()
   }
 
-=======
->>>>>>> tsr
+
   const handleRunPipeline = async () => {
     if (droppedFiles.length === 0) return
 
@@ -690,7 +681,6 @@ export default function CaseWorkspacePage() {
     </div>
   )
 
-<<<<<<< HEAD
   const PaymentChrome = () => (
     <>
       <TsrPaymentModal
@@ -712,10 +702,6 @@ export default function CaseWorkspacePage() {
   if (!hasReport) {
     return (
       <>
-=======
-  if (!hasReport) {
-    return (
->>>>>>> tsr
       <div className="min-h-full px-6 py-10 max-w-3xl mx-auto w-full bg-cream">
         <CaseHeader />
 
@@ -848,54 +834,34 @@ export default function CaseWorkspacePage() {
 
             <div className="mt-8 flex flex-col items-center gap-3">
               <button
-<<<<<<< HEAD
                 onClick={handleStartReport}
-=======
-                onClick={handleRunPipeline}
->>>>>>> tsr
                 disabled={droppedFiles.length === 0}
                 className="group flex items-center gap-2.5 px-9 py-4 rounded-2xl text-cream font-semibold text-sm bg-maroon hover:bg-maroon-deep transition-all hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 shadow-[0_18px_40px_-16px_rgba(104,3,24,0.55)]"
               >
                 <Sparkles className="w-4 h-4 transition-transform group-hover:scale-110" />
-<<<<<<< HEAD
                 {existingPayment ? 'Run OCR Pipeline' : 'Pay & Generate Report'}
-=======
-                Run OCR Pipeline
->>>>>>> tsr
                 {droppedFiles.length > 0 && (
                   <span className="ml-1 bg-cream/20 text-cream text-xs font-bold px-2 py-0.5 rounded-full">
                     {droppedFiles.length}
                   </span>
                 )}
               </button>
-<<<<<<< HEAD
               {droppedFiles.length === 0 ? (
                 <p className="text-xs text-ink/45">Upload at least one document to enable the pipeline.</p>
               ) : !existingPayment ? (
                 <p className="text-xs text-ink/45">A one-time per-report payment is required before AI processing begins.</p>
               ) : null}
-=======
-              {droppedFiles.length === 0 && (
-                <p className="text-xs text-ink/45">Upload at least one document to enable the pipeline.</p>
-              )}
->>>>>>> tsr
             </div>
           </>
         )}
       </div>
-<<<<<<< HEAD
       <PaymentChrome />
       </>
-=======
->>>>>>> tsr
     )
   }
 
   return (
-<<<<<<< HEAD
     <>
-=======
->>>>>>> tsr
     <div className="min-h-full px-6 py-10 max-w-4xl mx-auto w-full bg-cream">
       <CaseHeader />
 
@@ -1022,7 +988,6 @@ export default function CaseWorkspacePage() {
         )}
       </div>
     </div>
-<<<<<<< HEAD
     <PaymentChrome />
     </>
   )
@@ -1046,7 +1011,3 @@ function mapTsrPaymentToInvoice(p: TsrPaymentRecord): InvoicePayment {
     paid_at: p.paid_at ?? undefined,
   }
 }
-=======
-  )
-}
->>>>>>> tsr

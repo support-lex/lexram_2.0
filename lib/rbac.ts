@@ -11,11 +11,7 @@
 
 "use client";
 
-<<<<<<< HEAD
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-=======
-import { useEffect, useState } from "react";
->>>>>>> tsr
 import { supabase as lexramSupabase } from "@/lib/supabase/client";
 
 export type Role = "super_admin" | "admin" | "member" | "no_role";
@@ -68,7 +64,6 @@ export interface RoleContext {
   refresh:    () => Promise<void>;
 }
 
-<<<<<<< HEAD
 // ── Role hook — MODULE-LEVEL shared store ──────────────────────────────────
 //
 // Why module-level?
@@ -250,59 +245,6 @@ export function useRoleContext(): RoleContext {
   }, []);
 
   return { ...snap, refresh: () => roleStore.load() };
-=======
-// ── Role hook ───────────────────────────────────────────────────────────────
-
-export function useRoleContext(): RoleContext {
-  const sb = lexramSupabase();
-  const [state, setState] = useState<Omit<RoleContext, "refresh">>({
-    role: "no_role", loading: true, user_id: null, email: null, org: null, membership: null,
-  });
-
-  const load = async () => {
-    setState((s) => ({ ...s, loading: true }));
-    const { data: { user }, error } = await sb.auth.getUser();
-    if (!user || error) {
-      setState({ role: "no_role", loading: false, user_id: null, email: null, org: null, membership: null });
-      return;
-    }
-    const isSuper = (user.app_metadata as Record<string, unknown>)?.role === "super_admin";
-
-    const { data: m } = await sb
-      .from("organization_members")
-      .select("role, status, org_id, organizations:org_id ( id, name, slug, plan, status, seat_limit, admin_email, admin_name, account_type, created_at )")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    type Row = {
-      role: MemberRole; status: MemberStatus; org_id: string;
-      organizations: Organization | Organization[] | null;
-    };
-    const row = m as Row | null;
-    const orgRaw = row?.organizations ?? null;
-    const org: Organization | null = Array.isArray(orgRaw) ? (orgRaw[0] ?? null) : orgRaw;
-
-    const role: Role = isSuper
-      ? "super_admin"
-      : row ? (row.role === "admin" ? "admin" : "member") : "no_role";
-
-    setState({
-      role, loading: false,
-      user_id: user.id, email: user.email ?? null,
-      org, membership: row ? { role: row.role, status: row.status } : null,
-    });
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => { if (!cancelled) await load(); })();
-    const { data: { subscription } } = sb.auth.onAuthStateChange(() => { if (!cancelled) load(); });
-    return () => { cancelled = true; subscription.unsubscribe(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return { ...state, refresh: load };
->>>>>>> tsr
 }
 
 // ── API helpers ─────────────────────────────────────────────────────────────
@@ -440,7 +382,6 @@ export function useMyOrgRequest(enabled: boolean) {
     // when `enabled` flips false → true (e.g. once useRoleContext settles).
     setState((s) => ({ ...s, loading: true }));
     (async () => {
-<<<<<<< HEAD
       try {
         const { data: { session } } = await sb.auth.getSession();
         if (cancelled) return;
@@ -457,17 +398,6 @@ export function useMyOrgRequest(enabled: boolean) {
         console.warn("[useMyOrgRequest] load failed:", err);
         if (!cancelled) setState({ request: null, loading: false });
       }
-=======
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session?.user) { if (!cancelled) setState({ request: null, loading: false }); return; }
-      const { data } = await sb
-        .from("tsr_org_requests")
-        .select("*")
-        .eq("requested_by", session.user.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (!cancelled) setState({ request: (data?.[0] as OrgRequest | undefined) ?? null, loading: false });
->>>>>>> tsr
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

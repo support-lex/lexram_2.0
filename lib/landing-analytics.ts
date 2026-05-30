@@ -12,6 +12,7 @@ export type AnalyticsEvent =
   | "cta_start_trial_click"
   | "cta_login_click"
   | "cta_talk_sales_click"
+  | "cta_see_pricing_click"
   | "contact_form_submit"
   | "faq_toggle"
   | "pricing_plan_hover"

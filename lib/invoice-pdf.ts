@@ -75,13 +75,8 @@ function buildHTML(payment: Payment, userEmail: string, userName: string): strin
 
   /* Header */
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-  .logo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-  .logo-box {
-    width: 36px; height: 36px; border-radius: 10px;
-    background: #111827;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
-  }
+  .logo-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .logo-img { height: 36px; width: auto; display: block; }
   .logo-name { font-family: Georgia, "Times New Roman", serif; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: #111827; }
   .company-info { font-size: 11px; color: #9ca3af; line-height: 1.7; }
 
@@ -151,8 +146,7 @@ function buildHTML(payment: Payment, userEmail: string, userName: string): strin
     <div class="header">
       <div>
         <div class="logo-row">
-          <div class="logo-box">⚖</div>
-          <div class="logo-name">${COMPANY.brand}</div>
+          <img class="logo-img" src="https://lexram.ai/lexram-logo.png" alt="${COMPANY.brand}" />
         </div>
         <div class="company-info">
           ${COMPANY.name}<br>

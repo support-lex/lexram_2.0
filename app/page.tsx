@@ -4,11 +4,10 @@ import type * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   Search, FileText, Scale, Shield, Sparkles, BookOpen, Gavel,
-  CheckCircle2, ArrowRight, Quote, Plus, Minus, Star, Zap,
+  CheckCircle2, ArrowRight, Quote, Plus, Minus, Star,
   Library, PenTool, Users, Download, Bookmark,
   Calendar, TrendingUp, FileSearch, Layers, Mic,
   Mail, Phone, Clock, Send, MessageSquare,
-  Image as ImageIcon,
   Menu, X,
 } from "lucide-react";
 import { track } from "@/lib/landing-analytics";
@@ -23,7 +22,6 @@ const SIGNUP = "/sign-in?intent=signup";
 const LOGIN = "/sign-in";
 const RESEARCH = "/dashboard/research-2";
 const RESOURCES = "/dashboard/search";
-const BLOG = "/blog";
 const CONTACT = "/contact";
 
 const go = (href: string) => {
@@ -206,7 +204,7 @@ function Nav() {
     { href: "#research", label: "Research" },
     { href: "#drafting", label: "Drafting" },
     { href: "/dashboard/tsr", label: "TSR" },
-    { href: "#blog",     label: "Blog" },
+    { href: "/dashboard/blog", label: "Blog" },
     { href: "#pricing",  label: "Pricing" },
     { href: "#faq",      label: "FAQ" },
     { href: "#contact",  label: "Contact" },
@@ -214,15 +212,16 @@ function Nav() {
 
   return (
     <header className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-[#fff0df]/80 border-b border-[#680318]/10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+      <div className="max-w-[1440px] mx-auto px-6 sm:px-10 h-16 flex items-center justify-between gap-3">
         {/* Brand */}
-        <a href="#" className="flex items-center gap-2 shrink-0">
-          <div className="w-8 h-8 rounded-md bg-gradient-warm grid place-items-center shadow-soft">
-            <Scale className="w-4 h-4 text-[#fff0df]" />
-          </div>
-          <span className="font-serif text-lg sm:text-xl font-bold text-[#680318]">
-            LexRam<span className="text-[#b94826]">.</span>ai
-          </span>
+        <a href="#" aria-label="Lexram" className="flex items-center shrink-0">
+          <img
+            src="/lexram-logo.png"
+            alt="Lexram"
+            width={120}
+            height={42}
+            className="h-9 sm:h-10 w-auto"
+          />
         </a>
 
         {/* Desktop nav */}
@@ -273,10 +272,10 @@ function Nav() {
       {/* Mobile drawer */}
       <div
         className={`lg:hidden overflow-hidden border-t border-[#680318]/10 bg-[#fff0df]/95 backdrop-blur-md transition-[max-height,opacity] duration-300 ease-out ${
-          open ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+          open ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
         }`}
       >
-        <nav className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col">
+        <nav className="max-w-[1440px] mx-auto px-6 sm:px-10 py-4 flex flex-col">
           {links.map((l) => (
             <a
               key={l.href}
@@ -312,7 +311,7 @@ function Nav() {
    ============================================================ */
 function Hero() {
   const y = useScrollY();
-  const tabs = ["Title Scrutiny", "Research", "Drafting"];
+  const tabs = ["Research", "Drafting", "Title Scrutiny"];
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
 
@@ -330,18 +329,6 @@ function Hero() {
 
   const content = [
     {
-      badge: "NEW",
-      title: "Title Scrutiny Reports",
-      accent: "Bank-ready title scrutiny.",
-      accent2: "Built from your documents.",
-      tagline: "Upload. Verify. Lend.",
-      desc: "Upload the property file. Lexram maps the ownership chain, flags encumbrances, and delivers a report lenders can act on — nothing assumed, everything verifiable.",
-      bullets: ["Title scrutiny report India", "Bank-ready property report", "Encumbrance check"],
-      cta: "Start a Report",
-      cta2: "See a sample report",
-      ctaHref: "/dashboard/tsr",
-    },
-    {
       badge: "RESEARCH",
       title: "Deep Legal Research",
       accent: "Statute-first.",
@@ -350,7 +337,7 @@ function Hero() {
       desc: "Built exclusively on verified Indian legal sources — so every judgment you cite is one you can stand behind in court.",
       bullets: ["Central statutes", "Supreme Court judgements backed", "Supreme Court precedent search", "Filters per incuriam judgments", "No fake citations", "Zero hallucinations", "Verified citations"],
       cta: "Start Research",
-      cta2: "See how it works",
+      cta2: "Explore",
       ctaHref: "#research",
     },
     {
@@ -362,8 +349,20 @@ function Hero() {
       desc: "Upload your case file. Lexram reads it, structures the pleading, and pulls your research in — formatted to what your court or tribunal expects, every time.",
       bullets: ["AI legal drafting India", "Court-formatted output", "Verified citations only", "Editable at 2 stages", "Hassle-Free drafting", "Documents to draft"],
       cta: "Start Drafting",
-      cta2: "Explore tools",
+      cta2: "Explore",
       ctaHref: "#drafting",
+    },
+    {
+      badge: "NEW",
+      title: "Title Scrutiny Reports",
+      accent: "Bank-ready title scrutiny.",
+      accent2: "Built from your documents.",
+      tagline: "Upload. Verify. Lend.",
+      desc: "Upload the property file. Lexram maps the ownership chain, flags encumbrances, and delivers a report lenders can act on — nothing assumed, everything verifiable.",
+      bullets: ["Title scrutiny report India", "Bank-ready property report", "Encumbrance check"],
+      cta: "Start a Report",
+      cta2: "Explore",
+      ctaHref: "/dashboard/tsr",
     },
   ];
 
@@ -384,102 +383,108 @@ function Hero() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(42,26,28,0.5)_100%)]" />
 
       <div
-        className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-20 sm:py-24 md:py-32 lg:py-40"
-        style={{
-          transform: `translateY(${y * -0.1}px)`,
-          opacity: Math.max(0, 1 - y / 600),
-        }}
+        className="relative w-full max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-10 pt-28 sm:pt-32 md:pt-36 pb-0"
+        style={{ transform: `translateY(${y * -0.1}px)` }}
       >
-        <div className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16">
-          {/* ── Left: Brand message ─────────────────────────────── */}
-          <div className="flex-1 text-center lg:text-left">
-            <span className="reveal-up inline-block mb-4 text-[10px] sm:text-[11px] font-bold tracking-[0.3em] uppercase text-[#b94826]">
-              LexRam AI
-            </span>
+        {/* ── Top: Hero heading + CTAs — fades on scroll ─────────── */}
+        <div
+          className="text-center w-full mx-auto"
+          style={{ opacity: Math.max(0, 1 - y / 500) }}
+        >
+          <h1 className="reveal-up font-serif text-[2.4rem] leading-none sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-[#fff0df] text-center w-full">
+            Indian AI <span className="text-[#b94826] italic">Law Assistant</span>
+          </h1>
 
-            <h1 className="reveal-up font-serif text-[2.2rem] leading-[0.95] sm:text-4xl md:text-5xl lg:text-7xl xl:text-8xl lg:leading-[0.95] font-bold text-[#fff0df] text-balance">
-              Indian AI
-              <br />
-              <span className="text-[#b94826] italic">Law Assistant</span>
-            </h1>
+          <p className="reveal-up mt-6 sm:mt-8 text-lg sm:text-xl md:text-2xl text-[#fff0df]/75 max-w-2xl mx-auto font-light leading-relaxed" style={{ transitionDelay: "120ms", textShadow: '0 1px 4px rgba(0,0,0,0.35)' }}>
+            Research legal questions, draft pleadings, manage matters, trace titles, and grow your network — one platform, built on India&apos;s courts alone.
+          </p>
 
-            <p className="reveal-up mt-5 sm:mt-7 text-base sm:text-lg md:text-xl text-[#fff0df]/60 max-w-lg mx-auto lg:mx-0 font-light leading-relaxed" style={{ transitionDelay: "120ms" }}>
-              Research legal questions, draft pleadings, manage matters, trace titles, and grow your network — one platform, built on India&apos;s courts alone.
-            </p>
-
-            <div className="reveal-blur mt-6 sm:mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start" style={{ transitionDelay: "240ms" }}>
-              <button
-                type="button"
-                onClick={() => {
-                  track("cta_start_trial_click", { location: "hero" });
-                  go(SIGNUP);
-                }}
-                className="inline-flex items-center justify-center gap-2 bg-[#b94826] text-[#fff0df] px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg text-sm font-semibold hover:bg-[#8f3318] transition-colors shadow-[0_10px_30px_-10px_rgba(185,72,38,0.5)]"
-              >
-                Start Free Trial <ArrowRight className="w-4 h-4" />
-              </button>
-              <a href="#research" className="inline-flex items-center justify-center gap-2 border border-[#fff0df]/25 text-[#fff0df] px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg text-sm font-medium hover:border-[#fff0df]/50 hover:bg-white/5 transition-all">
-                Explore
-              </a>
-            </div>
+          <div className="reveal-blur mt-8 sm:mt-10 flex flex-col sm:flex-row gap-4 justify-center" style={{ transitionDelay: "240ms" }}>
+            <button
+              type="button"
+              onClick={() => {
+                track("cta_start_trial_click", { location: "hero" });
+                go(SIGNUP);
+              }}
+              className="inline-flex items-center justify-center gap-2 bg-[#b94826] text-[#fff0df] px-8 py-4 rounded-xl text-base font-semibold hover:bg-[#8f3318] transition-colors shadow-[0_10px_30px_-10px_rgba(185,72,38,0.5)]"
+            >
+              Start Free Trial <ArrowRight className="w-5 h-5" />
+            </button>
+            <a
+              href="#research"
+              className="inline-flex items-center justify-center gap-2 border border-[#fff0df]/25 text-[#fff0df] px-8 py-4 rounded-xl text-base font-medium hover:border-[#fff0df]/50 hover:bg-white/5 transition-all"
+            >
+              Explore
+            </a>
           </div>
+        </div>
 
-          {/* ── Right: Feature tabs card ────────────────────────── */}
-          <div className="flex-1 w-full max-w-xl reveal-up lg:reveal-right" style={{ transitionDelay: "160ms" }}>
-            <div className="rounded-2xl border border-[#fff0df]/12 bg-[#fff0df]/[0.04] backdrop-blur-xl overflow-hidden shadow-[0_20px_60px_-20px_rgba(0,0,0,0.4)]">
-              {/* Tab bar */}
-              <div className="flex items-center gap-0.5 sm:gap-1 p-1 sm:p-1.5 border-b border-[#fff0df]/8">
-                {tabs.map((label, i) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => handleTab(i)}
-                    className={`relative flex-1 inline-flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold transition-all duration-300 ${
-                      i === active
-                        ? "bg-[#b94826] text-[#fff0df] shadow-[0_2px_10px_rgba(185,72,38,0.4)]"
-                        : "text-[#fff0df]/50 hover:text-[#fff0df]/80 hover:bg-white/5"
-                    }`}
-                  >
-                    <span className="hidden sm:inline">{label}</span>
-                    <span className="sm:hidden">{label === "Title Scrutiny" ? "TSR" : label}</span>
-                    {label === "Title Scrutiny" && (
-                      <span className="text-[8px] sm:text-[9px] font-bold tracking-wider px-1 sm:px-1.5 py-0.5 rounded-full leading-none bg-[#fff0df] text-[#680318]">
-                        NEW
-                      </span>
-                    )}
-                  </button>
+        {/* ── Below: Feature tabs card ───────────────────────────── */}
+        <div className="reveal-up w-full max-w-[1200px] mx-auto mt-12 sm:mt-16" style={{ transitionDelay: "160ms" }}>
+          <div className="rounded-2xl border border-[#fff0df]/30 bg-[#fff0df]/[0.18] backdrop-blur-2xl overflow-hidden shadow-[0_24px_70px_-20px_rgba(0,0,0,0.65),0_0_40px_rgba(104,3,24,0.22)]">
+            {/* Tab bar */}
+            <div className="flex items-center gap-0.5 sm:gap-1 p-1 sm:p-1.5 border-b border-[#fff0df]/8">
+              {tabs.map((label, i) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => handleTab(i)}
+                  className={`relative flex-1 inline-flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2.5 sm:py-3 rounded-lg text-sm sm:text-base font-bold transition-all duration-300 ${
+                    i === active
+                      ? "bg-[#b94826] text-[#680318] shadow-[0_4px_16px_rgba(185,72,38,0.45)]"
+                      : "text-[#fff0df]/60 hover:text-[#fff0df]/90 hover:bg-white/8"
+                  }`}
+                >
+                  <span className="hidden sm:inline">{label}</span>
+                  <span className="sm:hidden">{label === "Title Scrutiny" ? "TSR" : label}</span>
+                  {label === "Title Scrutiny" && (
+                    <span className="text-[9px] sm:text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded-full leading-none bg-[#fff0df] text-[#680318]">
+                      NEW
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab content — single column: badge → heading → desc → bullets → Explore (last) */}
+            <div
+              key={active}
+              className="p-5 sm:p-7 md:p-8 flex flex-col gap-4 min-h-[380px] animate-in fade-in slide-in-from-bottom-2 duration-400"
+            >
+              {/* Badge */}
+              <span className="inline-block text-xs font-bold tracking-[0.2em] uppercase px-2.5 py-1 rounded-md bg-[#e8c8a8] text-[#680318] self-start">
+                {c.badge}
+              </span>
+
+              {/* Heading */}
+              <h3 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#fff0df] leading-tight text-balance" style={{ textShadow: '0 2px 18px rgba(255,240,223,0.25), 0 1px 4px rgba(0,0,0,0.4)' }}>
+                <span className="text-[#e8c8a8]">{c.accent}</span>{" "}
+                <span className="text-[#b94826]">{c.accent2}</span>
+              </h3>
+
+              {/* Description */}
+              <p className="text-base md:text-lg text-[#fff0df]/85 leading-relaxed" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+                {c.desc}
+              </p>
+
+              {/* Bullets */}
+              <ul className="space-y-2.5">
+                {c.bullets.map((b, bi) => (
+                  <li key={bi} className="flex items-start gap-2.5 text-sm sm:text-base text-[#fff0df]/90" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.25)' }}>
+                    <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-[#e8c8a8] mt-0.5 shrink-0" />
+                    <span>{b}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
 
-              {/* Tab content */}
-              <div key={active} className="p-4 sm:p-6 md:p-8 animate-in fade-in slide-in-from-bottom-2 duration-400">
-                <span className="inline-block text-[9px] sm:text-[10px] font-bold tracking-[0.2em] uppercase text-[#b94826] mb-2 sm:mb-3">
-                  {c.badge}
-                </span>
-                <h3 className="font-serif text-xl sm:text-2xl md:text-3xl font-bold text-[#fff0df] leading-tight text-balance">
-                  {c.accent}{" "}
-                  <span className="text-[#b94826]">{c.accent2}</span>
-                </h3>
-
-                <p className="mt-3 sm:mt-4 text-sm md:text-base text-[#fff0df]/60 leading-relaxed">
-                  {c.desc}
-                </p>
-
-                {/* Bullet features */}
-                <ul className="mt-4 sm:mt-5 space-y-2 sm:space-y-2.5">
-                  {c.bullets.map((b, i) => (
-                    <li key={i} className="flex items-start gap-2 sm:gap-2.5 text-xs sm:text-sm text-[#fff0df]/75">
-                      <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#b94826] mt-0.5 shrink-0" />
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="mt-5 sm:mt-7 flex items-center gap-4">
-                  <a href={c.ctaHref || "#research"} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#b94826] hover:text-[#fff0df] transition-colors">
-                    {c.cta2} <ArrowRight className="w-3.5 h-3.5" />
-                  </a>
-                </div>
+              {/* Explore — always last */}
+              <div className="mt-auto pt-2">
+                <a
+                  href={c.ctaHref || "#research"}
+                  className="inline-flex items-center gap-1.5 text-base font-semibold px-4 py-1.5 rounded-lg bg-[#e8c8a8] text-[#680318] hover:bg-[#fff0df] transition-colors"
+                >
+                  {c.cta2} <ArrowRight className="w-4 h-4" />
+                </a>
               </div>
             </div>
           </div>
@@ -494,48 +499,27 @@ function Hero() {
    ============================================================ */
 function TrustStrip() {
   const items = [
-    "AI Legal Drafting", "LexDraft", "AI Legal Research",
-    "Case Hub", "Precedent Map", "Concept Map",
-    "Zero Hallucinations", "Verified Citations", "No Assumptions",
-    "Customised Pleadings", "No Open Source", "Supreme Court Judgements",
-    "Central Statutes", "Research Sessions",
+    "AI Legal Drafting India", "AI Legal Research Platform India",
+    "Supreme Court Judgements India Online", "Zero Hallucination Legal AI",
+    "Legal Research Tool for Advocates", "Title Scrutiny Report India",
+    "Legal Opinion", "Legal AI India", "AI For Lawyers India",
+    "Online Legal Research India", "No Open Source Legal Software",
+    "AI Legal Assistant India",
   ];
   return (
-    <section className="py-10 bg-[#680318] text-[#fff0df]/80 overflow-hidden border-y border-[#b94826]/30">
-      <div className="reveal-down text-center text-xs tracking-[0.3em] mb-6 text-[#fff0df]/60">
+    <section className="py-14 md:py-16 bg-[#680318] text-[#fff0df]/80 overflow-hidden border-y border-[#b94826]/30">
+      <div className="reveal-down text-center text-sm tracking-[0.3em] mb-8 text-[#fff0df]/70 font-medium">
         Special tools with advanced Unique Features
       </div>
       <div className="relative">
         <div className="flex marquee whitespace-nowrap">
           {[...items, ...items].map((t, i) => (
-            <div key={i} className="mx-10 flex items-center gap-10">
-              <span className="font-serif text-lg tracking-wider">{t}</span>
-              <span className="text-[#b94826]">◆</span>
+            <div key={i} className="mx-12 flex items-center gap-12">
+              <span className="font-serif text-xl md:text-2xl tracking-wider">{t}</span>
+              <span className="text-[#b94826] text-lg">◆</span>
             </div>
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================================================
-   Parallax band
-   ============================================================ */
-function ParallaxBand({
-  image, title, kicker,
-}: { image: string; title: string; kicker: string }) {
-  return (
-    <section
-      className="relative h-[60vh] parallax-bg flex items-center"
-      style={{ backgroundImage: `url(${image})` }}
-    >
-      <div className="absolute inset-0 bg-gradient-to-r from-[#680318]/90 via-[#680318]/60 to-transparent" />
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 text-[#fff0df]">
-        <div className="text-xs tracking-[0.3em] text-[#b94826] mb-4">{kicker}</div>
-        <h2 className="font-serif text-4xl md:text-6xl font-bold max-w-3xl text-balance leading-tight">
-          {title}
-        </h2>
       </div>
     </section>
   );
@@ -634,15 +618,15 @@ type CTAEvent =
   | "cta_start_trial_click"
   | "cta_start_research_click"
   | "cta_book_demo_click"
-  | "cta_talk_sales_click";
+  | "cta_talk_sales_click"
+  | "cta_see_pricing_click";
 
 function SectionCTA({
-  label, tone = "light", primaryHref = SIGNUP, secondaryHref = SIGNUP, eventName = "cta_start_trial_click", location,
+  label, tone = "light", primaryHref = SIGNUP, eventName = "cta_start_trial_click", location,
 }: {
   label: string;
   tone?: "light" | "dark";
   primaryHref?: string;
-  secondaryHref?: string;
   eventName?: CTAEvent;
   location: string;
 }) {
@@ -659,16 +643,20 @@ function SectionCTA({
       >
         {label} <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition" />
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          track("cta_book_demo_click", { location });
-          go(secondaryHref);
-        }}
+      <a
+        href="#contact"
+        onClick={() => track("cta_book_demo_click", { location })}
         className={`lex-btn lex-btn--secondary ${dark ? "lex-btn--dark" : ""}`}
       >
         Book a demo
-      </button>
+      </a>
+      <a
+        href="#pricing"
+        onClick={() => track("cta_see_pricing_click", { location })}
+        className={`lex-btn lex-btn--pricing ${dark ? "lex-btn--dark" : ""}`}
+      >
+        See Pricing
+      </a>
     </div>
   );
 }
@@ -716,20 +704,20 @@ function ParallaxHeroImage({
 function Research() {
   useReveal();
   return (
-    <section id="research" className="py-10 md:py-12 bg-[#fff0df] relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+    <section id="research" className="py-10 md:py-12 bg-[#fff0df] relative overflow-hidden">
+      <div className="max-w-[1440px] mx-auto px-6 sm:px-10">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
-            <div className="text-xs tracking-[0.3em] text-[#b94826] mb-4">01 — RESEARCH · AI LEGAL RESEARCH ASSISTANT</div>
+            <div className="lex-kicker--bright text-xs tracking-[0.3em] text-[#b94826] mb-4">RESEARCH — AI LEGAL RESEARCH ASSISTANT</div>
             <h2 className="reveal-up font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#680318] leading-tight" style={{ transitionDelay: "120ms" }}>
-              Find the right legal answer — <span className="italic">verified</span>, not hallucinated.
+              Find the right legal answer —<br /><span className="italic">verified</span>, not hallucinated.
             </h2>
             <p className="reveal-up mt-6 text-lg text-[#680318]/70 leading-relaxed" style={{ transitionDelay: "240ms" }}>
-              Lexram searches India's largest curated legal database and returns answers anchored to real documents you can open, read, and rely on in court.
+              India&apos;s AI legal research platform — Lexram searches the largest curated database of Supreme Court judgements and statutes, you can open, read, and rely on in court.
             </p>
             <div className="mt-8">
               <div className="reveal-down flex items-center gap-3 mb-4" style={{ transitionDelay: "360ms" }}>
-                <div className="text-[10px] tracking-[0.3em] uppercase text-[#680318]/60">
+                <div className="text-xs font-bold tracking-[0.3em] uppercase text-[#680318]/90" style={{ textShadow: '0 1px 6px rgba(104,3,24,0.35)' }}>
                   Database
                 </div>
                 <div className="h-px flex-1 bg-gradient-to-r from-[#680318]/20 to-transparent" />
@@ -741,7 +729,7 @@ function Research() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
                   { t: "SC Judgements",   s: "Since 1950",                       icon: Gavel },
-                  { t: "Central Statutes", s: "BNS / IPC · BNSS / CrPC · BSA / IEA", icon: Scale },
+                  { t: "Central Statutes", s: "Since 1830 · BNS · BNSS · BSA", icon: Scale },
                 ].map((d, i) => (
                   <div
                     key={d.t}
@@ -768,7 +756,7 @@ function Research() {
                 location="research_section"
               />
             </div>
-            <div className="reveal-up mt-5 flex flex-wrap items-center gap-x-6 gap-y-3" style={{ transitionDelay: "1000ms" }}>
+            <div className="reveal-up mt-5 flex flex-col gap-y-3" style={{ transitionDelay: "1000ms" }}>
               <button
                 type="button"
                 onClick={() => {
@@ -809,7 +797,7 @@ function Research() {
 }
 
 /* ============================================================
-   Research features — interactive index + preview (old format)
+   Research features — interactive index + preview
    ============================================================ */
 function ResearchFeatures() {
   const [active, setActive] = useState(0);
@@ -826,9 +814,9 @@ function ResearchFeatures() {
   const items = [
     {
       n: "01",
-      icon: FileSearch,
+      icon: Layers,
       t: "Case Hub",
-      d: "All your matters in one organised workspace — research threads, uploaded documents, and drafted pleadings, organised by case.",
+      d: "All your matters in one organised workspace.",
       dd: "Case Hub is your central command for every matter you handle. Research threads, documents uploaded, and pleadings drafted are all pinned to their respective case — so nothing gets lost, nothing gets mixed up, and every matter stays exactly where you expect it.",
       visual: (
         <div className="space-y-2">
@@ -839,9 +827,9 @@ function ResearchFeatures() {
           ].map((m, i) => (
             <div key={i} className="flex items-center gap-4 px-4 py-3 rounded-lg border border-[#680318]/10 bg-[#fff0df]/40">
               <div className="w-8 h-8 rounded-md grid place-items-center bg-[#680318]/10">
-                <FileSearch className="w-4 h-4 text-[#680318]" />
+                <Layers className="w-4 h-4 text-[#680318]" />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 overflow-hidden">
                 <div className="font-serif text-sm font-bold text-[#680318] truncate">{m.name}</div>
                 <div className="text-[11px] text-[#680318]/55 mt-0.5">{m.meta}</div>
               </div>
@@ -858,7 +846,7 @@ function ResearchFeatures() {
     {
       n: "02",
       icon: Search,
-      t: "Multiple research sessions, one case",
+      t: "Multiple Research Sessions",
       d: "All research threads for a case pinned together — hassle-free legal research, always in context.",
       dd: "Every research thread you open for a matter is automatically pinned to that case. No hunting across sessions or retracing your steps — all threads for one case live together, so your research stays coherent from the first query to the last.",
       visual: (
@@ -866,9 +854,9 @@ function ResearchFeatures() {
           <div className="text-[10px] tracking-[0.25em] uppercase text-[#680318]/55">Case · Sharma v. State of Tamil Nadu</div>
           <div className="space-y-2">
             {[
-              { q: "section 302 IPC culpable homicide",       n: "14 results", date: "Today 14:32" },
-              { q: "circumstantial evidence last seen theory", n: "8 results",  date: "Today 11:15" },
-              { q: "discovery under section 27 Evidence Act",  n: "6 results",  date: "Yesterday" },
+              { q: "section 302 IPC culpable homicide",       n: "14 results" },
+              { q: "circumstantial evidence last seen theory", n: "8 results"  },
+              { q: "discovery under section 27 Evidence Act",  n: "6 results"  },
             ].map((s, i) => (
               <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-md border border-[#680318]/10 bg-[#fff0df]/30">
                 <span className="text-xs text-[#680318]/70 flex-1 truncate">{s.q}</span>
@@ -882,7 +870,7 @@ function ResearchFeatures() {
     {
       n: "03",
       icon: PenTool,
-      t: "Drafting integrated",
+      t: "Drafting Integrated",
       d: "Move from legal research to pleading draft in one platform — no tool switching, no lost context.",
       dd: "Drafting is built into the same workspace as your research. When you are ready to move from finding the law to filing the argument, the transition is a single step — no exports, no copy-paste, no switching between platforms.",
       visual: (
@@ -904,71 +892,7 @@ function ResearchFeatures() {
     },
     {
       n: "04",
-      icon: FileText,
-      t: "Draft management",
-      d: "Find every pleading draft under its case — no searching through individual research threads.",
-      dd: "All pleadings and drafts created for a matter are collected directly inside that case, not scattered across individual research threads. When you need to retrieve or review a draft, you go to the case — and it is there.",
-      visual: (
-        <div className="space-y-3">
-          <div className="text-[10px] tracking-[0.25em] uppercase text-[#680318]/55">Case · Sharma v. State of Tamil Nadu · Drafts</div>
-          {[
-            { name: "bail_application_v2.docx", date: "Jun 15, 2024", label: "Latest" },
-            { name: "anticipatory_bail_v1.docx", date: "Jun 12, 2024", label: "Filed" },
-            { name: "discharge_petition_v3.docx", date: "Jun 08, 2024", label: "Draft" },
-          ].map((d, i) => (
-            <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-md border border-[#680318]/10 bg-[#fff0df]/30">
-              <FileText className="w-4 h-4 text-[#680318]/60 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] text-[#680318] font-medium truncate">{d.name}</div>
-                <div className="text-[10px] text-[#680318]/55">{d.date}</div>
-              </div>
-              <span className="text-[10px] tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#b94826]/10 text-[#b94826] border border-[#b94826]/20">{d.label}</span>
-            </div>
-          ))}
-        </div>
-      ),
-    },
-    {
-      n: "05",
-      icon: Layers,
-      t: "Unlimited uploads",
-      d: "Upload large legal case files — Lexram indexes and makes every document instantly searchable.",
-      dd: "There is no limit on how much you can upload. Lexram reads, indexes, and makes your entire file bundle searchable the moment it is uploaded — whether it is a single FIR or a hundred-document case record.",
-      visual: (
-        <div className="space-y-4">
-          <div className="rounded-lg border border-dashed border-[#680318]/25 bg-[#fff0df]/30 p-6 text-center">
-            <Layers className="w-6 h-6 text-[#680318]/60 mx-auto" />
-            <div className="text-sm font-medium text-[#680318] mt-2">Drop files, any volume</div>
-            <div className="text-[11px] text-[#680318]/55 mt-1">PDFs · scans · charge sheets · prior orders</div>
-          </div>
-          <div className="space-y-2">
-            {[
-              { name: "charge_sheet_2024.pdf", meta: "142 pages",   state: "Indexed",     pct: 100 },
-              { name: "prior_orders.zip",       meta: "11 files",    state: "Indexing",    pct: 47 },
-              { name: "fir_madurai.jpg",        meta: "Scan · OCR",  state: "OCR'd",       pct: 100 },
-            ].map((f, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-md border border-[#680318]/10 bg-[#fff0df]/40">
-                <FileText className="w-4 h-4 text-[#680318]/70 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] text-[#680318] font-medium truncate">{f.name}</div>
-                  <div className="text-[10px] text-[#680318]/55">{f.meta}</div>
-                </div>
-                {f.pct < 100 ? (
-                  <div className="w-20 h-1.5 rounded-full bg-[#680318]/10 overflow-hidden">
-                    <div className="h-full bg-[#b94826]" style={{ width: `${f.pct}%` }} />
-                  </div>
-                ) : (
-                  <span className="text-[10px] tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#b94826]/15 text-[#b94826] border border-[#b94826]/30">{f.state}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      ),
-    },
-    {
-      n: "06",
-      icon: Clock,
+      icon: Bookmark,
       t: "Research History in Case Hub",
       d: "Your complete legal research history — preserved, organised, and searchable across every matter.",
       dd: "Your entire research history across all matters is preserved inside Lexram and remains fully searchable. Return to any case, any thread, or any prior research session at any point — nothing is lost when a matter goes dormant or resumes.",
@@ -981,10 +905,10 @@ function ResearchFeatures() {
           </div>
           <div className="space-y-3">
             {[
-              { day: "Today",       items: [{ time: "14:32", q: "section 138 NI Act bounce defence", n: "12 results" }] },
-              { day: "Yesterday",   items: [
-                { time: "18:01", q: "Kesavananda basic structure ratio",        n: "8 results" },
-                { time: "09:45", q: "specific performance limitation period",   n: "4 results" },
+              { day: "Today",     items: [{ time: "14:32", q: "section 138 NI Act bounce defence", n: "12 results" }] },
+              { day: "Yesterday", items: [
+                { time: "18:01", q: "Kesavananda basic structure ratio",      n: "8 results" },
+                { time: "09:45", q: "specific performance limitation period", n: "4 results" },
               ]},
             ].map((g) => (
               <div key={g.day}>
@@ -1005,9 +929,9 @@ function ResearchFeatures() {
       ),
     },
     {
-      n: "07",
+      n: "05",
       icon: Mic,
-      t: "Speech to text",
+      t: "Speech to Text",
       d: "Voice-powered legal research — speak your query, Lexram transcribes and returns relevant answers instantly.",
       dd: "Speak your research query directly into the search bar — Lexram listens, transcribes it accurately, and returns relevant legal answers immediately. No typing required, no reformulation needed — your question is heard and acted on exactly as you asked it.",
       visual: (
@@ -1033,15 +957,19 @@ function ResearchFeatures() {
   return (
     <div className="mt-10">
       <div className="mb-10">
-        <div className="reveal-down text-xs tracking-[0.3em] text-[#b94826] mb-3">FEATURES</div>
-        <h3 className="reveal-blur font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#680318] leading-tight max-w-2xl" style={{ transitionDelay: "120ms" }}>
-          Built like a workspace — not a search box.
-        </h3>
+        <div className="reveal-down flex items-center gap-3 mb-3">
+          <div className="text-xs font-bold tracking-[0.3em] uppercase text-[#680318]/90" style={{ textShadow: '0 1px 6px rgba(104,3,24,0.35)' }}>Features</div>
+          <div className="h-px flex-1 bg-gradient-to-r from-[#680318]/20 to-transparent" />
+          <div className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.2em] uppercase text-[#b94826]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#b94826] animate-pulse" />
+            5 capabilities
+          </div>
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_1.25fr] gap-10 lg:gap-16 items-start">
+      <div className="grid lg:grid-cols-[1fr_1.25fr] gap-10 lg:gap-16 items-stretch w-full">
         {/* Left: numbered index */}
-        <div className="lg:sticky lg:top-24">
+        <div className="lg:sticky lg:top-24 min-w-0 overflow-hidden">
           {items.map((item, i) => {
             const isActive = active === i;
             const Icon = item.icon;
@@ -1049,7 +977,11 @@ function ResearchFeatures() {
               <button
                 key={i}
                 onClick={() => setActive(i)}
-                className="reveal-left group relative w-full text-left flex items-start gap-5 py-6 border-b border-[#680318]/10 transition-all"
+                className={`reveal-left group relative w-full max-w-full text-left flex items-start gap-4 py-6 border-b border-[#680318]/10 rounded-xl transition-all duration-200 ${
+                  isActive
+                    ? "bg-[#680318]/[0.04] shadow-[0_6px_24px_-4px_rgba(185,72,38,0.18),0_2px_8px_rgba(104,3,24,0.08)] -translate-y-0.5 px-3"
+                    : "hover:bg-[#680318]/[0.025] hover:shadow-[0_4px_18px_-4px_rgba(104,3,24,0.14),0_1px_4px_rgba(104,3,24,0.05)] hover:-translate-y-0.5 hover:px-3"
+                }`}
                 style={{ transitionDelay: `${200 + i * 110}ms` }}
               >
                 <span
@@ -1066,29 +998,30 @@ function ResearchFeatures() {
                 }`}>
                   <Icon className={`w-5 h-5 transition-colors ${isActive ? "text-[#b94826]" : "text-[#680318]"}`} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className={`font-serif text-xl md:text-2xl font-bold transition-colors ${isActive ? "text-[#b94826]" : "text-[#680318]"}`}>
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <div className={`font-serif text-lg sm:text-xl md:text-2xl font-bold transition-colors break-words ${isActive ? "text-[#b94826]" : "text-[#680318]"}`}>
                     {item.t}
                   </div>
-                  <div className="text-sm leading-relaxed text-[#680318]/70 mt-2">
+                  <div className="text-sm leading-relaxed text-[#680318]/70 mt-2 break-words">
                     {item.d}
                   </div>
                   {expandedItems.has(i) && (
-                    <div className="mt-3 text-sm leading-relaxed text-[#680318]/55 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="mt-3 text-sm leading-relaxed text-[#680318]/55 animate-in fade-in slide-in-from-top-1 duration-300 break-words">
                       {item.dd}
                     </div>
                   )}
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={-1}
                     onClick={(e) => { e.stopPropagation(); toggleExpand(i); }}
-                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#b94826] hover:text-[#680318] transition-colors"
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#b94826] hover:text-[#680318] transition-colors cursor-pointer"
                   >
                     {expandedItems.has(i) ? (
                       <>Show less <Minus className="w-3 h-3" /></>
                     ) : (
                       <>More <Plus className="w-3 h-3" /></>
                     )}
-                  </button>
+                  </div>
                 </div>
                 <ArrowRight
                   className={`w-4 h-4 mt-2 text-[#b94826] transition-all shrink-0 ${
@@ -1100,11 +1033,11 @@ function ResearchFeatures() {
           })}
         </div>
 
-        {/* Right: live preview */}
-        <div className="reveal-tilt relative" style={{ transitionDelay: "260ms" }}>
-          <div aria-hidden className="absolute -inset-8 bg-gradient-warm opacity-25 blur-3xl rounded-full pointer-events-none" />
-          <div className="relative rounded-2xl border border-[#680318]/15 bg-[#fff0df] shadow-elegant overflow-hidden min-h-[440px]">
-            <div className="flex items-center gap-2 px-5 py-3 border-b border-[#680318]/10 bg-[#680318]/[0.03]">
+        {/* Right: live preview — stretches to match the feature list height */}
+        <div className="reveal-tilt relative flex flex-col" style={{ transitionDelay: "260ms" }}>
+          <div aria-hidden className="absolute inset-0 bg-gradient-warm opacity-20 blur-3xl rounded-full pointer-events-none" />
+          <div className="relative flex flex-col flex-1 rounded-2xl border border-[#680318]/15 bg-[#fff0df] shadow-elegant overflow-hidden min-h-[440px]">
+            <div className="flex items-center gap-2 px-5 py-3 border-b border-[#680318]/10 bg-[#680318]/[0.03] shrink-0">
               <div className="w-2.5 h-2.5 rounded-full bg-[#b94826]/60" />
               <div className="w-2.5 h-2.5 rounded-full bg-[#680318]/15" />
               <div className="w-2.5 h-2.5 rounded-full bg-[#680318]/15" />
@@ -1112,7 +1045,7 @@ function ResearchFeatures() {
                 {items[active].n} · {items[active].t}
               </div>
             </div>
-            <div key={active} className="swap-in p-6 md:p-8">
+            <div key={active} className="swap-in p-6 md:p-8 flex-1">
               {items[active].visual}
             </div>
           </div>
@@ -1146,12 +1079,12 @@ function LexramEdge() {
   };
 
   const features: EdgeFeature[] = [
-    { n: "01", t: "Statute to Precedent", d: "AI legal research that follows the law's own logic — the statute first, so you understand the precedent, not just the outcome.", dd: "Lexram anchors every research query in the governing statute before surfacing precedents. You understand why a ruling exists, not just what was decided — giving you the interpretive context advocates actually need.", icon: Scale,        image: "/landing/library.jpg"    },
-    { n: "02", t: "Per Incuriam Test",    d: "Lexram filters out the bad law before you see it — so everything you research is precedent you can stand behind.", dd: "Before a precedent reaches you, Lexram applies a per incuriam test to eliminate decisions that courts ignored as binding authority. Every result you see is law you can stand behind.", icon: Sparkles,     image: "/landing/papers.jpg"     },
-    { n: "03", t: "Visual Legal Research Map", d: "Lexram turns your research into a concept map rooted in the statute — so you can see at a glance how the law is interpreted.", dd: "Lexram transforms your legal research into a structured concept map that starts with the statute and branches through every relevant interpretation. You see the full picture of how the law has been read.", icon: Layers,       image: "/landing/chamber.jpg"    },
-    { n: "04", t: "Legal Indian Precedent History", d: "Lexram gives the complete precedent trail in one view — Supreme Court rulings that followed, distinguished, or shaped the law.", dd: "Advocates get a complete, chronological view of how Supreme Court rulings have followed, distinguished, or evolved a legal position. No more piecing together a case's history across multiple searches — Lexram delivers the entire trail at once.", icon: TrendingUp,   image: "/landing/courthouse.jpg" },
-    { n: "05", t: "Zero Hallucinations",   d: "Every answer is anchored to a real document you can open and verify. Existing citations only — no fakes, no inventions.", dd: "Every answer Lexram generates is tied to an actual document you can open and read. All citations are real, all references are verifiable — so you can rely on your research output with full professional confidence.", icon: Shield,       image: "/landing/lawbook.jpg"    },
-    { n: "06", t: "Trained on India's Courts, Not the Internet", d: "Lexram's database is built exclusively from verified Indian legal sources, so every answer is grounded in law, not noise.", dd: "Lexram's database is built entirely from verified Indian legal sources — not the internet at large. Every answer is grounded in the actual law of Indian courts, filtered free of noise, so your research reflects India's legal reality, not generic AI output.", icon: BookOpen,     image: "/landing/pen.jpg"        },
+    { n: "01", t: "Statute to Precedent",      d: "Research Indian law the way courts reason — statute first, precedent second.",                                         dd: "Lexram anchors every research query in the governing statute before surfacing precedents. You understand why a ruling exists, not just what was decided — giving you the interpretive context advocates actually need.",                                                                                                                                         icon: BookOpen,    image: "/landing/library.jpg"    },
+    { n: "02", t: "Per Incuriam Test",          d: "Cite only good law — Lexram screens out overruled and per incuriam judgments automatically.",                          dd: "Before a precedent reaches you, Lexram applies a per incuriam test to eliminate decisions that courts ignored as binding authority. Every result you see is law you can stand behind.",                                                                                                                                                                            icon: Shield,      image: "/landing/papers.jpg"     },
+    { n: "03", t: "Precedent History",          d: "The full Supreme Court precedent trail — followed, distinguished, and shaped — in a single view.",                    dd: "Advocates get a complete, chronological view of how Supreme Court rulings have followed, distinguished, or evolved a legal position. No more piecing together a case history across multiple searches — Lexram delivers the entire trail at once.",                                                                                                                          icon: TrendingUp,  image: "/landing/courthouse.jpg" },
+    { n: "04", t: "Zero Hallucination",         d: "No fake citations, no AI guesswork — every Lexram result links to a verifiable source.",                              dd: "Every answer Lexram generates is tied to an actual document you can open and read.",                                                                                                                                                                                                                                                                                         icon: CheckCircle2, image: "/landing/lawbook.jpg"   },
+    { n: "05", t: "Trained on India's Courts",  d: "AI legal research built exclusively on verified Indian legal sources — not the open web.",                            dd: "Lexram's database is built entirely from verified Indian legal sources — not the internet at large. Every answer is grounded in the actual law of Indian courts, filtered free of noise, so your research reflects India's legal reality, not generic AI output.",                                                                                                               icon: Sparkles,    image: "/landing/pen.jpg"        },
+    { n: "06", t: "Free Trial Available",       d: "Start with a free trial — no credit card required.",                                                                  dd: "Get full access to Lexram research capabilities with a free trial. Explore Supreme Court judgements, statutes, and AI-assisted research before committing to a plan.",                                                                                                                                                                                                    icon: Star,        image: "/landing/chamber.jpg"    },
   ];
 
   const [active, setActive] = useState(0);
@@ -1161,19 +1094,20 @@ function LexramEdge() {
       <div aria-hidden className="absolute top-1/4 -left-32 w-[520px] h-[520px] bg-[#b94826] opacity-10 blur-[160px] rounded-full pointer-events-none lex-float" />
       <div aria-hidden className="absolute bottom-0 -right-32 w-[520px] h-[520px] bg-[#b94826] opacity-[0.08] blur-[180px] rounded-full pointer-events-none" />
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 text-[#680318]">
-        <div className="max-w-3xl">
-          <div className="text-xs tracking-[0.3em] text-[#b94826] mb-4">LEXRAM EDGE</div>
-          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-balance">
-            Every citation is real. <span className="italic text-[#b94826]">Every source is open.</span>
-          </h2>
-          <p className="mt-6 text-lg text-[#680318]/70 leading-relaxed max-w-2xl">
-            Five reasons litigators trust Lexram with court-bound research.
-          </p>
+      <div className="relative max-w-[1440px] mx-auto px-6 sm:px-10 text-[#680318]">
+        <div className="mb-8">
+          <div className="flex items-center gap-3">
+            <div className="text-xs font-bold tracking-[0.3em] uppercase text-[#680318]/90" style={{ textShadow: '0 1px 6px rgba(104,3,24,0.35)' }}>Lexram Edge</div>
+            <div className="h-px flex-1 bg-gradient-to-r from-[#680318]/20 to-transparent" />
+            <div className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.2em] uppercase text-[#b94826]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#b94826] animate-pulse" />
+              6 features
+            </div>
+          </div>
         </div>
 
         {/* Left: clickable feature list — Right: image that swaps */}
-        <div className="mt-12 grid lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-14 items-start">
+        <div className="grid lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-14 items-stretch w-full">
           {/* Feature list */}
           <div>
             {features.map((f, i) => {
@@ -1185,8 +1119,10 @@ function LexramEdge() {
                   type="button"
                   onClick={() => setActive(i)}
                   aria-pressed={isActive}
-                  className={`relative w-full text-left flex items-start gap-5 px-3 py-5 border-b border-[#680318]/10 transition-all ${
-                    isActive ? "" : "opacity-70 hover:opacity-100"
+                  className={`relative w-full max-w-full text-left flex items-start gap-4 px-3 py-5 border-b border-[#680318]/10 rounded-xl transition-all duration-200 ${
+                    isActive
+                      ? "bg-[#680318]/[0.04] shadow-[0_6px_24px_-4px_rgba(185,72,38,0.18),0_2px_8px_rgba(104,3,24,0.08)] -translate-y-0.5"
+                      : "opacity-80 hover:opacity-100 hover:bg-[#680318]/[0.025] hover:shadow-[0_4px_18px_-4px_rgba(104,3,24,0.14),0_1px_4px_rgba(104,3,24,0.05)] hover:-translate-y-0.5"
                   }`}
                 >
                   <span
@@ -1202,7 +1138,7 @@ function LexramEdge() {
                   }`}>
                     <Icon className={`w-5 h-5 transition-colors ${isActive ? "text-[#b94826]" : "text-[#680318]"}`} />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 overflow-hidden">
                     <div className={`font-serif text-xl md:text-2xl font-bold leading-tight transition-colors ${
                       isActive ? "text-[#b94826]" : "text-[#680318]"
                     }`}>
@@ -1216,17 +1152,18 @@ function LexramEdge() {
                         {f.dd}
                       </div>
                     )}
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={-1}
                       onClick={(e) => { e.stopPropagation(); toggleEdgeExpand(i); }}
-                      className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#b94826] hover:text-[#680318] transition-colors"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#b94826] hover:text-[#680318] transition-colors cursor-pointer"
                     >
                       {expandedEdge.has(i) ? (
                         <>Show less <Minus className="w-3 h-3" /></>
                       ) : (
                         <>More <Plus className="w-3 h-3" /></>
                       )}
-                    </button>
+                    </div>
                   </div>
                   <ArrowRight
                     className={`w-4 h-4 mt-2 text-[#b94826] transition-all shrink-0 ${
@@ -1238,13 +1175,11 @@ function LexramEdge() {
             })}
           </div>
 
-          {/* Right column — image card on top, progress + mini CTA below.
-              Together they fill the sticky column so it doesn't leave a
-              vacant block beside the longer feature list on the left. */}
-          <div className="relative lg:sticky lg:top-24 space-y-5">
-            <div className="relative">
+          {/* Right column — image fills full column height */}
+          <div className="relative flex flex-col gap-5">
+            <div className="relative flex flex-col flex-1">
               <div aria-hidden className="absolute -inset-6 bg-gradient-warm opacity-25 blur-3xl rounded-full pointer-events-none" />
-              <div className="relative rounded-2xl overflow-hidden shadow-elegant aspect-[4/3] bg-[#680318]/10">
+              <div className="relative flex-1 rounded-2xl overflow-hidden shadow-elegant bg-[#680318]/10 min-h-[320px]">
                 {features.map((f, i) => (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
@@ -1312,49 +1247,6 @@ function LexramEdge() {
         </div>
       </div>
     </section>
-
-  );
-}
-
-/* BentoCard is no longer used by LexramEdge but kept for backward compatibility
-   in case anything else imports it. Safe to remove later. */
-function BentoCard({
-  f, className = "", hero = false, delayMs = 0,
-}: { f: EdgeFeature; className?: string; hero?: boolean; delayMs?: number }) {
-  return (
-    <div
-      className={`group relative rounded-2xl border border-[#680318]/12 bg-[#fff0df] shadow-soft p-6 md:p-7 overflow-hidden hover:border-[#b94826]/50 hover:shadow-elegant hover:-translate-y-0.5 transition-all ${className}`}
-      style={{ transitionDelay: delayMs ? `${delayMs}ms` : undefined }}
-    >
-      <div aria-hidden className="absolute -top-20 -right-20 w-52 h-52 bg-[#b94826] opacity-0 group-hover:opacity-15 blur-3xl transition-opacity duration-500 rounded-full pointer-events-none" />
-      {hero && (
-        <div aria-hidden className="absolute -bottom-24 -left-16 w-72 h-72 bg-[#b94826] opacity-10 blur-3xl rounded-full pointer-events-none" />
-      )}
-
-      <div className="relative flex flex-col h-full">
-        <div className="flex items-start justify-between mb-4">
-          <div className="w-10 h-10 rounded-lg grid place-items-center bg-[#680318]/10 border border-[#680318]/15 group-hover:bg-[#b94826]/15 group-hover:border-[#b94826]/40 transition-colors">
-            <f.icon className="w-5 h-5 text-[#680318] group-hover:text-[#b94826] transition-colors" />
-          </div>
-          <span className="text-[10px] font-mono tracking-wider text-[#680318]/45">{f.n}</span>
-        </div>
-        <div className={`font-serif font-bold leading-tight text-[#680318] ${hero ? "text-3xl md:text-4xl" : "text-xl"}`}>
-          {f.t}
-        </div>
-        <p className={`mt-3 leading-relaxed text-[#680318]/70 ${hero ? "text-base md:text-lg max-w-xl" : "text-sm"}`}>
-          {f.d}
-        </p>
-        {hero && (
-          <div className="mt-auto pt-6 flex items-center gap-3 text-[11px] tracking-[0.2em] uppercase text-[#680318]/60">
-            <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#b94826]" /> Anchored</span>
-            <span className="w-1 h-1 rounded-full bg-[#680318]/30" />
-            <span>Zero hallucinations</span>
-            <span className="w-1 h-1 rounded-full bg-[#680318]/30" />
-            <span>Court-ready</span>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -1367,19 +1259,19 @@ function Drafting() {
   return (
     <section id="drafting" className="py-10 md:py-12 bg-[#680318] text-[#fff0df] relative overflow-hidden">
       <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(185,72,38,0.25),transparent_60%)]" />
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="relative max-w-[1440px] mx-auto px-6 sm:px-10">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
-            <div className="text-xs tracking-[0.3em] text-[#b94826] mb-4">02 — DRAFTING · AI LEGAL DRAFTING ASSISTANT</div>
+            <div className="lex-kicker--bright text-xs tracking-[0.3em] text-[#b94826] mb-4">DRAFTING — AI LEGAL DRAFTING ASSISTANT</div>
             <h2 className="reveal-up font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#fff0df] leading-tight" style={{ transitionDelay: "120ms" }}>
               The first draft is <span className="italic text-[#b94826]">&ldquo;already&rdquo;</span> done.
             </h2>
             <p className="reveal-up mt-6 text-lg text-[#fff0df]/80 leading-relaxed" style={{ transitionDelay: "240ms" }}>
-              Upload your documents. Tell Lexram what petition you need — anticipatory bail, writ under Article 226, legal notice, reply to charge sheet. Every argument is backed by a real Supreme Court judgement. Done.
+              Upload your documents. Tell Lexram what petition you need — anticipatory bail, writ under Article 226, legal notice, etc. Every draft is backed by real Supreme Court Judgements and statutes.
             </p>
             <div className="mt-8">
               <div className="reveal-down flex items-center gap-3 mb-4" style={{ transitionDelay: "360ms" }}>
-                <div className="text-[10px] tracking-[0.3em] uppercase text-[#fff0df]/60">
+                <div className="text-xs font-bold tracking-[0.3em] uppercase text-[#fff0df]/95" style={{ textShadow: '0 1px 6px rgba(255,240,223,0.4)' }}>
                   Database
                 </div>
                 <div className="h-px flex-1 bg-gradient-to-r from-[#fff0df]/30 to-transparent" />
@@ -1419,7 +1311,7 @@ function Drafting() {
                 location="drafting_section"
               />
             </div>
-            <div className="reveal-up mt-5 flex flex-wrap items-center gap-x-6 gap-y-3" style={{ transitionDelay: "1000ms" }}>
+            <div className="reveal-up mt-5 flex flex-col gap-y-3" style={{ transitionDelay: "1000ms" }}>
               <button
                 type="button"
                 onClick={() => {
@@ -1477,14 +1369,14 @@ function DraftingCapabilities() {
   const items = [
     {
       n: "01",
-      icon: Layers,
-      t: "Multi-document upload",
+      icon: FileText,
+      t: "Multi-document Upload",
       d: "Upload multiple legal documents — Lexram reads across all of them and drafts one coherent response.",
       dd: "Upload your entire document set at once. Lexram reads across every file simultaneously and builds a single, coherent response that draws from the full bundle — not just the document you opened last. No manual collation, no missed context.",
       visual: (
         <div className="space-y-4">
           <div className="rounded-lg border border-dashed border-[#680318]/25 bg-[#fff0df]/30 p-6 text-center">
-            <Layers className="w-6 h-6 text-[#680318]/60 mx-auto" />
+            <FileText className="w-6 h-6 text-[#680318]/60 mx-auto" />
             <div className="text-sm font-medium text-[#680318] mt-2">Drop the entire case file</div>
             <div className="text-[11px] text-[#680318]/55 mt-1">PDFs · scans · charge sheets · prior orders</div>
           </div>
@@ -1496,7 +1388,7 @@ function DraftingCapabilities() {
             ].map((f, i) => (
               <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-md border border-[#680318]/10 bg-[#fff0df]/40">
                 <FileText className="w-4 h-4 text-[#680318]/70 shrink-0" />
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <div className="text-[13px] text-[#680318] font-medium truncate">{f.name}</div>
                   <div className="text-[10px] text-[#680318]/55">{f.meta}</div>
                 </div>
@@ -1515,17 +1407,17 @@ function DraftingCapabilities() {
     },
     {
       n: "02",
-      icon: ImageIcon,
-      t: "Scan to draft",
+      icon: FileSearch,
+      t: "Scan to Draft",
       d: "Scan physical legal documents — Lexram indexes and drafts a structured response instantly.",
-      dd: "Scan a physical document and Lexram takes it from there. It indexes the scanned content, extracts what matters, and builds a structured draft response directly from it — turning paper records into actionable pleadings without any manual reading.",
+      dd: "Scan a physical document and Lexram takes it from there. It maps every key element: parties, sections, citations, and events. The extracted facts are structured exactly as the responding court or forum expects them, so your draft is organised correctly from the ground up, every time.",
       visual: (
         <div className="space-y-4">
           <div className="text-[10px] tracking-[0.25em] uppercase text-[#680318]/55">Scanned input → indexed → draft</div>
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-lg border border-[#680318]/15 bg-[#fff0df]/50 p-4">
               <div className="w-9 h-9 rounded-md bg-[#680318]/10 grid place-items-center mb-2">
-                <ImageIcon className="w-4 h-4 text-[#680318]" />
+                <FileSearch className="w-4 h-4 text-[#680318]" />
               </div>
               <div className="text-[11px] font-bold text-[#680318]">Scanned</div>
               <div className="text-[10px] text-[#680318]/55">PDF · JPG · TIFF</div>
@@ -1550,8 +1442,8 @@ function DraftingCapabilities() {
     },
     {
       n: "03",
-      icon: FileText,
-      t: "Draft management",
+      icon: Layers,
+      t: "Draft Management",
       d: "Find every pleading draft under its case — no searching through individual research threads.",
       dd: "All pleadings and drafts created for a matter are collected directly inside that case, not scattered across individual research threads. When you need to retrieve or review a draft, you go to the case — and it is there.",
       visual: (
@@ -1564,7 +1456,7 @@ function DraftingCapabilities() {
           ].map((d, i) => (
             <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-md border border-[#680318]/10 bg-[#fff0df]/30">
               <FileText className="w-4 h-4 text-[#680318]/60 shrink-0" />
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 overflow-hidden">
                 <div className="text-[13px] text-[#680318] font-medium truncate">{d.name}</div>
                 <div className="text-[10px] text-[#680318]/55">{d.date}</div>
               </div>
@@ -1576,36 +1468,9 @@ function DraftingCapabilities() {
     },
     {
       n: "04",
-      icon: FileSearch,
-      t: "Fact extraction engine",
-      d: "Maps who, what, when — parties, sections, citations and events — automatically, every time.",
-      dd: "Lexram does not just read your documents — it maps every key element: parties, sections, citations, and events. The extracted facts are structured exactly as the responding court or forum expects them, so your draft is organised correctly from the ground up, every time.",
-      visual: (
-        <div className="space-y-3">
-          <div className="text-[10px] tracking-[0.25em] uppercase text-[#680318]/55">Extracted facts · master case</div>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[
-              { k: "Parties",           v: "R. Sharma  vs.  State of T.N." },
-              { k: "Section",           v: "Sec. 420, 406 IPC" },
-              { k: "Date of incident",  v: "12 Mar 2024" },
-              { k: "FIR no.",           v: "CR-217/2024, Madurai PS" },
-              { k: "Prior bail",        v: "Rejected · 04 Apr 2024" },
-              { k: "Property value",    v: "₹ 47,80,000" },
-            ].map((f) => (
-              <div key={f.k} className="rounded-lg border border-[#680318]/10 bg-[#fff0df]/40 p-3">
-                <dt className="text-[10px] font-bold text-[#b94826] tracking-[0.18em] uppercase">{f.k}</dt>
-                <dd className="text-sm text-[#680318] font-medium mt-0.5">{f.v}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      ),
-    },
-    {
-      n: "05",
-      icon: BookOpen,
-      t: "Response document builder",
-      d: "Structured exactly as the responding court or forum expects — every time.",
+      icon: Download,
+      t: "Response Document Builder",
+      d: "AI legal response drafting structured to the format of the responding Indian court or forum.",
       dd: "Every response document Lexram builds follows the structure the specific court or forum requires. Format, sequence, and presentation are aligned to what the tribunal expects — so you are not reformatting after drafting, you are filing from it.",
       visual: (
         <div className="space-y-4">
@@ -1632,10 +1497,10 @@ function DraftingCapabilities() {
       ),
     },
     {
-      n: "06",
+      n: "05",
       icon: PenTool,
-      t: "Edit at 2 stages",
-      d: "Draft plan and final draft are both fully editable — full advocate control at every stage.",
+      t: "Edit at 2 Stages",
+      d: "Edit the draft plan before writing begins and the final draft after — full advocate control at every stage.",
       dd: "Lexram gives you two distinct points of control — the draft plan before any clause is written, and the final draft once it is generated. Both are fully editable, so you can shape the argument at the structural level and refine it at the language level.",
       visual: (
         <div className="space-y-4">
@@ -1660,43 +1525,24 @@ function DraftingCapabilities() {
         </div>
       ),
     },
-    {
-      n: "07",
-      icon: Bookmark,
-      t: "Research integration",
-      d: "One-click legal research to draft integration — real citations only, zero hallucinations.",
-      dd: "The research you have already done pulls directly into your draft with a single click. Every citation that comes in is real and verifiable — no fake case names, no invented references — so your pleading is grounded in law you have already reviewed and stand behind.",
-      visual: (
-        <div className="space-y-4">
-          <div className="text-[10px] tracking-[0.25em] uppercase text-[#680318]/55">Draft · Bail application ¶ 4</div>
-          <div className="rounded-lg border border-[#680318]/10 bg-[#fff0df]/40 p-5 font-serif text-[15px] leading-relaxed text-[#680318]/90">
-            …the applicant places reliance on the principle laid down in{" "}
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#b94826]/15 border border-[#b94826]/30 text-[#b94826] not-italic text-[12px] font-sans">
-              <Bookmark className="w-3 h-3" /> Arnesh Kumar v. State of Bihar, (2014) 8 SCC 273, ¶ 7
-            </span>{" "}
-            wherein the Hon&apos;ble Court held that arrest is not mandatory…
-          </div>
-          <div className="flex items-center justify-between text-[11px] text-[#680318]/60">
-            <span className="inline-flex items-center gap-1.5"><PenTool className="w-3 h-3" /> One-click insert from research</span>
-            <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#b94826]" /> Real citations only</span>
-          </div>
-        </div>
-      ),
-    },
   ];
 
   return (
     <div className="mt-10">
       <div className="mb-8">
-        <div className="reveal-down text-xs tracking-[0.3em] text-[#b94826] mb-3">FEATURES</div>
-        <h3 className="reveal-blur font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#fff0df] leading-tight max-w-2xl" style={{ transitionDelay: "120ms" }}>
-          A drafting workspace — not a blank page.
-        </h3>
+        <div className="reveal-down flex items-center gap-3 mb-3">
+          <div className="text-xs font-bold tracking-[0.3em] uppercase text-[#fff0df]/95" style={{ textShadow: '0 1px 6px rgba(255,240,223,0.4)' }}>Features</div>
+          <div className="h-px flex-1 bg-gradient-to-r from-[#fff0df]/20 to-transparent" />
+          <div className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.2em] uppercase text-[#b94826]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#b94826] animate-pulse" />
+            5 capabilities
+          </div>
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_1.25fr] gap-10 lg:gap-16 items-start">
+      <div className="grid lg:grid-cols-[1fr_1.25fr] gap-10 lg:gap-16 items-stretch w-full">
         {/* Left: numbered index */}
-        <div className="lg:sticky lg:top-24">
+        <div className="lg:sticky lg:top-24 min-w-0 overflow-hidden">
           {items.map((item, i) => {
             const isActive = active === i;
             const Icon = item.icon;
@@ -1704,7 +1550,11 @@ function DraftingCapabilities() {
               <button
                 key={i}
                 onClick={() => setActive(i)}
-                className="reveal-left group relative w-full text-left flex items-start gap-5 py-6 border-b border-[#fff0df]/12 transition-all"
+                className={`reveal-left group relative w-full max-w-full text-left flex items-start gap-4 py-6 border-b border-[#fff0df]/12 rounded-xl transition-all duration-200 ${
+                  isActive
+                    ? "bg-[#fff0df]/[0.06] shadow-[0_6px_24px_-4px_rgba(185,72,38,0.25),0_2px_8px_rgba(0,0,0,0.15)] -translate-y-0.5 px-3"
+                    : "hover:bg-[#fff0df]/[0.04] hover:shadow-[0_4px_18px_-4px_rgba(185,72,38,0.18),0_1px_4px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 hover:px-3"
+                }`}
                 style={{ transitionDelay: `${200 + i * 110}ms` }}
               >
                 <span
@@ -1721,29 +1571,30 @@ function DraftingCapabilities() {
                 }`}>
                   <Icon className={`w-5 h-5 transition-colors ${isActive ? "text-[#b94826]" : "text-[#fff0df]"}`} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className={`font-serif text-xl md:text-2xl font-bold transition-colors ${isActive ? "text-[#b94826]" : "text-[#fff0df]"}`}>
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <div className={`font-serif text-lg sm:text-xl md:text-2xl font-bold transition-colors break-words ${isActive ? "text-[#b94826]" : "text-[#fff0df]"}`}>
                     {item.t}
                   </div>
-                  <div className="text-sm leading-relaxed text-[#fff0df]/70 mt-2">
+                  <div className="text-sm leading-relaxed text-[#fff0df]/70 mt-2 break-words">
                     {item.d}
                   </div>
                   {expandedDraft.has(i) && (
-                    <div className="mt-3 text-sm leading-relaxed text-[#fff0df]/50 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="mt-3 text-sm leading-relaxed text-[#fff0df]/50 animate-in fade-in slide-in-from-top-1 duration-300 break-words">
                       {item.dd}
                     </div>
                   )}
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={-1}
                     onClick={(e) => { e.stopPropagation(); toggleDraftExpand(i); }}
-                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#b94826] hover:text-[#fff0df] transition-colors"
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#b94826] hover:text-[#fff0df] transition-colors cursor-pointer"
                   >
                     {expandedDraft.has(i) ? (
                       <>Show less <Minus className="w-3 h-3" /></>
                     ) : (
                       <>More <Plus className="w-3 h-3" /></>
                     )}
-                  </button>
+                  </div>
                 </div>
                 <ArrowRight
                   className={`w-4 h-4 mt-2 text-[#b94826] transition-all shrink-0 ${
@@ -1755,11 +1606,11 @@ function DraftingCapabilities() {
           })}
         </div>
 
-        {/* Right: live preview — cream card pops on the maroon section */}
-        <div className="reveal-tilt relative" style={{ transitionDelay: "260ms" }}>
+        {/* Right: live preview — stretches to match feature list height */}
+        <div className="reveal-tilt relative flex flex-col" style={{ transitionDelay: "260ms" }}>
           <div aria-hidden className="absolute -inset-8 bg-[#b94826] opacity-25 blur-3xl rounded-full pointer-events-none" />
-          <div className="relative rounded-2xl border border-[#fff0df]/15 bg-[#fff0df] shadow-elegant overflow-hidden min-h-[440px]">
-            <div className="flex items-center gap-2 px-5 py-3 border-b border-[#680318]/10 bg-[#680318]/[0.03]">
+          <div className="relative flex flex-col flex-1 rounded-2xl border border-[#fff0df]/15 bg-[#fff0df] shadow-elegant overflow-hidden min-h-[440px]">
+            <div className="flex items-center gap-2 px-5 py-3 border-b border-[#680318]/10 bg-[#680318]/[0.03] shrink-0">
               <div className="w-2.5 h-2.5 rounded-full bg-[#b94826]/60" />
               <div className="w-2.5 h-2.5 rounded-full bg-[#680318]/15" />
               <div className="w-2.5 h-2.5 rounded-full bg-[#680318]/15" />
@@ -1767,7 +1618,7 @@ function DraftingCapabilities() {
                 {items[active].n} · {items[active].t}
               </div>
             </div>
-            <div key={active} className="swap-in p-6 md:p-8">
+            <div key={active} className="swap-in p-6 md:p-8 flex-1">
               {items[active].visual}
             </div>
           </div>
@@ -1799,36 +1650,39 @@ function LexDraftEdge() {
     });
   };
 
-  const items: DraftEdge[] = [
-    { n: "01", t: "Legal Research and Drafting in One Platform", d: "One switch, no gaps. What you find from research goes straight into what you file.", dd: "Lexram connects research and drafting in a single, unbroken workflow. What you find during research flows directly into what you file — so there is no gap between the law you identify and the argument you make.", icon: Layers, image: "/landing/research-img.jpg" },
-    { n: "02", t: "Zero Assumptions", d: "Your facts, your documents, zero assumptions. Lexram builds the draft from what you uploaded — nothing assumed, nothing invented.", dd: "Lexram drafts exclusively from the documents you upload. It does not fill gaps with guesses or infer facts you have not provided. Every line of the draft traces back to something you gave it — nothing assumed, nothing invented.", icon: Shield, image: "/landing/lawbook.jpg" },
-    { n: "03", t: "Structures Before It Writes", d: "Lexram shows you the full draft plan before a single clause is written — edit it, approve it, then draft.", dd: "Before any clause is drafted, Lexram presents the complete structural plan for your document. You can review, edit, and approve the outline — so you stay in control of the argument architecture before drafting begins.", icon: FileText, image: "/landing/papers.jpg" },
-    { n: "04", t: "Upload Your Entire Case File — Lexram Reads All of It", d: "Lexram reads across your full bundle and builds a draft that addresses the complete picture.", dd: "Lexram does not skim. It reads across your entire uploaded case bundle — every FIR, chargesheet, order, and exhibit — and builds a draft that addresses the full factual and legal picture, not just the document you happened to open last.", icon: BookOpen, image: "/landing/library.jpg" },
-    { n: "05", t: "No Fake Citations. No Invented Sections. Every Source Verifiable.", d: "Every judgement in your draft traces back to a real, openable source — no hallucinations, no fabricated case names.", dd: "Every judgment cited in your draft links back to a real, openable source. No hallucinated case names, no fabricated section references — so you can file with confidence that every citation in your pleading will hold up to scrutiny.", icon: CheckCircle2, image: "/landing/courthouse.jpg" },
-    { n: "06", t: "Grounded in Judgements — Not AI Guesswork", d: "Every argument in your draft is backed by a real Supreme Court judgement and your uploaded documents — nothing invented.", dd: "Each argument Lexram drafts is anchored in a real Supreme Court judgment and grounded in the documents you uploaded. There is no AI guesswork filling the gaps — every position taken in your draft has a verifiable legal and factual basis behind it.", icon: Gavel, image: "/landing/chamber.jpg" },
+  const features: DraftEdge[] = [
+    { n: "01", t: "Research and Drafting in One Platform", d: "From legal research to courtroom draft — no copy-paste, no context lost, no platform switch.", dd: "Lexram connects research and drafting in a single, unbroken workflow. What you find during research flows directly into what you file — so there is no gap between the law you identify and the argument you make.", icon: Layers, image: "/landing/research-img.jpg" },
+    { n: "02", t: "Zero Assumptions", d: "AI legal drafting built only from your uploaded documents — no assumptions, nothing invented.", dd: "Lexram drafts exclusively from the documents you upload. It does not fill gaps with guesses or infer facts you have not provided. Every line of the draft traces back to something you gave it — nothing assumed, nothing invented.", icon: Shield, image: "/landing/lawbook.jpg" },
+    { n: "03", t: "Structures Before It Writes", d: "Review and approve the full draft structure before a single clause is written.", dd: "Before any clause is drafted, Lexram presents the complete structural plan for your document. You can review, edit, and approve the outline — so you stay in control of the argument architecture before drafting begins.", icon: FileText, image: "/landing/papers.jpg" },
+    { n: "04", t: "Upload Your Entire Case File", d: "Upload your full case bundle — Lexram reads every document and drafts the complete picture.", dd: "Lexram does not skim. It reads across your entire uploaded case bundle — every FIR, chargesheet, order, and exhibit — and builds a draft that addresses the full factual and legal picture, not just the document you happened to open last.", icon: Download, image: "/landing/library.jpg" },
+    { n: "05", t: "No Fake Citations", d: "Every case citation and section in your draft is real, openable, and verifiable.", dd: "Every judgment and section cited in your draft links back to Supreme Court judgements and Central statutes. No hallucinated case names, no fabricated section references — zero hallucinated Supreme Court judgements and sections.", icon: CheckCircle2, image: "/landing/courthouse.jpg" },
+    { n: "06", t: "Free Trial Available", d: "Try AI legal drafting with a free trial — no credit card required.", dd: "Get full access to Lexram drafting capabilities with a free trial. Generate your first court-ready draft from your documents before committing to a plan.", icon: Star, image: "/landing/chamber.jpg" },
   ];
 
   const [active, setActive] = useState(0);
 
   return (
     <section id="lexdraft-edge" className="relative py-10 md:py-12 overflow-hidden bg-[#680318] text-[#fff0df]">
-      <div aria-hidden className="absolute top-1/3 -left-32 w-[420px] h-[420px] bg-[#b94826] opacity-15 blur-[160px] rounded-full pointer-events-none lex-float-x" />
-      <div aria-hidden className="absolute bottom-0 -right-32 w-[420px] h-[420px] bg-[#b94826] opacity-10 blur-[180px] rounded-full pointer-events-none lex-float" />
+      <div aria-hidden className="absolute top-1/4 -left-32 w-[520px] h-[520px] bg-[#b94826] opacity-20 blur-[160px] rounded-full pointer-events-none lex-float" />
+      <div aria-hidden className="absolute bottom-0 -right-32 w-[520px] h-[520px] bg-[#b94826] opacity-[0.12] blur-[180px] rounded-full pointer-events-none" />
 
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
-        {/* Header */}
-        <div className="max-w-3xl mb-10">
-          <div className="text-[10px] tracking-[0.3em] text-[#b94826]">LEXRAM EDGE</div>
-          <h2 className="font-serif text-3xl md:text-4xl font-bold leading-tight mt-2">
-            The edge that makes a draft <span className="italic text-[#b94826]">filable</span>.
-          </h2>
+      <div className="relative max-w-[1440px] mx-auto px-6 sm:px-10">
+        <div className="mb-8">
+          <div className="flex items-center gap-3">
+            <div className="text-xs font-bold tracking-[0.3em] uppercase text-[#fff0df]/95" style={{ textShadow: '0 1px 6px rgba(255,240,223,0.4)' }}>Lexram Edge</div>
+            <div className="h-px flex-1 bg-gradient-to-r from-[#fff0df]/20 to-transparent" />
+            <div className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.2em] uppercase text-[#b94826]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#b94826] animate-pulse" />
+              6 features
+            </div>
+          </div>
         </div>
 
         {/* Left: clickable feature list — Right: image that swaps */}
-        <div className="grid lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-14 items-start">
+        <div className="grid lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-14 items-stretch w-full">
           {/* Feature list */}
           <div>
-            {items.map((f, i) => {
+            {features.map((f, i) => {
               const isActive = active === i;
               const Icon = f.icon;
               return (
@@ -1837,8 +1691,10 @@ function LexDraftEdge() {
                   type="button"
                   onClick={() => setActive(i)}
                   aria-pressed={isActive}
-                  className={`relative w-full text-left flex items-start gap-5 px-3 py-5 border-b border-[#fff0df]/12 transition-all ${
-                    isActive ? "" : "opacity-65 hover:opacity-100"
+                  className={`relative w-full max-w-full text-left flex items-start gap-4 px-3 py-5 border-b border-[#fff0df]/12 rounded-xl transition-all duration-200 ${
+                    isActive
+                      ? "bg-[#fff0df]/[0.06] shadow-[0_6px_24px_-4px_rgba(185,72,38,0.25),0_2px_8px_rgba(0,0,0,0.15)] -translate-y-0.5"
+                      : "opacity-80 hover:opacity-100 hover:bg-[#fff0df]/[0.04] hover:shadow-[0_4px_18px_-4px_rgba(185,72,38,0.18),0_1px_4px_rgba(0,0,0,0.10)] hover:-translate-y-0.5"
                   }`}
                 >
                   <span
@@ -1850,11 +1706,11 @@ function LexDraftEdge() {
                   <div className={`w-10 h-10 rounded-lg grid place-items-center border shrink-0 transition-colors ${
                     isActive
                       ? "bg-[#b94826]/25 border-[#b94826]/50"
-                      : "bg-[#fff0df]/[0.06] border-[#fff0df]/15"
+                      : "bg-[#fff0df]/[0.08] border-[#fff0df]/15"
                   }`}>
                     <Icon className={`w-5 h-5 transition-colors ${isActive ? "text-[#b94826]" : "text-[#fff0df]"}`} />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 overflow-hidden">
                     <div className={`font-serif text-xl md:text-2xl font-bold leading-tight transition-colors ${
                       isActive ? "text-[#b94826]" : "text-[#fff0df]"
                     }`}>
@@ -1864,25 +1720,26 @@ function LexDraftEdge() {
                       {f.d}
                     </div>
                     {expandedLD.has(i) && (
-                      <div className="mt-3 text-sm leading-relaxed text-[#fff0df]/50 animate-in fade-in slide-in-from-top-1 duration-300">
+                      <div className="mt-3 text-sm leading-relaxed text-[#fff0df]/55 animate-in fade-in slide-in-from-top-1 duration-300">
                         {f.dd}
                       </div>
                     )}
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={-1}
                       onClick={(e) => { e.stopPropagation(); toggleLDExpand(i); }}
-                      className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#b94826] hover:text-[#fff0df] transition-colors"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#b94826] hover:text-[#fff0df] transition-colors cursor-pointer"
                     >
                       {expandedLD.has(i) ? (
                         <>Show less <Minus className="w-3 h-3" /></>
                       ) : (
                         <>More <Plus className="w-3 h-3" /></>
                       )}
-                    </button>
+                    </div>
                   </div>
                   <ArrowRight
                     className={`w-4 h-4 mt-2 text-[#b94826] transition-all shrink-0 ${
-                      isActive ? "translate-x-1 opacity-100" : "opacity-30"
+                      isActive ? "translate-x-1 opacity-100" : "opacity-40"
                     }`}
                   />
                 </button>
@@ -1890,13 +1747,12 @@ function LexDraftEdge() {
             })}
           </div>
 
-          {/* Right column — image card + progress nav + proof-points fill
-              the sticky column so the longer left list never leaves dead space. */}
-          <div className="relative lg:sticky lg:top-24 space-y-5">
-            <div className="relative">
-              <div aria-hidden className="absolute -inset-6 bg-[#b94826] opacity-25 blur-3xl rounded-full pointer-events-none" />
-              <div className="relative rounded-2xl overflow-hidden shadow-elegant aspect-[4/3] bg-[#fff0df]/[0.04] border border-[#fff0df]/12">
-                {items.map((f, i) => (
+          {/* Right column — image fills full column height */}
+          <div className="relative flex flex-col gap-5">
+            <div className="relative flex flex-col flex-1">
+              <div aria-hidden className="absolute -inset-6 bg-[#b94826] opacity-20 blur-3xl rounded-full pointer-events-none" />
+              <div className="relative flex-1 rounded-2xl overflow-hidden shadow-elegant bg-[#fff0df]/10 min-h-[320px]">
+                {features.map((f, i) => (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     key={f.image}
@@ -1909,51 +1765,51 @@ function LexDraftEdge() {
                   />
                 ))}
                 {/* caption strip overlay on the image */}
-                <div className="absolute left-0 right-0 bottom-0 bg-gradient-to-t from-[#680318]/90 via-[#680318]/50 to-transparent px-6 py-5 text-[#fff0df]">
+                <div className="absolute left-0 right-0 bottom-0 bg-gradient-to-t from-[#680318]/85 via-[#680318]/45 to-transparent px-6 py-5 text-[#fff0df]">
                   <div className="flex items-center gap-2 text-[10px] tracking-[0.25em] uppercase text-[#b94826]">
-                    <span className="font-mono">EDGE / {items[active].n}</span>
+                    <span className="font-mono">{features[active].n}</span>
                     <span className="w-px h-3 bg-[#fff0df]/30" />
-                    <span>Filable</span>
+                    <span>Lexram Edge</span>
                   </div>
                   <div className="font-serif text-xl md:text-2xl font-bold mt-1">
-                    {items[active].t}
+                    {features[active].t}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Position indicator + dot progress + nav arrows (dark variant) */}
-            <div className="relative flex items-center gap-4 rounded-2xl border border-[#fff0df]/15 bg-[#fff0df]/[0.05] backdrop-blur-sm p-4">
+            {/* Position indicator + dot progress + nav arrows */}
+            <div className="relative flex items-center gap-4 rounded-2xl border border-[#fff0df]/15 bg-[#fff0df]/[0.06] shadow-soft p-4">
               <button
                 type="button"
                 aria-label="Previous edge"
-                onClick={() => setActive((i) => (i - 1 + items.length) % items.length)}
+                onClick={() => setActive((i) => (i - 1 + features.length) % features.length)}
                 className="w-9 h-9 rounded-lg border border-[#fff0df]/20 grid place-items-center text-[#fff0df] hover:border-[#b94826] hover:text-[#b94826] transition"
               >
                 <ArrowRight className="w-4 h-4 rotate-180" />
               </button>
               <div className="flex-1">
                 <div className="flex items-center gap-1.5">
-                  {items.map((_, i) => (
+                  {features.map((_, i) => (
                     <button
                       key={i}
                       type="button"
                       aria-label={`Go to edge ${i + 1}`}
                       onClick={() => setActive(i)}
                       className={`h-1.5 rounded-full transition-all ${
-                        i === active ? "w-8 bg-[#b94826]" : "w-2 bg-[#fff0df]/25 hover:bg-[#fff0df]/50"
+                        i === active ? "w-8 bg-[#b94826]" : "w-2 bg-[#fff0df]/20 hover:bg-[#fff0df]/40"
                       }`}
                     />
                   ))}
                 </div>
                 <div className="mt-2 text-[10px] tracking-[0.25em] uppercase text-[#fff0df]/60">
-                  Edge {items[active].n} of {String(items.length).padStart(2, "0")}
+                  Edge {features[active].n} of {String(features.length).padStart(2, "0")}
                 </div>
               </div>
               <button
                 type="button"
                 aria-label="Next edge"
-                onClick={() => setActive((i) => (i + 1) % items.length)}
+                onClick={() => setActive((i) => (i + 1) % features.length)}
                 className="w-9 h-9 rounded-lg border border-[#fff0df]/20 grid place-items-center text-[#fff0df] hover:border-[#b94826] hover:text-[#b94826] transition"
               >
                 <ArrowRight className="w-4 h-4" />
@@ -1981,9 +1837,9 @@ function Resources() {
   ];
   return (
     <section id="resources" className="py-10 md:py-12 bg-[#fff0df] relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-[1440px] mx-auto px-6 sm:px-10">
         <div className="max-w-3xl">
-          <div className="reveal-left text-xs tracking-[0.3em] text-[#b94826] mb-4">03 — RESOURCES</div>
+          <div className="reveal-left text-xs tracking-[0.3em] text-[#b94826] mb-4">RESOURCES</div>
           <h2 className="reveal-up font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#680318] leading-tight" style={{ transitionDelay: "120ms" }}>
             A working library, not a <span className="italic">reference shelf</span>.
           </h2>
@@ -2001,161 +1857,6 @@ function Resources() {
         </div>
 
         <FeatureGrid features={features} />
-      </div>
-    </section>
-  );
-}
-
-/* ============================================================
-   Blog — rotating background of real blog covers + centered legal
-   quote that cycles in sync. Covers are pulled from the live
-   blog_posts table (published only). Falls back to bundled landing
-   imagery if there are no posts yet.
-   ============================================================ */
-const BLOG_FALLBACK_COVERS = [
-  "/landing/courthouse.jpg",
-  "/landing/library.jpg",
-  "/landing/parallax-court.jpg",
-  "/landing/chamber.jpg",
-];
-
-/* Editorial pillars — the three formats Lexram's bench desk publishes. The
-   cycle hints at what readers will find on the blog without dumping a list
-   of headlines (which would go stale fast). */
-const LEGAL_QUOTES: { q: string; a: string }[] = [
-  { q: "Every piece traces back to the full Supreme Court judgement — one click, no searching.",
-    a: "Opinion & Editorial" },
-  { q: "Sharp enough for a senior advocate. Clear enough for a first-year.",
-    a: "Supreme Court Judgement Analysis" },
-  { q: "What changes in Indian law — and what it means for advocates' practice.",
-    a: "Supreme Court Ruling Analysis" },
-];
-
-function Blog() {
-  useReveal();
-  const [covers, setCovers] = useState<string[]>(BLOG_FALLBACK_COVERS);
-  const [imgIdx, setImgIdx] = useState(0);
-  const [qIdx, setQIdx] = useState(0);
-
-  /* Pull published blog cover_image_urls once on mount. Quietly fall
-     back to the bundled imagery if the call errors or returns nothing. */
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { supabase } = await import("@/lib/supabase/client");
-        const { data } = await supabase()
-          .from("blog_posts")
-          .select("cover_image_url")
-          .eq("status", "published")
-          .not("cover_image_url", "is", null)
-          .order("published_at", { ascending: false })
-          .limit(8);
-        if (cancelled) return;
-        const urls = (data ?? [])
-          .map((r: { cover_image_url: string | null }) => r.cover_image_url)
-          .filter((u): u is string => !!u);
-        if (urls.length > 0) setCovers(urls);
-      } catch {
-        /* keep fallbacks */
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  /* Cycle images and quotes on independent intervals so they feel alive
-     but not in lockstep. */
-  useEffect(() => {
-    const t = setInterval(() => setImgIdx((i) => (i + 1) % covers.length), 5500);
-    return () => clearInterval(t);
-  }, [covers.length]);
-  useEffect(() => {
-    const t = setInterval(() => setQIdx((i) => (i + 1) % LEGAL_QUOTES.length), 7000);
-    return () => clearInterval(t);
-  }, []);
-
-  const currentQuote = LEGAL_QUOTES[qIdx];
-
-  return (
-    <section
-      id="blog"
-      className="relative text-[#fff0df] overflow-hidden h-[560px] md:h-[640px] flex items-center"
-    >
-      {/* Rotating background covers — locked container, crossfade between images.
-          Fixed height + object-cover + centered focal point so every image fills
-          the same frame regardless of its native aspect ratio. */}
-      <div aria-hidden className="absolute inset-0 overflow-hidden">
-        {covers.map((src, i) => (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            key={src + i}
-            src={src}
-            alt=""
-            loading="lazy"
-            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-[1400ms] ease-out ${
-              i === imgIdx ? "opacity-100" : "opacity-0"
-            }`}
-          />
-        ))}
-        {/* Maroon overlay + vignette so the quote stays legible regardless of image */}
-        <div className="absolute inset-0 bg-[#680318]/75" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(42,15,16,0.7)_100%)]" />
-      </div>
-
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center py-8">
-        <div className="text-xs tracking-[0.3em] text-[#b94826] mb-3">
-          LEGAL BLOGS
-        </div>
-
-        <h2 className="font-serif text-2xl md:text-4xl lg:text-5xl font-bold leading-[1.1] text-balance text-[#fff0df] max-w-3xl mx-auto">
-          We don&apos;t report Indian law. <span className="italic text-[#b94826]">We practise it.</span>
-        </h2>
-
-        <p className="mt-3 text-sm md:text-base text-[#fff0df]/75 max-w-xl mx-auto leading-relaxed">
-          Legal opinions written by Indian advocates — not journalists.
-        </p>
-
-        {/* Editorial pillar cycle — category label above, tagline below */}
-        <div className="mt-8 flex flex-col items-center justify-center">
-          <div
-            key={`a-${qIdx}`}
-            className="swap-in inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#b94826]/20 border border-[#b94826]/40 text-[10px] md:text-xs tracking-[0.3em] uppercase text-[#fff0df]"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#b94826] animate-pulse" />
-            {currentQuote.a}
-          </div>
-          <blockquote
-            key={qIdx}
-            className="swap-in mt-4 font-serif text-lg md:text-2xl lg:text-3xl font-bold leading-[1.3] text-balance text-[#fff0df] max-w-2xl"
-          >
-            &ldquo;{currentQuote.q}&rdquo;
-          </blockquote>
-        </div>
-
-        <div className="reveal-blur mt-6 flex flex-wrap items-center justify-center gap-3" style={{ transitionDelay: "240ms" }}>
-          <SectionCTA
-            label="Read the Blog"
-            tone="dark"
-            primaryHref={BLOG}
-            eventName="cta_start_research_click"
-            location="blog_section"
-          />
-        </div>
-
-        {/* Image position indicator dots */}
-        <div className="mt-8 flex items-center justify-center gap-1.5">
-          {covers.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              aria-label={`Show cover ${i + 1}`}
-              onClick={() => setImgIdx(i)}
-              className={`h-1.5 rounded-full transition-all ${
-                i === imgIdx ? "w-6 bg-[#b94826]" : "w-1.5 bg-[#fff0df]/40 hover:bg-[#fff0df]/70"
-              }`}
-            />
-          ))}
-        </div>
       </div>
     </section>
   );
@@ -2181,7 +1882,7 @@ function Stats() {
       }}
     >
       <div className="absolute inset-0 bg-[#680318]/85" />
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-2 md:grid-cols-4 gap-10 text-center">
+      <div className="relative max-w-[1440px] mx-auto px-6 sm:px-10 grid grid-cols-2 md:grid-cols-4 gap-10 text-center">
         {stats.map((s, i) => (
           <div key={i} className="reveal-zoom" style={{ transitionDelay: `${i * 120}ms` }}>
             <div className="font-serif text-4xl sm:text-5xl md:text-7xl font-bold text-[#b94826]">{s.n}</div>
@@ -2238,10 +1939,10 @@ function Stories() {
 
   return (
     <section id="testimonials" className="py-10 md:py-12 bg-[#fff0df]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-[1440px] mx-auto px-6 sm:px-10">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="reveal-down text-xs tracking-[0.3em] text-[#b94826] mb-4">TESTIMONIALS</div>
+          <div className="reveal-down lex-kicker--bright text-xs tracking-[0.3em] text-[#b94826] mb-4">TESTIMONIALS — FROM ADVOCATES</div>
           <h2 className="reveal-blur font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#680318] text-balance" style={{ transitionDelay: "120ms" }}>
             From the advocates who <span className="italic">use it every day</span>.
           </h2>
@@ -2387,10 +2088,10 @@ function MarketComparison() {
 
   return (
     <section id="compare" className="py-10 md:py-12 bg-[#fff0df]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-[1440px] mx-auto px-6 sm:px-10">
         <div className="reveal-down max-w-3xl mb-10">
-          <div className="text-xs tracking-[0.3em] text-[#b94826] mb-4">
-            WHERE LEXRAM SITS IN THE MARKET
+          <div className="lex-kicker--bright text-xs tracking-[0.3em] text-[#b94826] mb-4">
+            COMPARE — WHERE LEXRAM SITS IN THE MARKET
           </div>
           <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#680318] leading-tight">
             Compared, plainly.
@@ -2473,9 +2174,9 @@ function Pricing() {
   ];
   return (
     <section id="pricing" className="py-10 md:py-12 bg-[#fff0df]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+      <div className="max-w-[1440px] mx-auto px-6 sm:px-10">
         <div className="text-center mb-8">
-          <div className="reveal-down text-xs tracking-[0.3em] text-[#b94826] mb-4">PRICING</div>
+          <div className="reveal-down lex-kicker--bright text-xs tracking-[0.3em] text-[#b94826] mb-4">PRICING — PLANS &amp; TIERS</div>
           <h2 className="reveal-blur font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#680318]" style={{ transitionDelay: "120ms" }}>
             Pay as you go.
           </h2>
@@ -2610,9 +2311,9 @@ function FAQ() {
 
   return (
     <section id="faq" className="py-10 md:py-12 bg-[#fff0df]">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+      <div className="max-w-[1200px] mx-auto px-6 sm:px-10">
         <div className="text-center mb-8">
-          <div className="reveal-down text-xs tracking-[0.3em] text-[#b94826] mb-4">FAQ</div>
+          <div className="reveal-down lex-kicker--bright text-xs tracking-[0.3em] text-[#b94826] mb-4">FAQ — FREQUENTLY ASKED</div>
           <h2 className="reveal-blur font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#680318]" style={{ transitionDelay: "120ms" }}>
             Questions, <span className="italic">answered</span>.
           </h2>
@@ -2754,7 +2455,7 @@ function ContactRow({
       </div>
       <div>
         <div className="text-[10px] tracking-[0.25em] uppercase text-[#b94826] mb-1">{label}</div>
-        <div className="font-serif text-lg text-[#fff0df] font-semibold leading-snug">{value}</div>
+        <div className="font-mono text-xl text-[#fff0df] font-bold leading-snug tracking-wide">{value}</div>
       </div>
     </div>
   );
@@ -2797,7 +2498,7 @@ function GetInTouch() {
   const [form, setForm] = useState({ name: "", email: "", firm: "", phone: "", topic: "Sales", message: "" });
   const [submitted, setSubmitted] = useState(false);
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     track("contact_form_submit", {
       location: "get_in_touch",
@@ -2816,10 +2517,10 @@ function GetInTouch() {
       <div aria-hidden className="absolute top-1/4 -left-32 w-[520px] h-[520px] bg-[#b94826] opacity-15 blur-[160px] rounded-full pointer-events-none lex-float-x" />
       <div aria-hidden className="absolute bottom-0 -right-32 w-[520px] h-[520px] bg-[#b94826] opacity-10 blur-[180px] rounded-full pointer-events-none lex-float" />
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="relative max-w-[1440px] mx-auto px-6 sm:px-10">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-10">
-          <div className="text-xs tracking-[0.3em] text-[#b94826] mb-4">GET IN TOUCH</div>
+          <div className="lex-kicker--bright text-xs tracking-[0.3em] text-[#b94826] mb-4">CONTACT — GET IN TOUCH</div>
           <h2 className="font-serif text-3xl sm:text-4xl md:text-6xl font-bold text-[#fff0df] leading-[1.05] text-balance">
             Have a question?
             <br />
@@ -2949,7 +2650,7 @@ function GetInTouch() {
    ============================================================ */
 function CTA() {
   const [email, setEmail] = useState("");
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     track("cta_start_trial_click", { location: "final_cta" });
     const qs = email ? `&email=${encodeURIComponent(email)}` : "";
@@ -3001,17 +2702,18 @@ function CTA() {
 function Footer() {
   return (
     <footer className="bg-[#680318] text-[#fff0df]/70 pt-16 pb-10 border-t border-[#b94826]/20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-[1440px] mx-auto px-6 sm:px-10">
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10">
           {/* Brand */}
           <div className="lg:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-md bg-gradient-warm grid place-items-center">
-                <Scale className="w-4 h-4 text-[#fff0df]" />
-              </div>
-              <span className="font-serif text-xl font-bold text-[#fff0df]">
-                LexRam<span className="text-[#b94826]">.</span>ai
-              </span>
+            <div className="flex items-center mb-4">
+              <img
+                src="/lexram-logo.png"
+                alt="Lexram"
+                width={132}
+                height={46}
+                className="h-10 w-auto brightness-0 invert"
+              />
             </div>
             <p className="text-sm max-w-sm leading-relaxed mb-4">
               &ldquo;You argue the case. We&apos;ll find the law.&rdquo; From statute to submission — built on India&apos;s courts alone.
@@ -3095,9 +2797,8 @@ export default function LandingPage() {
       <Drafting />
       <LexDraftEdge />
       {/* <Resources /> — temporarily hidden; re-enable when section is finalised */}
-      <Blog />
-      <Stats />
       <MarketComparison />
+      <Stats />
       <Stories />
       <Pricing />
       <FAQ />

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -116,19 +117,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 render={<Link href="/dashboard/research-2" />}
                 className="sidebar-logo flex-1"
               >
-                <div
-                  className="flex aspect-square size-8 items-center justify-center rounded-md border shrink-0"
-                  style={{
-                    borderColor: "color-mix(in srgb, var(--accent) 40%, transparent)",
-                    color: "var(--accent)",
-                  }}
-                >
-                  <Scale className="size-4" />
-                </div>
+                <Image
+                  src="/lexram-logo.png"
+                  alt="Lexram"
+                  width={116}
+                  height={40}
+                  className="h-8 w-auto shrink-0"
+                />
                 <div className="sidebar-brand-text grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-serif font-bold text-[var(--text-on-sidebar)]">
-                    LexRam
-                  </span>
                   <span className="truncate text-xs text-[var(--text-on-sidebar)]/60">
                     Legal AI
                   </span>

@@ -32,8 +32,11 @@ export default function TsrLayout({ children }: { children: React.ReactNode }) {
   const isOnboardingPending = pathname.startsWith("/dashboard/tsr/onboarding/pending");
   const isAnyOnboarding = isOnboardingChoice || isOnboardingOrg || isOnboardingPending;
 
-  // Members already inside the workspace don't need org-request data; skip the query.
-  const hasMembership = !ctx.loading && ctx.role !== "no_role" && !!ctx.org;
+  // Super admins are platform-level operators and don't belong to an org —
+  // they get unconditional workspace access (the super-admin pages have their
+  // own role gate). Members must have an active org_members row.
+  const isSuperAdmin = !ctx.loading && ctx.role === "super_admin";
+  const hasMembership = isSuperAdmin || (!ctx.loading && ctx.role !== "no_role" && !!ctx.org);
   const { request, loading: reqLoading } = useMyOrgRequest(!ctx.loading && !hasMembership);
 
   // Watchdog: if we're still loading after STUCK_AFTER_MS, surface a panel

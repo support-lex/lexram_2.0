@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -22,7 +23,6 @@ import {
   Users,
   Settings,
   HelpCircle,
-  Scale,
   Menu,
   X,
   BadgeCheckIcon,
@@ -186,25 +186,20 @@ export function AppTopBar() {
       />
 
       <div className="h-full px-6 flex items-center justify-between gap-6">
-        {/* ── Left: animated logo ──────────────────────────────── */}
+        {/* ── Left: brand logo ──────────────────────────────── */}
         <Link
           href="/dashboard"
-          className="flex items-center gap-2.5 shrink-0 group/logo"
+          aria-label="Lexram"
+          className="flex items-center shrink-0 transition-transform duration-300 hover:scale-[1.04]"
         >
-          <div
-            className="grid place-items-center size-7 rounded-full text-white shadow-[0_4px_14px_rgba(122,31,43,0.35)] transition-all duration-300 group-hover/logo:shadow-[0_6px_20px_rgba(122,31,43,0.55)] group-hover/logo:scale-105"
-            style={{
-              background: "linear-gradient(135deg, #7a1f2b 0%, #5e1721 100%)",
-            }}
-          >
-            <Scale
-              className="size-4 transition-transform duration-500 group-hover/logo:rotate-[18deg]"
-              strokeWidth={2}
-            />
-          </div>
-          <span className="text-[16px] font-semibold tracking-tight text-[#7a1f2b] transition-colors group-hover/logo:text-[#5e1721]">
-            Lexram
-          </span>
+          <Image
+            src="/lexram-logo.png"
+            alt="Lexram"
+            width={116}
+            height={40}
+            priority
+            className="h-8 w-auto"
+          />
         </Link>
 
         {/* ── Center: nav with sliding pills (desktop) ─────────── */}

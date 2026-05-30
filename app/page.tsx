@@ -212,35 +212,35 @@ function Nav() {
 
   return (
     <header className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-[#fff0df]/80 border-b border-[#680318]/10">
-      <div className="max-w-[1440px] mx-auto px-6 sm:px-10 h-16 flex items-center justify-between gap-3">
+      <div className="max-w-[1440px] mx-auto px-6 sm:px-10 h-20 flex items-center justify-between gap-3">
         {/* Brand */}
         <a href="#" aria-label="Lexram" className="flex items-center shrink-0">
           <img
             src="/lexram-logo.png"
             alt="Lexram"
-            width={120}
-            height={42}
-            className="h-9 sm:h-10 w-auto"
+            width={140}
+            height={48}
+            className="h-11 sm:h-12 w-auto"
           />
         </a>
 
         {/* Desktop nav */}
-        <nav className="hidden lg:flex items-center gap-6 text-sm text-[#680318]/80">
+        <nav className="hidden lg:flex items-center gap-8 text-base text-[#680318]/80">
           {links.map((l) => (
-            <a key={l.href} href={l.href} className="hover:text-[#680318] transition">
+            <a key={l.href} href={l.href} className="font-medium hover:text-[#680318] transition">
               {l.label}
             </a>
           ))}
         </nav>
 
         {/* Desktop CTAs */}
-        <div className="hidden sm:flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-3">
           <button
             onClick={() => {
               track("cta_login_click", { location: "nav" });
               go(LOGIN);
             }}
-            className="inline-flex items-center gap-2 border border-[#680318]/25 text-[#680318] px-3.5 lg:px-4 py-2 rounded-md text-sm font-medium hover:border-[#b94826] hover:text-[#b94826] transition"
+            className="inline-flex items-center gap-2 border border-[#680318]/25 text-[#680318] px-4 lg:px-5 py-2.5 rounded-md text-base font-medium hover:border-[#b94826] hover:text-[#b94826] transition"
           >
             Login
           </button>
@@ -249,7 +249,7 @@ function Nav() {
               track("cta_start_trial_click", { location: "nav" });
               go(SIGNUP);
             }}
-            className="inline-flex items-center gap-2 bg-[#680318] text-[#fff0df] px-3.5 lg:px-4 py-2 rounded-md text-sm font-medium hover:bg-[#b94826] transition shadow-soft"
+            className="inline-flex items-center gap-2 bg-[#680318] text-[#fff0df] px-4 lg:px-5 py-2.5 rounded-md text-base font-medium hover:bg-[#b94826] transition shadow-soft"
           >
             <span className="hidden md:inline">Free Trial</span>
             <span className="md:hidden">Trial</span>
@@ -263,7 +263,7 @@ function Nav() {
           onClick={() => setOpen((o) => !o)}
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
-          className="lg:hidden inline-flex items-center justify-center w-10 h-10 rounded-md border border-[#680318]/20 text-[#680318] hover:border-[#b94826] hover:text-[#b94826] transition"
+          className="lg:hidden inline-flex items-center justify-center w-11 h-11 rounded-md border border-[#680318]/20 text-[#680318] hover:border-[#b94826] hover:text-[#b94826] transition"
         >
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -281,7 +281,7 @@ function Nav() {
               key={l.href}
               href={l.href}
               onClick={() => setOpen(false)}
-              className="py-3 text-base font-medium text-[#680318]/85 border-b border-[#680318]/10 last:border-b-0 hover:text-[#b94826] transition"
+              className="py-3.5 text-lg font-semibold text-[#680318]/85 border-b border-[#680318]/10 last:border-b-0 hover:text-[#b94826] transition"
             >
               {l.label}
             </a>
@@ -334,8 +334,8 @@ function Hero() {
       accent: "Statute-first.",
       accent2: "Precedent-backed.",
       tagline: "\u201CYou argue the case. We'll find the law.\u201D",
-      desc: "Built exclusively on verified Indian legal sources — so every judgment you cite is one you can stand behind in court.",
-      bullets: ["Central statutes", "Supreme Court judgements backed", "Supreme Court precedent search", "Filters per incuriam judgments", "No fake citations", "Zero hallucinations", "Verified citations"],
+      desc: "AI legal research platform built on Supreme Court judgements and statutes — so every judgment you cite is one you can stand behind in court.",
+      bullets: ["Central statutes", "Supreme Court judgements backed", "Supreme Court precedent search", "Filters per incuriam judgments", "No fake citations", "Zero hallucinations Legal AI", "Verified citations"],
       cta: "Start Research",
       cta2: "Explore",
       ctaHref: "#research",
@@ -449,21 +449,28 @@ function Hero() {
             {/* Tab content — single column: badge → heading → desc → bullets → Explore (last) */}
             <div
               key={active}
-              className="p-5 sm:p-7 md:p-8 flex flex-col gap-4 min-h-[380px] animate-in fade-in slide-in-from-bottom-2 duration-400"
+              className="p-5 sm:p-7 md:p-8 flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-400"
             >
               {/* Badge */}
               <span className="inline-block text-xs font-bold tracking-[0.2em] uppercase px-2.5 py-1 rounded-md bg-[#e8c8a8] text-[#680318] self-start">
                 {c.badge}
               </span>
 
+              {/* Tagline — quote */}
+              {c.tagline && (
+                <p className="font-serif text-base sm:text-lg italic text-[#fff0df] leading-snug border-l-2 border-[#b94826] pl-3" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.45)' }}>
+                  {c.tagline}
+                </p>
+              )}
+
               {/* Heading */}
-              <h3 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-[#fff0df] leading-tight text-balance" style={{ textShadow: '0 2px 18px rgba(255,240,223,0.25), 0 1px 4px rgba(0,0,0,0.4)' }}>
+              <h3 className="font-serif text-xl sm:text-2xl md:text-3xl font-bold text-[#fff0df] leading-tight text-balance" style={{ textShadow: '0 2px 18px rgba(255,240,223,0.25), 0 1px 4px rgba(0,0,0,0.4)' }}>
                 <span className="text-[#e8c8a8]">{c.accent}</span>{" "}
                 <span className="text-[#b94826]">{c.accent2}</span>
               </h3>
 
               {/* Description */}
-              <p className="text-base md:text-lg text-[#fff0df]/85 leading-relaxed" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+              <p className="text-sm md:text-base text-[#fff0df]/85 leading-relaxed" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
                 {c.desc}
               </p>
 
@@ -508,15 +515,24 @@ function TrustStrip() {
   ];
   return (
     <section className="py-14 md:py-16 bg-[#680318] text-[#fff0df]/80 overflow-hidden border-y border-[#b94826]/30">
-      <div className="reveal-down text-center text-sm tracking-[0.3em] mb-8 text-[#fff0df]/70 font-medium">
+      <div
+        className="reveal-down text-center text-sm tracking-[0.3em] mb-8 font-bold text-[#fff0df]"
+        style={{ textShadow: '0 0 18px rgba(185,72,38,1), 0 0 36px rgba(185,72,38,0.7), 0 0 60px rgba(185,72,38,0.4), 0 2px 6px rgba(0,0,0,0.8)' }}
+      >
         Special tools with advanced Unique Features
       </div>
       <div className="relative">
         <div className="flex marquee whitespace-nowrap">
           {[...items, ...items].map((t, i) => (
             <div key={i} className="mx-12 flex items-center gap-12">
-              <span className="font-serif text-xl md:text-2xl tracking-wider">{t}</span>
-              <span className="text-[#b94826] text-lg">◆</span>
+              <span
+                className="font-serif text-xl md:text-2xl tracking-wider text-[#fff0df]"
+                style={{ textShadow: '0 0 16px rgba(185,72,38,0.95), 0 0 32px rgba(185,72,38,0.65), 0 0 52px rgba(185,72,38,0.35), 0 2px 4px rgba(0,0,0,0.7)' }}
+              >{t}</span>
+              <span
+                className="text-[#b94826] text-lg"
+                style={{ textShadow: '0 0 10px rgba(185,72,38,1), 0 0 22px rgba(185,72,38,0.8)' }}
+              >◆</span>
             </div>
           ))}
         </div>
@@ -728,8 +744,8 @@ function Research() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
-                  { t: "SC Judgements",   s: "Since 1950",                       icon: Gavel },
-                  { t: "Central Statutes", s: "Since 1830 · BNS · BNSS · BSA", icon: Scale },
+                  { t: "SUPREME COURT judgements", s: "Since 1950", icon: Gavel },
+                  { t: "Central Statutes", s: "Since 1830", icon: Scale },
                 ].map((d, i) => (
                   <div
                     key={d.t}
@@ -898,10 +914,10 @@ function ResearchFeatures() {
       dd: "Your entire research history across all matters is preserved inside Lexram and remains fully searchable. Return to any case, any thread, or any prior research session at any point — nothing is lost when a matter goes dormant or resumes.",
       visual: (
         <div className="space-y-4">
-          <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-[#680318]/15 bg-[#fff0df]/40">
-            <Search className="w-4 h-4 text-[#680318]/60" />
-            <span className="text-sm text-[#680318]/80 font-light">section 138 NI Act bounce defence</span>
-            <span className="ml-auto text-[10px] tracking-wider uppercase text-[#680318]/45">history</span>
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-[#680318]/15 bg-[#fff0df]/40 min-w-0">
+            <Search className="w-4 h-4 text-[#680318]/60 shrink-0" />
+            <span className="flex-1 min-w-0 text-sm text-[#680318]/80 font-light truncate">section 138 NI Act bounce defence</span>
+            <span className="shrink-0 text-[10px] tracking-wider uppercase text-[#680318]/45">history</span>
           </div>
           <div className="space-y-3">
             {[
@@ -955,7 +971,7 @@ function ResearchFeatures() {
   ];
 
   return (
-    <div className="mt-10">
+    <div className="mt-10 overflow-hidden">
       <div className="mb-10">
         <div className="reveal-down flex items-center gap-3 mb-3">
           <div className="text-xs font-bold tracking-[0.3em] uppercase text-[#680318]/90" style={{ textShadow: '0 1px 6px rgba(104,3,24,0.35)' }}>Features</div>
@@ -967,9 +983,9 @@ function ResearchFeatures() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_1.25fr] gap-10 lg:gap-16 items-stretch w-full">
+      <div className="grid lg:grid-cols-[1fr_1.25fr] gap-10 lg:gap-16 items-stretch w-full min-w-0">
         {/* Left: numbered index */}
-        <div className="lg:sticky lg:top-24 min-w-0 overflow-hidden">
+        <div className="lg:sticky lg:top-24 min-w-0 overflow-hidden w-full">
           {items.map((item, i) => {
             const isActive = active === i;
             const Icon = item.icon;
@@ -977,7 +993,7 @@ function ResearchFeatures() {
               <button
                 key={i}
                 onClick={() => setActive(i)}
-                className={`reveal-left group relative w-full max-w-full text-left flex items-start gap-4 py-6 border-b border-[#680318]/10 rounded-xl transition-all duration-200 ${
+                className={`reveal-left group relative w-full max-w-full min-w-0 text-left flex items-start gap-3 py-5 border-b border-[#680318]/10 rounded-xl transition-all duration-200 ${
                   isActive
                     ? "bg-[#680318]/[0.04] shadow-[0_6px_24px_-4px_rgba(185,72,38,0.18),0_2px_8px_rgba(104,3,24,0.08)] -translate-y-0.5 px-3"
                     : "hover:bg-[#680318]/[0.025] hover:shadow-[0_4px_18px_-4px_rgba(104,3,24,0.14),0_1px_4px_rgba(104,3,24,0.05)] hover:-translate-y-0.5 hover:px-3"
@@ -1034,18 +1050,18 @@ function ResearchFeatures() {
         </div>
 
         {/* Right: live preview — stretches to match the feature list height */}
-        <div className="reveal-tilt relative flex flex-col" style={{ transitionDelay: "260ms" }}>
+        <div className="reveal-up relative flex flex-col min-w-0 w-full" style={{ transitionDelay: "260ms" }}>
           <div aria-hidden className="absolute inset-0 bg-gradient-warm opacity-20 blur-3xl rounded-full pointer-events-none" />
-          <div className="relative flex flex-col flex-1 rounded-2xl border border-[#680318]/15 bg-[#fff0df] shadow-elegant overflow-hidden min-h-[440px]">
-            <div className="flex items-center gap-2 px-5 py-3 border-b border-[#680318]/10 bg-[#680318]/[0.03] shrink-0">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#b94826]/60" />
-              <div className="w-2.5 h-2.5 rounded-full bg-[#680318]/15" />
-              <div className="w-2.5 h-2.5 rounded-full bg-[#680318]/15" />
-              <div key={`label-${active}`} className="swap-label ml-auto text-[10px] tracking-[0.2em] text-[#680318]/55 uppercase">
+          <div className="relative flex flex-col flex-1 rounded-2xl border border-[#680318]/15 bg-[#fff0df] shadow-elegant overflow-hidden min-h-[440px] w-full">
+            <div className="flex items-center gap-2 px-5 py-3 border-b border-[#680318]/10 bg-[#680318]/[0.03] shrink-0 min-w-0">
+              <div className="w-2.5 h-2.5 rounded-full bg-[#b94826]/60 shrink-0" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[#680318]/15 shrink-0" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[#680318]/15 shrink-0" />
+              <div key={`label-${active}`} className="swap-label ml-auto text-[10px] tracking-[0.2em] text-[#680318]/55 uppercase truncate min-w-0">
                 {items[active].n} · {items[active].t}
               </div>
             </div>
-            <div key={active} className="swap-in p-6 md:p-8 flex-1">
+            <div key={active} className="swap-in p-4 sm:p-6 md:p-8 flex-1 overflow-hidden min-w-0">
               {items[active].visual}
             </div>
           </div>
@@ -1082,7 +1098,7 @@ function LexramEdge() {
     { n: "01", t: "Statute to Precedent",      d: "Research Indian law the way courts reason — statute first, precedent second.",                                         dd: "Lexram anchors every research query in the governing statute before surfacing precedents. You understand why a ruling exists, not just what was decided — giving you the interpretive context advocates actually need.",                                                                                                                                         icon: BookOpen,    image: "/landing/library.jpg"    },
     { n: "02", t: "Per Incuriam Test",          d: "Cite only good law — Lexram screens out overruled and per incuriam judgments automatically.",                          dd: "Before a precedent reaches you, Lexram applies a per incuriam test to eliminate decisions that courts ignored as binding authority. Every result you see is law you can stand behind.",                                                                                                                                                                            icon: Shield,      image: "/landing/papers.jpg"     },
     { n: "03", t: "Precedent History",          d: "The full Supreme Court precedent trail — followed, distinguished, and shaped — in a single view.",                    dd: "Advocates get a complete, chronological view of how Supreme Court rulings have followed, distinguished, or evolved a legal position. No more piecing together a case history across multiple searches — Lexram delivers the entire trail at once.",                                                                                                                          icon: TrendingUp,  image: "/landing/courthouse.jpg" },
-    { n: "04", t: "Zero Hallucination",         d: "No fake citations, no AI guesswork — every Lexram result links to a verifiable source.",                              dd: "Every answer Lexram generates is tied to an actual document you can open and read.",                                                                                                                                                                                                                                                                                         icon: CheckCircle2, image: "/landing/lawbook.jpg"   },
+    { n: "04", t: "Zero Hallucination Legal AI", d: "Every answer is anchored to a real document you can open and verify. No fake citations, no hallucinations.",         dd: "No fake citations, no AI guesswork — every Lexram result links to a verifiable source i.e. statutes and SUPREME COURT judgements. Every answer Lexram generates is tied to an actual document you can open and read. All citations are real, all references are verifiable — so you can rely on your research output with full professional confidence.",                                                                                                                                                                                                                                                                                         icon: CheckCircle2, image: "/landing/lawbook.jpg"   },
     { n: "05", t: "Trained on India's Courts",  d: "AI legal research built exclusively on verified Indian legal sources — not the open web.",                            dd: "Lexram's database is built entirely from verified Indian legal sources — not the internet at large. Every answer is grounded in the actual law of Indian courts, filtered free of noise, so your research reflects India's legal reality, not generic AI output.",                                                                                                               icon: Sparkles,    image: "/landing/pen.jpg"        },
     { n: "06", t: "Free Trial Available",       d: "Start with a free trial — no credit card required.",                                                                  dd: "Get full access to Lexram research capabilities with a free trial. Explore Supreme Court judgements, statutes, and AI-assisted research before committing to a plan.",                                                                                                                                                                                                    icon: Star,        image: "/landing/chamber.jpg"    },
   ];
@@ -1262,12 +1278,12 @@ function Drafting() {
       <div className="relative max-w-[1440px] mx-auto px-6 sm:px-10">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
-            <div className="lex-kicker--bright text-xs tracking-[0.3em] text-[#b94826] mb-4">DRAFTING — AI LEGAL DRAFTING ASSISTANT</div>
+            <div className="lex-kicker--bright text-xs tracking-[0.3em] text-[#b94826] mb-4">LEXDRAFT — AI LEGAL DRAFTING ASSISTANT</div>
             <h2 className="reveal-up font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-[#fff0df] leading-tight" style={{ transitionDelay: "120ms" }}>
               The first draft is <span className="italic text-[#b94826]">&ldquo;already&rdquo;</span> done.
             </h2>
             <p className="reveal-up mt-6 text-lg text-[#fff0df]/80 leading-relaxed" style={{ transitionDelay: "240ms" }}>
-              Upload your documents. Tell Lexram what petition you need — anticipatory bail, writ under Article 226, legal notice, etc. Every draft is backed by real Supreme Court Judgements and statutes.
+              Upload your documents. Tell Lexram what petition you need — anticipatory bail, writ under Article 226, legal notice, etc. Every draft is backed by a real Supreme Court Judgements and statutes.
             </p>
             <div className="mt-8">
               <div className="reveal-down flex items-center gap-3 mb-4" style={{ transitionDelay: "360ms" }}>
@@ -1409,7 +1425,7 @@ function DraftingCapabilities() {
       n: "02",
       icon: FileSearch,
       t: "Scan to Draft",
-      d: "Scan physical legal documents — Lexram indexes and drafts a structured response instantly.",
+      d: "Lexram indexes it and maps Who, What, When, and Which from it — scan physical legal documents and drafts a structured response instantly.",
       dd: "Scan a physical document and Lexram takes it from there. It maps every key element: parties, sections, citations, and events. The extracted facts are structured exactly as the responding court or forum expects them, so your draft is organised correctly from the ground up, every time.",
       visual: (
         <div className="space-y-4">
@@ -1655,7 +1671,7 @@ function LexDraftEdge() {
     { n: "02", t: "Zero Assumptions", d: "AI legal drafting built only from your uploaded documents — no assumptions, nothing invented.", dd: "Lexram drafts exclusively from the documents you upload. It does not fill gaps with guesses or infer facts you have not provided. Every line of the draft traces back to something you gave it — nothing assumed, nothing invented.", icon: Shield, image: "/landing/lawbook.jpg" },
     { n: "03", t: "Structures Before It Writes", d: "Review and approve the full draft structure before a single clause is written.", dd: "Before any clause is drafted, Lexram presents the complete structural plan for your document. You can review, edit, and approve the outline — so you stay in control of the argument architecture before drafting begins.", icon: FileText, image: "/landing/papers.jpg" },
     { n: "04", t: "Upload Your Entire Case File", d: "Upload your full case bundle — Lexram reads every document and drafts the complete picture.", dd: "Lexram does not skim. It reads across your entire uploaded case bundle — every FIR, chargesheet, order, and exhibit — and builds a draft that addresses the full factual and legal picture, not just the document you happened to open last.", icon: Download, image: "/landing/library.jpg" },
-    { n: "05", t: "No Fake Citations", d: "Every case citation and section in your draft is real, openable, and verifiable.", dd: "Every judgment and section cited in your draft links back to Supreme Court judgements and Central statutes. No hallucinated case names, no fabricated section references — zero hallucinated Supreme Court judgements and sections.", icon: CheckCircle2, image: "/landing/courthouse.jpg" },
+    { n: "05", t: "No Fake Citations. No Invented Sections. Every Source Verifiable.", d: "Every judgement and section in your draft traces back to a real, openable source — no hallucinations, no fabrications, no inventions.", dd: "Every case citation and section in your draft is real, openable, and verifiable Supreme Court judgements and Central statutes. Every judgment and section cited in your draft links back to Supreme Court judgements and Central statutes. No hallucinated case names, no fabricated section references – zero hallucinated Supreme Court judgements and sections.", icon: CheckCircle2, image: "/landing/courthouse.jpg" },
     { n: "06", t: "Free Trial Available", d: "Try AI legal drafting with a free trial — no credit card required.", dd: "Get full access to Lexram drafting capabilities with a free trial. Generate your first court-ready draft from your documents before committing to a plan.", icon: Star, image: "/landing/chamber.jpg" },
   ];
 
@@ -1900,24 +1916,21 @@ function Stats() {
 function Stories() {
   useReveal();
 
-  type Topic = "Research" | "Drafting" | "Blog";
+  type Topic = "Research" | "Drafting";
   type Quote = { q: string; a: string; r: string; topic: Topic };
 
   const quotes: Quote[] = [
     /* Research */
-    { topic: "Research", q: "I am practising in the Madras High Court as a Litigant and the one constant frustration has been missing a judgement that opposing counsel finds. Lexram's conflicting judgement detector and bench strength indicator have completely changed how I prepare. I walk into court knowing I haven't missed anything.", a: "Shree Harini H N", r: "MS. 4036/2025 · Research Law Assistant, Madras High Court, Madurai Bench" },
+    { topic: "Research", q: "I am practising at Madras High Court as a Litigant and the one constant frustration has been missing a judgement that opposing counsel finds. Lexram's conflicting judgement detector and bench strength indicator have completely changed how I prepare. I walk into court knowing I haven't missed anything.", a: "Shree Harini H N", r: "MS. 4036/2025 · Research Law Assistant, Madras High Court, Madurai Bench" },
     { topic: "Research", q: "What struck me first was that every result Lexram returned was a real judgement I could open and verify. After years of being burned by AI tools that fabricate citations, that alone made me a convert.", a: "Shyam M", r: "MS. 8227/2024 · Practising at District Court, Trichy, Tamil Nadu" },
     /* Drafting */
     { topic: "Drafting", q: "The draft plan step is what separates Lexram from everything else I've tried. I approve the structure before a single clause is written, so the final draft reflects my strategy, not the AI's interpretation of it.",                                                                                              a: "Johnson S A",          r: "MS. 1958/2023 · Madras High Court" },
     { topic: "Drafting", q: "The curated questions are remarkably precise. When I asked for an anticipatory bail application, it asked exactly what I would have to ask my senior for — grounds, date of arrest, prior bail history, nature of offence. Nothing generic. Nothing wasted.",                                                       a: "Priyanka C",           r: "MS. 1423/2024 · Madras High Court" },
     { topic: "Drafting", q: "Being able to pull a judgement from research directly into my draft without switching tabs or reformatting the citation has saved me more time than I can calculate. Research and drafting being one workflow is not a feature — it is the correct way to work.",                                                  a: "Pravin Kumar T",       r: "MS. 2649/2021 · Madras High Court" },
     { topic: "Drafting", q: "I uploaded a scanned charge sheet and Lexram read it, extracted the relevant facts, and had a bail application draft plan ready. I genuinely did not expect it to work that well.",                                                                                                                                 a: "Sam Dinakaran Manuel", r: "MS. 4232/2025 · Madras High Court" },
-    /* Blog */
-    { topic: "Blog",     q: "The analysis is written by people who have clearly read the full judgement — not summarised a summary. The depth of engagement with the reasoning, not just the outcome, is what keeps me coming back.",                                                                                                            a: "Keerthana",            r: "MS. 7511/2023 · Madras High Court" },
-    { topic: "Blog",     q: "What I appreciate most is that every piece links directly to the full judgement in Lexram's database. I read the analysis, I read the order, in one place. No searching, no hunting for the source.",                                                                                                              a: "Sachin A D",           r: "MS. 7423/2025 · Madras High Court" },
   ];
 
-  const tabs: Topic[] = ["Research", "Drafting", "Blog"];
+  const tabs: Topic[] = ["Research", "Drafting"];
   const [tab, setTab] = useState<Topic>("Research");
 
   /* Deep-link: ?#testimonials-research / -drafting / -blog selects the tab.
@@ -1927,7 +1940,6 @@ function Stories() {
       const h = window.location.hash.toLowerCase();
       if (h.includes("testimonials-research"))      setTab("Research");
       else if (h.includes("testimonials-drafting")) setTab("Drafting");
-      else if (h.includes("testimonials-blog"))     setTab("Blog");
     };
     apply();
     window.addEventListener("hashchange", apply);
@@ -2105,7 +2117,7 @@ function MarketComparison() {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-[#680318] text-[#fff0df]">
-                <th scope="col" className="text-left p-4 font-sans font-semibold min-w-[260px] sticky left-0 bg-[#680318]">
+                <th scope="col" className="text-left p-4 font-sans font-semibold min-w-[260px]">
                   Capability
                 </th>
                 {competitors.map((c) => (
@@ -2129,7 +2141,7 @@ function MarketComparison() {
                 >
                   <th
                     scope="row"
-                    className="text-left p-4 font-medium text-[#680318] align-top sticky left-0 bg-inherit"
+                    className="text-left p-4 font-medium text-[#680318] align-top"
                   >
                     {row.feature}
                   </th>
@@ -2262,18 +2274,17 @@ function FAQ() {
     {
       topic: "General",
       items: [
-        { q: "What is Lexram AI — and how is it different from other legal research tools in India?", a: "Lexram is an AI-powered legal platform built exclusively for Indian lawyers — combining research and drafting in one place." },
-        { q: "How is Lexram different from ChatGPT or generic AI tools for legal research?",          a: "Generic AI tools generate answers from the internet — and hallucinate. Lexram is trained exclusively on verified Indian legal sources. Every answer traces back to real SC judgements and central statutes. Nothing is fabricated." },
-        { q: "Is Lexram built specifically for Indian law and Indian courts?",                         a: "Yes. Entirely. Not trained on the internet. Trained on India's courts — the Supreme Court of India and Indian legislation." },
-        { q: "Is my data and client information safe on Lexram?",                                      a: "Yes. Everything you upload and draft on Lexram is encrypted and never used to train our models. Fully compliant with India's Digital Personal Data Protection Act, 2023." },
-        { q: "Does Lexram offer a free trial?",                                                        a: "Yes — 50 credits, no payment required. Start your free trial at India's AI legal research platform — Lexram today." },
+        { q: "What is Lexram AI — and how is it different from other legal research tools in India?", a: "Lexram is an AI-powered legal platform built exclusively for Indian lawyers. The Indian AI legal Assistant, LexRam uses Supreme Court Judgements and Central statutes as its legal sources and not any open internet sources." },
+        { q: "How is Lexram different from ChatGPT or generic AI tools for legal research?",          a: "Generic AI tools generate answers from the internet — and hallucinate. Lexram is trained exclusively on verified Indian legal sources. Every answer traces back to real SUPREME COURT judgements and central statutes. Nothing is fabricated." },
+        { q: "Is Lexram built specifically for Indian law and Indian courts?",                         a: "Yes. Entirely. Not trained on the internet, not an open source legal software. Trained on India's courts — the Supreme Court of India and Indian legislation." },
+        { q: "Does Lexram offer a free trial?",                                                        a: "Yes — 50 credits, no payment required. Start your free trial at India's AI legal research platform — LexRam today." },
       ],
     },
     {
       topic: "Research",
       items: [
         { q: "Does Lexram have the latest Supreme Court judgements — how current is the database?",   a: "Lexram covers every Supreme Court judgement since 1950 and updates daily with new Supreme Court of India decisions." },
-        { q: "Does Lexram generate fake citations or fabricated case names?",                           a: "No. Lexram only surfaces citations from its verified database. It does not generate, infer, or fabricate case names or citations — ever. Hence no hallucinated citations or fabricated judges' analysis." },
+        { q: "Does Lexram generate fake citations or fabricated case names?",                           a: "No. Lexram only surfaces citations from its verified database i.e Supreme Court Judgements. It does not generate, infer, or fabricate case names or citations — ever. Hence no hallucinated citations or fabricated judges' analysis." },
         { q: "What if two Supreme Court benches have taken opposite views on the same legal point?",   a: "Lexram's per incuriam checker filters out compromised judgements at the source — what reaches you is only the law that holds." },
         { q: "How do I know if the Supreme Court judgement I am relying on is still good law?",        a: "Every judgement in Lexram is marked — affirmed, distinguished, or overruled — so you never argue from a precedent that no longer stands." },
       ],
@@ -2281,11 +2292,11 @@ function FAQ() {
     {
       topic: "Drafting",
       items: [
-        { q: "What documents can I upload for AI legal drafting on Lexram?",                           a: "Any PDF — charge sheets, prior court orders, and scanned physical documents." },
+        { q: "What documents can I upload for AI legal drafting on Lexram?",                           a: "Any scanned documents including handwritten documents in Indian languages can be uploaded on LexRam. LexRam can read the uploaded documents without any hallucinations." },
         { q: "Do I need to know how to prompt an AI to use Lexram's drafting tool?",                   a: "No. Upload the documents to the designated case in the Case Hub and attach them. Just type the petition you need in plain language by clicking on the draft button in the search bar. Lexram reads your documents, asks the right questions, and builds the draft." },
-        { q: "Will Lexram ask the same questions for every petition type?",                            a: "No. Questions are curated to every petition you request Lexram to draft. A bail application gets anticipatory-bail-related questions such as \"Does the accused have any prior convictions or pending cases?\". Nothing irrelevant. Nothing missed." },
-        { q: "Can I edit the AI-generated legal draft before it is finalised?",                        a: "Yes — at two stages. You review and edit the draft plan before drafting begins, and the final draft is fully editable before export." },
-        { q: "Are the judgements cited in my AI-drafted petition real and verifiable?",                a: "Every judgement cited in your draft traces back to a real, verifiable Indian legal source in Lexram's database. The draft reflects your uploaded facts and real SC judgements — not AI guesswork." },
+        { q: "Will Lexram ask the same questions for every petition type?",                            a: "No. Questions are curated to every petition you request LexRam to draft. A bail application gets anticipatory bail related questions such as \"Does the accused have any prior convictions or pending cases?\". Nothing irrelevant. Nothing missed." },
+        { q: "How to draft a bail application using LexRam?",                                          a: "Upload the relevant documents i.e FIR and click on the Draft button in the search bar. Type 'Draft a bail application' and press enter. Lexram reads your documents, asks the right questions, and builds the draft." },
+        { q: "Are the judgements cited in my AI-drafted petition real and verifiable?",                a: "Every judgement cited in your draft traces back to a real, verifiable Indian legal sources which includes Supreme Court judgements and Central Statutes in Lexram's database. The draft reflects your uploaded facts and real SUPREME COURT judgements — not AI guesswork." },
       ],
     },
   ];

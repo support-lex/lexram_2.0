@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import DashboardSidebar from "./_components/DashboardSidebar";
 import { useMyOrgRequest, useRoleContext } from "@/lib/rbac";
+import { LandingNav, LandingFooter } from "@/components/LandingShell";
 
 /**
  * TSR layout — controls who gets to see the workspace vs. an onboarding screen.
@@ -74,12 +75,16 @@ export default function TsrLayout({ children }: { children: React.ReactNode }) {
     router,
   ]);
 
-  // Onboarding pages: render full-bleed (no sidebar).
+  // Onboarding pages: render with landing nav + footer (no sidebar).
   if (isAnyOnboarding) {
     return (
-      <main className="flex-1 overflow-auto" style={{ backgroundColor: "var(--bg-primary)" }}>
-        {children}
-      </main>
+      <div data-landing-v2 className="min-h-screen flex flex-col bg-[#fff0df]">
+        <LandingNav />
+        <main className="flex-1 pt-20">
+          {children}
+        </main>
+        <LandingFooter />
+      </div>
     );
   }
 

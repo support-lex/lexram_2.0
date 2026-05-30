@@ -174,7 +174,7 @@ export function AppTopBar() {
   }, [hoveredIdx, activeIdx])
 
   return (
-    <header className="flex-shrink-0 h-12 border-b border-[#f0e6e8] bg-white/95 backdrop-blur-md relative z-40">
+    <header className="flex-shrink-0 h-12 border-b border-[#680318]/10 bg-[#fff0df]/80 backdrop-blur-md relative z-40">
       {/* Subtle maroon shimmer line at the bottom of the topbar */}
       <div
         aria-hidden

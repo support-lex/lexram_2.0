@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Scale, ArrowRight, Menu, X } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 export default function BlogLayout({ children }: { children: React.ReactNode }) {
@@ -36,13 +37,15 @@ function BlogNav() {
   return (
     <header className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-[#fff0df]/80 border-b border-[#680318]/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <div className="w-8 h-8 rounded-md bg-gradient-warm grid place-items-center shadow-soft">
-            <Scale className="w-4 h-4 text-[#fff0df]" />
-          </div>
-          <span className="font-serif text-lg sm:text-xl font-bold text-[#680318]">
-            LexRam<span className="text-[#b94826]">.</span>ai
-          </span>
+        <Link href="/" aria-label="LexRam" className="flex items-center shrink-0">
+          <Image
+            src="/lexram-logo.png"
+            alt="LexRam"
+            width={120}
+            height={42}
+            priority
+            className="h-9 sm:h-10 w-auto"
+          />
         </Link>
 
         <nav className="hidden lg:flex items-center gap-6 text-sm text-[#680318]/80">
@@ -125,13 +128,14 @@ function BlogFooter() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="grid md:grid-cols-4 gap-10">
           <div className="md:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-md bg-gradient-warm grid place-items-center">
-                <Scale className="w-4 h-4 text-[#fff0df]" />
-              </div>
-              <span className="font-serif text-xl font-bold text-[#fff0df]">
-                LexRam<span className="text-[#b94826]">.</span>ai
-              </span>
+            <div className="flex items-center mb-4">
+              <img
+                src="/lexram-logo-light.png"
+                alt="LexRam"
+                width={140}
+                height={48}
+                className="h-10 w-auto"
+              />
             </div>
             <p className="text-sm max-w-sm leading-relaxed">
               &ldquo;You argue the case. We&apos;ll find the law.&rdquo; From statute to submission — built on India&apos;s courts alone.

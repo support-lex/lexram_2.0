@@ -98,7 +98,7 @@ export default function BlogExplorer({ posts, isAdmin }: Props) {
           <h1 className="mt-1 text-2xl sm:text-3xl md:text-4xl font-serif font-light tracking-tight text-[#680318]">
             Insights &amp; dispatches
           </h1>
-          <p className="mt-2 max-w-2xl text-[13px] sm:text-sm text-[#680318]/60 leading-relaxed">
+          <p className="mt-2 max-w-2xl text-[13px] sm:text-sm text-[#680318]/75 leading-relaxed">
             Notes on legal technology, AI-assisted research, and the future of practice in India.
           </p>
         </div>
@@ -107,14 +107,14 @@ export default function BlogExplorer({ posts, isAdmin }: Props) {
           <div className="shrink-0 flex flex-wrap items-center gap-2">
             <Link
               href="/blog/admin"
-              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:border-[var(--accent)]/40 hover:bg-[var(--surface-hover)] transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium border border-[#680318]/25 bg-[#fff7ec] text-[#680318] hover:border-[#b94826]/50 hover:bg-[#680318]/8 transition-colors"
             >
               <LayoutList className="h-4 w-4" /> Manage
             </Link>
             {drafts.length > 0 && <ScheduleQueueButton drafts={drafts} />}
             <Link
               href="/blog/create"
-              className="inline-flex items-center gap-1.5 px-4 h-9 rounded-full text-sm font-semibold bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)] shadow-[var(--shadow-sm)] transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 h-9 rounded-full text-sm font-semibold bg-[#b94826]text-[#fff0df] hover:bg-[#8f3318] shadow-sm transition-colors"
             >
               <Plus className="h-4 w-4" /> New post
             </Link>
@@ -148,7 +148,7 @@ export default function BlogExplorer({ posts, isAdmin }: Props) {
             <button
               type="button"
               onClick={() => setTagFilter(null)}
-              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/30 hover:bg-[var(--accent)]/20 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium bg-[#b94826]/10 text-[#b94826] border border-[#b94826]/30 hover:bg-[#b94826]/20 transition-colors"
             >
               <TagIcon className="h-3.5 w-3.5" /> #{tagFilter}
               <X className="h-3.5 w-3.5 ml-1" />
@@ -170,7 +170,7 @@ export default function BlogExplorer({ posts, isAdmin }: Props) {
                   className={`inline-flex items-center px-3 h-7 rounded-full text-xs font-medium border transition-colors
                     ${tagFilter === t
                       ? "bg-[#680318] text-[#fff0df] border-[#680318]"
-                      : "bg-white text-[#680318]/70 border-[#680318]/20 hover:border-[#b94826]/50 hover:text-[#680318]"
+                      : "bg-[#fff7ec] text-[#680318]/75 border-[#680318]/20 hover:border-[#b94826]/50 hover:text-[#680318]"
                     }`}
                 >
                   #{t}
@@ -200,19 +200,19 @@ export default function BlogExplorer({ posts, isAdmin }: Props) {
 function SearchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="relative">
-      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)] pointer-events-none" aria-hidden />
+      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#680318]/55 pointer-events-none" aria-hidden />
       <input
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Search posts, tags, categories..."
-        className="w-full h-11 pl-10 pr-10 rounded-full border border-[#680318]/12 bg-white text-sm text-[#680318] placeholder:text-[#680318]/40 outline-none focus:border-[#b94826] focus:ring-2 focus:ring-[#b94826]/30 transition-all"
+        className="w-full h-11 pl-10 pr-10 rounded-full border border-[#680318]/12 bg-[#fff7ec] text-sm text-[#680318] placeholder:text-[#680318]/40 outline-none focus:border-[#b94826] focus:ring-2 focus:ring-[#b94826]/30 transition-all"
       />
       {value && (
         <button
           type="button"
           onClick={() => onChange("")}
-          className="absolute right-3 top-1/2 -translate-y-1/2 grid place-items-center h-6 w-6 rounded-full text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 grid place-items-center h-6 w-6 rounded-full text-[#680318]/55 hover:bg-[#680318]/8 hover:text-[#680318] transition-colors"
           aria-label="Clear search"
         >
           <X className="h-3.5 w-3.5" />
@@ -237,7 +237,7 @@ function HeroCarousel({ posts }: { posts: BlogPost[] }) {
 
   return (
     <section
-      className="relative rounded-2xl overflow-hidden border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-[var(--shadow-card)] aspect-[16/9] sm:aspect-[16/7] md:aspect-[2.4/1]"
+      className="relative rounded-2xl overflow-hidden border border-[#680318]/15 bg-[#fff7ec] shadow-md aspect-[16/9] sm:aspect-[16/7] md:aspect-[2.4/1]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       aria-roledescription="carousel"
@@ -260,7 +260,7 @@ function HeroCarousel({ posts }: { posts: BlogPost[] }) {
           <div className="relative h-full flex flex-col justify-end p-5 sm:p-8 md:p-10">
             <div className="flex items-center gap-2 flex-wrap">
               {post.category && (
-                <span className="inline-block px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] rounded-full bg-[var(--accent)] text-[var(--accent-text)]">
+                <span className="inline-block px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] rounded-full bg-[#b94826]text-[#fff0df]">
                   {post.category}
                 </span>
               )}
@@ -336,7 +336,7 @@ function SectionHeading({ title, hint }: { title: string; hint?: string }) {
 
 function NewBadge() {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-emerald-500 text-white shadow-sm">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-[#b94826] text-[#fff0df] shadow-sm">
       <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> NEW
     </span>
   );
@@ -346,7 +346,7 @@ function TodayCard({ post }: { post: BlogPost }) {
   return (
     <Link
       href={`/blog/${post.slug}`}
-      className="group flex flex-col rounded-xl overflow-hidden border border-[var(--border-default)] bg-[var(--bg-surface)] hover:shadow-[var(--shadow-card-hover)] transition-shadow"
+      className="group flex flex-col rounded-xl overflow-hidden border border-[#680318]/15 bg-[#fff7ec] hover:shadow-lg transition-shadow"
     >
       <div className="relative">
         {post.cover_image_url ? (
@@ -371,7 +371,7 @@ function TodayCard({ post }: { post: BlogPost }) {
           {post.title}
         </h3>
         {post.subtitle && (
-          <p className="mt-1.5 text-xs text-[#680318]/60 line-clamp-2 flex-1">{post.subtitle}</p>
+          <p className="mt-1.5 text-xs text-[#680318]/75 line-clamp-2 flex-1">{post.subtitle}</p>
         )}
       </div>
     </Link>
@@ -384,7 +384,7 @@ function SortTabs({ value, onChange }: { value: Sort; onChange: (v: Sort) => voi
     { id: "trending", label: "Trending", icon: <Flame className="h-3.5 w-3.5" /> },
   ];
   return (
-    <div role="tablist" className="inline-flex items-center p-1 rounded-full bg-white border border-[#680318]/12">
+    <div role="tablist" className="inline-flex items-center p-1 rounded-full bg-[#fff7ec] border border-[#680318]/15">
       {items.map((it) => (
         <button
           key={it.id}
@@ -395,7 +395,7 @@ function SortTabs({ value, onChange }: { value: Sort; onChange: (v: Sort) => voi
           className={`inline-flex items-center gap-1.5 px-3.5 h-7 rounded-full text-xs font-semibold transition-all
             ${value === it.id
               ? "bg-[#680318] text-[#fff0df] shadow-[0_10px_30px_-10px_rgba(104,3,24,0.18)]"
-              : "text-[#680318]/60 hover:text-[#680318]"
+              : "text-[#680318]/75 hover:text-[#680318]"
             }`}
         >
           {it.icon} {it.label}
@@ -409,7 +409,7 @@ function PostCard({ post, highlight }: { post: BlogPost; highlight?: boolean }) 
   return (
     <Link
       href={`/blog/${post.slug}`}
-      className="group flex flex-col rounded-2xl overflow-hidden border border-[var(--border-default)] bg-[var(--bg-surface)] hover:shadow-[var(--shadow-card-hover)] transition-shadow"
+      className="group flex flex-col rounded-2xl overflow-hidden border border-[#680318]/15 bg-[#fff7ec] hover:shadow-lg transition-shadow"
     >
       <div className="relative">
         {post.cover_image_url ? (
@@ -427,7 +427,7 @@ function PostCard({ post, highlight }: { post: BlogPost; highlight?: boolean }) 
         )}
         {highlight && (post.view_count ?? 0) > 0 && (
           <div className="absolute top-2.5 right-2.5">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-orange-500 text-white shadow">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-[#680318] text-[#fff0df] shadow">
               <Flame className="h-3 w-3" /> {compactNumber(post.view_count ?? 0)}
             </span>
           </div>
@@ -439,12 +439,12 @@ function PostCard({ post, highlight }: { post: BlogPost; highlight?: boolean }) 
           {post.title}
         </h3>
         {post.subtitle && (
-          <p className="mt-2 text-sm text-[#680318]/60 line-clamp-2 flex-1">{post.subtitle}</p>
+          <p className="mt-2 text-sm text-[#680318]/75 line-clamp-2 flex-1">{post.subtitle}</p>
         )}
         {post.tags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1">
             {post.tags.slice(0, 3).map((t) => (
-              <span key={t} className="inline-block px-1.5 py-0.5 text-[10px] rounded-md bg-[#fff0df] text-[#680318]/60">
+              <span key={t} className="inline-block px-1.5 py-0.5 text-[10px] rounded-md bg-[#fff0df] text-[#680318]/75">
                 #{t}
               </span>
             ))}
@@ -458,9 +458,9 @@ function PostCard({ post, highlight }: { post: BlogPost; highlight?: boolean }) 
 function Meta({ post }: { post: BlogPost }) {
   const date = post.published_at ? new Date(post.published_at) : new Date(post.created_at);
   return (
-    <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] flex-wrap">
+    <div className="flex items-center gap-2 text-xs text-[#680318]/55 flex-wrap">
       {post.status !== "published" && (
-        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-[#fff0df] text-[#680318] border border-[#b94826]/40">
           {post.status}
         </span>
       )}
@@ -482,9 +482,9 @@ function Meta({ post }: { post: BlogPost }) {
 
 function EmptyState({ onClear, isAdmin }: { onClear?: () => void; isAdmin: boolean }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[var(--border-default)] bg-[var(--bg-surface)] p-12 text-center">
-      <BookOpen className="h-8 w-8 mx-auto mb-3 text-[var(--text-muted)]" />
-      <p className="text-sm text-[var(--text-muted)]">
+    <div className="rounded-2xl border border-dashed border-[#680318]/15 bg-[#fff7ec] p-12 text-center">
+      <BookOpen className="h-8 w-8 mx-auto mb-3 text-[#680318]/55" />
+      <p className="text-sm text-[#680318]/55">
         {onClear ? "No posts match your filters." : isAdmin ? "No posts yet — start the first one." : "Articles will appear here soon."}
       </p>
       {onClear && (

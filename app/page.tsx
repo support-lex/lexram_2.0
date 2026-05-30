@@ -2708,11 +2708,11 @@ function Footer() {
           <div className="lg:col-span-2">
             <div className="flex items-center mb-4">
               <img
-                src="/lexram-logo.png"
+                src="/lexram-logo-light.png"
                 alt="Lexram"
                 width={132}
                 height={46}
-                className="h-10 w-auto brightness-0 invert"
+                className="h-10 w-auto"
               />
             </div>
             <p className="text-sm max-w-sm leading-relaxed mb-4">

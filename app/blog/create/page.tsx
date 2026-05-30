@@ -33,7 +33,7 @@ const AUTOSAVE_DEBOUNCE_MS = 2500;
 
 export default function CreateBlogPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen grid place-items-center bg-[var(--bg-primary)] text-[var(--text-muted)]"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+    <Suspense fallback={<div className="min-h-screen grid place-items-center bg-[#fff0df] text-[#680318]/60"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
       <CreateBlogPageInner />
     </Suspense>
   );
@@ -227,27 +227,27 @@ function CreateBlogPageInner() {
 
   if (roleLoading || role !== "admin" || loadingExisting) {
     return (
-      <div className="min-h-screen grid place-items-center bg-[var(--bg-primary)] text-[var(--text-muted)]">
+      <div className="min-h-screen grid place-items-center bg-[#fff0df] text-[#680318]/60">
         <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] pb-32">
+    <div className="min-h-screen bg-[#fff0df] pb-32">
       {/* ─────── Sticky header ─────── */}
-      <header className="sticky top-0 z-30 bg-[var(--bg-primary)]/85 backdrop-blur border-b border-[var(--border-default)]">
+      <header className="sticky top-0 z-30 bg-[#fff0df]/85 backdrop-blur border-b border-[#680318]/20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <Link
               href="/blog"
-              className="grid place-items-center h-9 w-9 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] transition-colors"
+              className="grid place-items-center h-9 w-9 rounded-lg text-[#680318]/80 hover:bg-[#680318]/8 hover:text-[#680318] transition-colors"
               aria-label="Back to blog"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <div className="min-w-0">
-              <h1 className="font-serif text-lg font-bold text-[var(--text-primary)] truncate">
+              <h1 className="font-serif text-lg font-bold text-[#680318] truncate">
                 {post ? "Edit blog" : "Create blog"}
               </h1>
               <SaveStatusLine saving={saving} lastSavedAt={lastSavedAt} status={status} />
@@ -259,7 +259,7 @@ function CreateBlogPageInner() {
               type="button"
               onClick={handlePreview}
               disabled={saving}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-50 transition-colors"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium border border-[#680318]/25 bg-[#fff7ec] text-[#680318] hover:border-[#b94826]/50 hover:bg-[#680318]/8 disabled:opacity-50 transition-colors"
             >
               <Eye className="h-4 w-4" /> Preview
             </button>
@@ -267,7 +267,7 @@ function CreateBlogPageInner() {
               type="button"
               onClick={() => doSave({ nextStatus: "draft" })}
               disabled={saving}
-              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium border border-[#680318]/25 bg-[#fff7ec] text-[#680318] hover:border-[#b94826]/50 hover:bg-[#680318]/8 disabled:opacity-50 transition-colors"
             >
               <Save className="h-4 w-4" /> <span className="hidden sm:inline">Save draft</span>
             </button>
@@ -275,7 +275,7 @@ function CreateBlogPageInner() {
               type="button"
               onClick={handlePublish}
               disabled={saving}
-              className="inline-flex items-center gap-1.5 px-4 h-9 rounded-lg text-sm font-semibold bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)] disabled:opacity-50 shadow-[var(--shadow-sm)] transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 h-9 rounded-lg text-sm font-semibold bg-[#680318] text-[#fff0df] border border-[#680318] hover:bg-[#7a1f2b] hover:border-[#7a1f2b] disabled:opacity-50 shadow-[0_4px_14px_-4px_rgba(104,3,24,0.45)] transition-all"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {status === "published" ? "Update" : "Publish"}
@@ -288,22 +288,23 @@ function CreateBlogPageInner() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 space-y-6">
         <CoverImageUpload value={coverUrl} onChange={setCoverUrl} />
 
-        <div className="space-y-3">
+        <div className="space-y-3 rounded-2xl border border-[#680318]/15 bg-[#fff7ec] p-5 sm:p-6 focus-within:border-[#b94826]/40 focus-within:shadow-sm transition-all">
           <textarea
             ref={titleRef}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Enter blog title"
             rows={1}
-            className="w-full font-serif text-3xl sm:text-4xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-muted)] bg-transparent outline-none resize-none leading-tight"
+            className="w-full font-serif text-3xl sm:text-4xl font-bold text-[#680318] placeholder:text-[#680318]/55 bg-transparent outline-none resize-none leading-tight"
           />
+          <div className="h-px bg-[#680318]/10" aria-hidden />
           <textarea
             ref={subtitleRef}
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             placeholder="Add a subtitle or short description (optional)"
             rows={1}
-            className="w-full text-base sm:text-lg text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] bg-transparent outline-none resize-none leading-snug"
+            className="w-full text-base sm:text-lg text-[#680318]/85 placeholder:text-[#680318]/50 bg-transparent outline-none resize-none leading-snug"
           />
         </div>
 
@@ -315,7 +316,7 @@ function CreateBlogPageInner() {
               value={authorName}
               onChange={(e) => setAuthorName(e.target.value)}
               placeholder="Author name"
-              className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring-accent)] transition-all"
+              className="w-full px-3 py-2 rounded-lg border border-[#680318]/20 bg-[#fff7ec] text-sm text-[#680318] outline-none focus:border-[#b94826] focus:ring-2 focus:ring-[#b94826]/25 transition-all"
             />
           </Field>
           <Field label="Category">
@@ -323,12 +324,12 @@ function CreateBlogPageInner() {
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full appearance-none px-3 py-2 pr-9 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring-accent)] transition-all"
+                className="w-full appearance-none px-3 py-2 pr-9 rounded-lg border border-[#680318]/20 bg-[#fff7ec] text-sm text-[#680318] outline-none focus:border-[#b94826] focus:ring-2 focus:ring-[#b94826]/25 transition-all"
               >
                 <option value="">— Select category —</option>
                 {BLOG_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-              <ChevronDown className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
+              <ChevronDown className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-[#680318]/60 pointer-events-none" />
             </div>
           </Field>
         </section>
@@ -362,7 +363,7 @@ function CreateBlogPageInner() {
                 }}
               />
             </div>
-            <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
+            <div className="flex items-center gap-3 text-xs text-[#680318]/60">
               <span>{wordCount.toLocaleString()} words</span>
               <span aria-hidden>·</span>
               <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {readingTime} min read</span>
@@ -372,7 +373,7 @@ function CreateBlogPageInner() {
         </div>
 
         {/* ── Publish options ─────────────────────────────────────────── */}
-        <section className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-5 space-y-4">
+        <section className="rounded-xl border border-[#680318]/20 bg-[#fff7ec] p-5 space-y-4">
           <Label>Publish options</Label>
           <div role="radiogroup" className="grid sm:grid-cols-3 gap-2">
             {(["draft", "published", "scheduled"] as BlogStatus[]).map((opt) => (
@@ -384,12 +385,12 @@ function CreateBlogPageInner() {
                 onClick={() => setStatus(opt)}
                 className={`px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all border
                   ${status === opt
-                    ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--text-primary)]"
-                    : "border-[var(--border-default)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:border-[var(--accent)]/40"
+                    ? "border-[#b94826] bg-[#b94826]/10 text-[#680318]"
+                    : "border-[#680318]/20 bg-[#fff0df] text-[#680318]/80 hover:border-[#b94826]/40"
                   }`}
               >
                 <div className="capitalize font-semibold">{opt}</div>
-                <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                <div className="text-xs text-[#680318]/60 mt-0.5">
                   {opt === "draft" && "Keep private — only you can see it"}
                   {opt === "published" && "Visible to everyone immediately"}
                   {opt === "scheduled" && "Auto-publish at a chosen time"}
@@ -405,14 +406,14 @@ function CreateBlogPageInner() {
                   type="datetime-local"
                   value={scheduledFor}
                   onChange={(e) => setScheduledFor(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring-accent)]"
+                  className="w-full px-3 py-2 rounded-lg border border-[#680318]/20 bg-[#fff0df] text-sm text-[#680318] outline-none focus:border-[#b94826] focus:ring-2 focus:ring-[#b94826]/25"
                 />
               </Field>
               <button
                 type="button"
                 onClick={handleSchedule}
                 disabled={saving || !scheduledFor}
-                className="px-4 h-9 rounded-lg text-sm font-semibold bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
+                className="px-4 h-9 rounded-lg text-sm font-semibold bg-[var(--accent)] text-[#fff0df] hover:bg-[#8f3318] disabled:opacity-50 transition-colors"
               >
                 Schedule now
               </button>
@@ -421,18 +422,18 @@ function CreateBlogPageInner() {
         </section>
 
         {/* ── SEO collapsible ─────────────────────────────────────────── */}
-        <section className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)]">
+        <section className="rounded-xl border border-[#680318]/20 bg-[#fff7ec]">
           <button
             type="button"
             onClick={() => setSeoOpen((v) => !v)}
             className="w-full flex items-center justify-between p-5 text-left"
           >
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-[var(--accent)]" />
-              <span className="text-sm font-semibold text-[var(--text-primary)]">SEO (optional)</span>
-              <span className="text-xs text-[var(--text-muted)]">— meta title and description</span>
+              <Sparkles className="h-4 w-4 text-[#b94826]" />
+              <span className="text-sm font-semibold text-[#680318]">SEO (optional)</span>
+              <span className="text-xs text-[#680318]/60">— meta title and description</span>
             </div>
-            {seoOpen ? <ChevronUp className="h-4 w-4 text-[var(--text-muted)]" /> : <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />}
+            {seoOpen ? <ChevronUp className="h-4 w-4 text-[#680318]/60" /> : <ChevronDown className="h-4 w-4 text-[#680318]/60" />}
           </button>
           {seoOpen && (
             <div className="px-5 pb-5 space-y-4">
@@ -443,7 +444,7 @@ function CreateBlogPageInner() {
                   onChange={(e) => setMetaTitle(e.target.value)}
                   maxLength={60}
                   placeholder={title || "Defaults to blog title"}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring-accent)]"
+                  className="w-full px-3 py-2 rounded-lg border border-[#680318]/20 bg-[#fff0df] text-sm text-[#680318] outline-none focus:border-[#b94826] focus:ring-2 focus:ring-[#b94826]/25"
                 />
               </Field>
               <Field label="Meta description" hint={`${metaDescription.length}/160`}>
@@ -453,7 +454,7 @@ function CreateBlogPageInner() {
                   maxLength={160}
                   rows={3}
                   placeholder={subtitle || "Short summary shown in search results"}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring-accent)] resize-y"
+                  className="w-full px-3 py-2 rounded-lg border border-[#680318]/20 bg-[#fff0df] text-sm text-[#680318] outline-none focus:border-[#b94826] focus:ring-2 focus:ring-[#b94826]/25 resize-y"
                 />
               </Field>
             </div>
@@ -469,7 +470,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     <label className="block space-y-1.5">
       <div className="flex items-center justify-between">
         <Label>{label}</Label>
-        {hint && <span className="text-[11px] text-[var(--text-muted)]">{hint}</span>}
+        {hint && <span className="text-[11px] text-[#680318]/60">{hint}</span>}
       </div>
       {children}
     </label>
@@ -478,7 +479,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">
+    <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#680318]/60">
       {children}
     </span>
   );
@@ -490,7 +491,7 @@ function SaveStatusLine({ saving, lastSavedAt, status }: { saving: boolean; last
     : lastSavedAt
       ? `Saved ${formatRelative(lastSavedAt)} · ${status}`
       : `Unsaved · ${status}`;
-  return <p className="text-xs text-[var(--text-muted)] truncate">{text}</p>;
+  return <p className="text-xs text-[#680318]/60 truncate">{text}</p>;
 }
 
 function formatRelative(d: Date): string {

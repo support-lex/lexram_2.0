@@ -56,7 +56,7 @@ export default async function BlogPostPage({ params }: PageProps) {
   const publishDate = post.published_at ? new Date(post.published_at) : new Date(post.created_at);
 
   return (
-    <article className="bg-[var(--bg-primary)] pb-24">
+    <article className="bg-[#fff0df] pb-24">
       {/* Cover */}
       {post.cover_image_url && (
         <div className="relative w-full h-[280px] sm:h-[420px] md:h-[520px] overflow-hidden">
@@ -71,12 +71,12 @@ export default async function BlogPostPage({ params }: PageProps) {
         <div className="mb-8 flex items-center justify-between">
           <Link
             href="/blog"
-            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium bg-[var(--bg-surface)]/90 backdrop-blur border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors shadow-[var(--shadow-sm)]"
+            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium bg-[#fff7ec]/90 backdrop-blur border border-[#680318]/15 text-[#680318] hover:text-[#680318] transition-colors shadow-sm"
           >
             <ArrowLeft className="h-4 w-4" /> Back
           </Link>
           {isDraft && (
-            <span className="inline-flex items-center px-3 h-7 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+            <span className="inline-flex items-center px-3 h-7 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-[#fff0df] text-[#680318] border border-[#b94826]/40">
               {post.status === "scheduled" ? "Scheduled" : "Draft preview"}
             </span>
           )}
@@ -86,27 +86,27 @@ export default async function BlogPostPage({ params }: PageProps) {
         <header className="mb-10 space-y-4">
           {post.category && (
             <div>
-              <span className="inline-block px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">
+              <span className="inline-block px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] rounded-full bg-[#b94826]/10 text-[#b94826]">
                 {post.category}
               </span>
             </div>
           )}
-          <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold leading-tight tracking-tight text-[var(--text-primary)]">
+          <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold leading-tight tracking-tight text-[#680318]">
             {post.title}
           </h1>
           {post.subtitle && (
-            <p className="text-lg sm:text-xl text-[var(--text-secondary)] leading-relaxed">
+            <p className="text-lg sm:text-xl text-[#680318] leading-relaxed">
               {post.subtitle}
             </p>
           )}
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 text-sm text-[var(--text-muted)]">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 text-sm text-[#680318]/60">
             {post.author_name && (
               <div className="flex items-center gap-2">
-                <div className="grid place-items-center h-8 w-8 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] text-xs font-semibold">
+                <div className="grid place-items-center h-8 w-8 rounded-full bg-[#b94826]/15 text-[#b94826] text-xs font-semibold">
                   {initials(post.author_name)}
                 </div>
-                <span className="text-[var(--text-primary)] font-medium">{post.author_name}</span>
+                <span className="text-[#680318] font-medium">{post.author_name}</span>
               </div>
             )}
             <span className="inline-flex items-center gap-1.5">
@@ -138,7 +138,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             {post.tags.map((t) => (
               <span
                 key={t}
-                className="inline-block px-3 py-1 text-xs font-medium rounded-full bg-[var(--bg-surface)] border border-[var(--border-default)] text-[var(--text-secondary)]"
+                className="inline-block px-3 py-1 text-xs font-medium rounded-full bg-[#fff7ec] border border-[#680318]/15 text-[#680318]"
               >
                 #{t}
               </span>
@@ -148,15 +148,15 @@ export default async function BlogPostPage({ params }: PageProps) {
 
         {/* Sticky-ish action bar */}
         <div className="sticky bottom-4 z-20 mt-12 flex justify-center">
-          <div className="rounded-full bg-[var(--bg-surface)]/90 backdrop-blur shadow-[var(--shadow-lg)] border border-[var(--border-default)] px-2 py-1">
+          <div className="rounded-full bg-[#fff7ec]/90 backdrop-blur shadow-lg border border-[#680318]/15 px-2 py-1">
             <BlogActions title={post.title} initialLikes={0} />
           </div>
         </div>
 
         {/* Comments placeholder */}
-        <section id="comments" className="mt-16 pt-10 border-t border-[var(--border-default)]">
-          <h2 className="font-serif text-2xl font-bold text-[var(--text-primary)] mb-4">Comments</h2>
-          <div className="rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--bg-surface)] p-8 text-center text-sm text-[var(--text-muted)]">
+        <section id="comments" className="mt-16 pt-10 border-t border-[#680318]/15">
+          <h2 className="font-serif text-2xl font-bold text-[#680318] mb-4">Comments</h2>
+          <div className="rounded-xl border border-dashed border-[#680318]/15 bg-[#fff7ec] p-8 text-center text-sm text-[#680318]/60">
             Comments are coming soon. In the meantime, share your thoughts on social.
           </div>
         </section>

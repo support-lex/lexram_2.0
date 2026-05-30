@@ -49,8 +49,8 @@ export default function BlogActions({ title, initialLikes = 0 }: Props) {
         aria-pressed={liked}
         className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium transition-all
           ${liked
-            ? "bg-[var(--accent)]/15 text-[var(--accent)]"
-            : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]"
+            ? "bg-[#b94826]/15 text-[#b94826]"
+            : "text-[#680318]/75 hover:bg-[#680318]/8 hover:text-[#680318]"
           }`}
       >
         <Heart className={`h-4 w-4 transition-transform ${liked ? "fill-current scale-110" : ""}`} />
@@ -59,7 +59,7 @@ export default function BlogActions({ title, initialLikes = 0 }: Props) {
 
       <a
         href="#comments"
-        className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] transition-colors"
+        className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium text-[#680318]/75 hover:bg-[#680318]/8 hover:text-[#680318] transition-colors"
       >
         <MessageCircle className="h-4 w-4" />
         <span className="hidden sm:inline">Comments</span>
@@ -68,9 +68,9 @@ export default function BlogActions({ title, initialLikes = 0 }: Props) {
       <button
         type="button"
         onClick={handleShare}
-        className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] transition-colors"
+        className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium text-[#680318]/75 hover:bg-[#680318]/8 hover:text-[#680318] transition-colors"
       >
-        {copied ? <Check className="h-4 w-4 text-green-600" /> : <Share2 className="h-4 w-4" />}
+        {copied ? <Check className="h-4 w-4 text-[#b94826]" /> : <Share2 className="h-4 w-4" />}
         <span className="hidden sm:inline">Share</span>
       </button>
     </div>

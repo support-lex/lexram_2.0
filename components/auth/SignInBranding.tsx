@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Scale, Quote } from "lucide-react";
+import { Quote } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 const stories = [
@@ -48,10 +49,17 @@ export default function SignInBranding() {
       <div className="relative z-10">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-[#fff0df] hover:opacity-80 transition-opacity"
+          aria-label="LexRam"
+          className="inline-flex items-center hover:opacity-80 transition-opacity"
         >
-          <Scale className="w-6 h-6 text-[#b94826]" />
-          <span className="font-serif font-bold text-xl tracking-tight">LexRam</span>
+          <Image
+            src="/lexram-logo-light.png"
+            alt="LexRam"
+            width={140}
+            height={48}
+            priority
+            className="h-10 w-auto"
+          />
         </Link>
       </div>
 

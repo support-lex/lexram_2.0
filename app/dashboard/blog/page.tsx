@@ -31,7 +31,7 @@ export default async function BlogPage() {
   // can scroll on its own. (The public /blog page renders the same explorer
   // inside <PageLayout>, which already provides page-level scroll.)
   return (
-    <div className="h-full overflow-y-auto bg-[var(--bg-primary)]">
+    <div className="h-full overflow-y-auto bg-[#fff0df]">
       <BlogExplorer posts={posts} isAdmin={isAdmin} />
     </div>
   );

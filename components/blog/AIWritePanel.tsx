@@ -78,7 +78,7 @@ export default function AIWritePanel({ title, existingHtml, onApply }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-semibold bg-gradient-to-r from-[var(--accent)]/15 to-purple-500/10 text-[var(--accent)] border border-[var(--accent)]/30 hover:from-[var(--accent)]/25 hover:to-purple-500/20 transition-all"
+        className="inline-flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-semibold bg-gradient-to-r from-[#b94826]/15 to-[#680318]/10 text-[#680318] border border-[#b94826]/40 hover:from-[#b94826]/25 hover:to-[#680318]/15 hover:border-[#b94826]/60 transition-all"
       >
         <Sparkles className="h-3.5 w-3.5" /> Write with AI
       </button>
@@ -86,22 +86,22 @@ export default function AIWritePanel({ title, existingHtml, onApply }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-[var(--accent)]/30 bg-gradient-to-br from-[var(--accent)]/5 via-[var(--bg-surface)] to-purple-500/5 p-4 sm:p-5 space-y-4 shadow-[var(--shadow-card)]">
+    <div className="rounded-xl border border-[#b94826]/40 bg-gradient-to-br from-[#b94826]/8 via-[#fff7ec] to-[#680318]/8 p-4 sm:p-5 space-y-4 shadow-md">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="grid place-items-center h-8 w-8 rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
+          <div className="grid place-items-center h-8 w-8 rounded-lg bg-[#b94826]/15 text-[#b94826]">
             <Sparkles className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Write with AI</h3>
-            <p className="text-xs text-[var(--text-muted)]">Describe the post — get an editable draft in seconds.</p>
+            <h3 className="text-sm font-semibold text-[#680318]">Write with AI</h3>
+            <p className="text-xs text-[#680318]/60">Describe the post — get an editable draft in seconds.</p>
           </div>
         </div>
         <button
           type="button"
           onClick={() => { setOpen(false); setPrompt(""); }}
           disabled={busy}
-          className="grid place-items-center h-8 w-8 rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-50 transition-colors"
+          className="grid place-items-center h-8 w-8 rounded-lg text-[#680318]/60 hover:bg-[#680318]/8 hover:text-[#680318] disabled:opacity-50 transition-colors"
           aria-label="Close"
         >
           <X className="h-4 w-4" />
@@ -115,10 +115,10 @@ export default function AIWritePanel({ title, existingHtml, onApply }: Props) {
           rows={4}
           maxLength={2000}
           placeholder='e.g. "A 1,000-word explainer on the Digital Personal Data Protection Act 2023 — what advocates need to tell startup clients."'
-          className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring-accent)] resize-y"
+          className="w-full px-3 py-2 rounded-lg border border-[#680318]/20 bg-[#fff7ec] text-sm text-[#680318] placeholder:text-[#680318]/60 outline-none focus:border-[#b94826] focus:ring-2 focus:ring-[#b94826]/25 resize-y"
           onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") generate(); }}
         />
-        <div className="mt-1 text-[11px] text-[var(--text-muted)] flex justify-between">
+        <div className="mt-1 text-[11px] text-[#680318]/60 flex justify-between">
           <span>⌘/Ctrl + Enter to generate</span>
           <span>{prompt.length}/2000</span>
         </div>
@@ -132,7 +132,7 @@ export default function AIWritePanel({ title, existingHtml, onApply }: Props) {
             type="button"
             onClick={() => setPrompt(s)}
             disabled={busy}
-            className="px-2.5 py-1 text-[11px] rounded-full bg-[var(--bg-surface)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:border-[var(--accent)]/40 hover:text-[var(--text-primary)] disabled:opacity-50 transition-colors"
+            className="px-2.5 py-1 text-[11px] rounded-full bg-[#fff7ec] border border-[#680318]/20 text-[#680318]/80 hover:border-[#b94826]/40 hover:text-[#680318] disabled:opacity-50 transition-colors"
           >
             {s}
           </button>
@@ -162,7 +162,7 @@ export default function AIWritePanel({ title, existingHtml, onApply }: Props) {
           type="button"
           onClick={() => { setOpen(false); setPrompt(""); }}
           disabled={busy}
-          className="px-3 h-9 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-50 transition-colors"
+          className="px-3 h-9 rounded-lg text-sm font-medium text-[#680318]/80 hover:bg-[#680318]/8 hover:text-[#680318] disabled:opacity-50 transition-colors"
         >
           Cancel
         </button>
@@ -170,7 +170,7 @@ export default function AIWritePanel({ title, existingHtml, onApply }: Props) {
           type="button"
           onClick={generate}
           disabled={busy || !prompt.trim()}
-          className="inline-flex items-center gap-1.5 px-4 h-9 rounded-lg text-sm font-semibold bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)] disabled:opacity-50 shadow-[var(--shadow-sm)] transition-colors"
+          className="inline-flex items-center gap-1.5 px-4 h-9 rounded-lg text-sm font-semibold bg-[#680318] text-[#fff0df] border border-[#680318] hover:bg-[#7a1f2b] hover:border-[#7a1f2b] disabled:opacity-50 shadow-[0_4px_14px_-4px_rgba(104,3,24,0.45)] transition-all"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
           {busy ? "Writing..." : "Generate"}
@@ -194,12 +194,12 @@ function ModeOption({
       onClick={onClick}
       className={`px-3 py-2 rounded-lg text-left transition-colors border
         ${active
-          ? "border-[var(--accent)] bg-[var(--accent)]/10"
-          : "border-[var(--border-default)] bg-[var(--bg-surface)] hover:border-[var(--accent)]/40"
+          ? "border-[#b94826] bg-[#b94826]/10"
+          : "border-[#680318]/20 bg-[#fff7ec] hover:border-[#b94826]/40"
         }`}
     >
-      <div className="text-xs font-semibold text-[var(--text-primary)]">{label}</div>
-      <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{hint}</div>
+      <div className="text-xs font-semibold text-[#680318]">{label}</div>
+      <div className="text-[11px] text-[#680318]/60 mt-0.5">{hint}</div>
     </button>
   );
 }

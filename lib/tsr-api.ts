@@ -41,7 +41,6 @@ function timeout<T>(ms: number, label: string): Promise<T> {
   );
 }
 
-
 /**
  * Returns the current Supabase access token, lazily fetching the session on
  * first call. Subsequent calls return the cached value (no auth lock contention).

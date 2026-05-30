@@ -22,7 +22,6 @@ export default function TsrRootPage() {
     }
   }, [ctx.loading, ctx.role, ctx.org, router]);
 
-
   return (
     <div className="flex-1 grid place-items-center min-h-full" style={{ backgroundColor: "var(--bg-primary)" }}>
       <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--accent)" }} />

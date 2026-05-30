@@ -39,7 +39,7 @@ export default function OnboardingChoicePage() {
     try {
       await startAsIndividual();
       await ctx.refresh();
-      router.replace("/dashboard/tsr/my-cases");
+      router.replace("/dashboard/tsr");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setBusy(false);

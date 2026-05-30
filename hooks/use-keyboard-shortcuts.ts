@@ -16,7 +16,7 @@ export function useKeyboardShortcuts(shortcuts: ShortcutMap) {
 
         const cmdMatch = isCmdOrCtrl ? (e.metaKey || e.ctrlKey) : !(e.metaKey || e.ctrlKey);
         const shiftMatch = isShift ? e.shiftKey : !e.shiftKey;
-        const keyMatch = key ? e.key?.toLowerCase() === key : true;
+        const keyMatch = key ? e.key.toLowerCase() === key : true;
 
         if (cmdMatch && shiftMatch && keyMatch) {
           e.preventDefault();

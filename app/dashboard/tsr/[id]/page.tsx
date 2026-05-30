@@ -218,7 +218,6 @@ export default function CaseWorkspacePage() {
   const [userEmail, setUserEmail] = useState<string>('')
   const [userFullName, setUserFullName] = useState<string>('')
 
-
   useEffect(() => {
     if (!id) return
     let mounted = true
@@ -272,7 +271,6 @@ export default function CaseWorkspacePage() {
     })()
     return () => { mounted = false }
   }, [id])
-
 
   useEffect(() => {
     if (!id) return
@@ -402,7 +400,6 @@ export default function CaseWorkspacePage() {
     setPaymentModalOpen(false)
     handleRunPipeline()
   }
-
 
   const handleRunPipeline = async () => {
     if (droppedFiles.length === 0) return

@@ -37,6 +37,7 @@
   ],
   "exclude": [
     "node_modules",
-    "admin-console"
+    "admin-console",
+    "tsr-tenant-app"
   ]
 }

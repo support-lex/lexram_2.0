@@ -7,7 +7,7 @@ import {
   CheckCircle2, ArrowRight, Quote, Plus, Minus, Star,
   Library, PenTool, Users, Download, Bookmark,
   Calendar, TrendingUp, FileSearch, Layers, Mic,
-  Mail, Phone, Clock, Send, MessageSquare,
+  Mail, Phone, MapPin, Clock, Send, MessageSquare,
   Menu, X,
 } from "lucide-react";
 import { track } from "@/lib/landing-analytics";
@@ -314,12 +314,12 @@ function Hero() {
   const tabs = ["Research", "Drafting", "Title Scrutiny"];
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
-
   useEffect(() => {
     if (paused) return;
     const t = setInterval(() => setActive((p) => (p + 1) % tabs.length), 4000);
     return () => clearInterval(t);
   }, [paused]);
+
 
   const handleTab = (i: number) => {
     setActive(i);
@@ -446,10 +446,10 @@ function Hero() {
               ))}
             </div>
 
-            {/* Tab content — single column: badge → heading → desc → bullets → Explore (last) */}
+            {/* Tab content */}
             <div
               key={active}
-              className="p-5 sm:p-7 md:p-8 flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-400"
+              className="p-5 sm:p-7 md:p-8 flex flex-col gap-4 h-[580px] sm:h-[590px] animate-in fade-in slide-in-from-bottom-2 duration-400"
             >
               {/* Badge */}
               <span className="inline-block text-xs font-bold tracking-[0.2em] uppercase px-2.5 py-1 rounded-md bg-[#e8c8a8] text-[#680318] self-start">
@@ -485,7 +485,7 @@ function Hero() {
               </ul>
 
               {/* Explore — always last */}
-              <div className="mt-auto pt-2">
+              <div className="mt-4">
                 <a
                   href={c.ctaHref || "#research"}
                   className="inline-flex items-center gap-1.5 text-base font-semibold px-4 py-1.5 rounded-lg bg-[#e8c8a8] text-[#680318] hover:bg-[#fff0df] transition-colors"
@@ -493,10 +493,10 @@ function Hero() {
                   {c.cta2} <ArrowRight className="w-4 h-4" />
                 </a>
               </div>
-            </div>
           </div>
         </div>
       </div>
+    </div>
     </section>
   );
 }
@@ -2711,86 +2711,101 @@ function CTA() {
    Footer
    ============================================================ */
 function Footer() {
+  const socials = [
+    { href: "https://www.linkedin.com/company/lexram-ai-legal-analysis/", svgPath: "M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z", label: "LinkedIn"  },
+    { href: "https://youtube.com/@lexramai?si=uyc3g0b8Ebde_eLN",          svgPath: "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z", label: "YouTube"   },
+    { href: "https://www.instagram.com/learn.with.lexram.ai?igsh=YW9hYjF2MjNyMThl",      svgPath: "M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z", label: "Instagram" },
+    { href: "https://www.facebook.com/profile.php?id=61588185590846",       svgPath: "M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z", label: "Facebook"  },
+  ];
+
   return (
-    <footer className="bg-[#680318] text-[#fff0df]/70 pt-16 pb-10 border-t border-[#b94826]/20">
-      <div className="max-w-[1440px] mx-auto px-6 sm:px-10">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10">
-          {/* Brand */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center mb-4">
-              <img
-                src="/lexram-logo-light.png"
-                alt="Lexram"
-                width={132}
-                height={46}
-                className="h-10 w-auto"
-              />
-            </div>
-            <p className="text-sm max-w-sm leading-relaxed mb-4">
-              &ldquo;You argue the case. We&apos;ll find the law.&rdquo; From statute to submission — built on India&apos;s courts alone.
+    <footer className="bg-[#680318] text-[#fff0df]/70 border-t border-[#b94826]/20">
+      <div className="max-w-[1440px] mx-auto px-6 sm:px-10 pt-14 pb-10">
+
+        {/* ── Main grid: brand+contact left, nav columns right ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr_1fr] gap-12 lg:gap-16">
+
+          {/* Col 1: Brand + contact + social */}
+          <div className="flex flex-col gap-6">
+            <span className="font-serif text-5xl sm:text-6xl font-bold text-[#fff0df] tracking-tight" style={{ textShadow: "0 2px 24px rgba(185,72,38,0.65), 0 1px 8px rgba(0,0,0,0.55)" }}>LexRam</span>
+            <p className="text-base leading-relaxed text-[#fff0df]/90 max-w-xs">
+              &ldquo;You argue the case. We&apos;ll find the law.&rdquo;<br />
+              Built exclusively on India&apos;s courts — statute to submission.
             </p>
-            <div className="flex items-center gap-3">
-              <a href="mailto:support@lexram.ai" className="inline-flex items-center gap-1.5 text-sm text-[#fff0df]/60 hover:text-[#b94826] transition-colors">
-                <Mail className="w-3.5 h-3.5" /> support@lexram.ai
+            <div className="space-y-4 text-base">
+              <a href="tel:+918754446066" className="flex items-center gap-2.5 text-[#fff0df]/90 hover:text-[#fff0df] transition-colors">
+                <Phone className="w-4 h-4 text-[#b94826] shrink-0" />
+                +91 87544 46066
               </a>
+              <a href="mailto:hello@lexram.ai" className="flex items-center gap-2.5 text-[#fff0df]/90 hover:text-[#fff0df] transition-colors">
+                <Mail className="w-4 h-4 text-[#b94826] shrink-0" />
+                hello@lexram.ai
+              </a>
+              <div className="flex items-start gap-2.5 text-[#fff0df]/85">
+                <MapPin className="w-4 h-4 text-[#b94826] shrink-0 mt-0.5" />
+                <address className="not-italic text-sm leading-[1.8]">
+                  G1 (Ground Floor), Bhaskara Apartments,<br />
+                  No.&nbsp;28, Pycrofts Garden Road,<br />
+                  Nungambakkam, Chennai&nbsp;— 600&nbsp;006
+                </address>
+              </div>
+            </div>
+            {/* Social icons */}
+            <div className="flex items-center gap-2.5 pt-1">
+              {socials.map(({ href, svgPath, label }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="w-8 h-8 rounded-md border border-[#fff0df]/15 grid place-items-center text-[#fff0df]/55 hover:border-[#b94826] hover:text-[#b94826] hover:bg-[#b94826]/10 transition-all"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                    <path d={svgPath} />
+                  </svg>
+                </a>
+              ))}
             </div>
           </div>
 
-          {/* Product */}
+          {/* Col 2: Products */}
           <div>
-            <h4 className="font-serif text-[#fff0df] font-semibold mb-4">Product</h4>
-            <ul className="space-y-2.5 text-sm">
-              <li><a href="#research" className="hover:text-[#b94826] transition-colors">AI Legal Research</a></li>
-              <li><a href="#drafting" className="hover:text-[#b94826] transition-colors">LexDraft</a></li>
-              <li><a href="/dashboard/tsr" className="hover:text-[#b94826] transition-colors">Title Scrutiny</a></li>
-              <li><a href="/acts" className="hover:text-[#b94826] transition-colors">Statutes & Acts</a></li>
-              <li><a href="/dashboard/network" className="hover:text-[#b94826] transition-colors">Advocate Network</a></li>
-              <li><a href="#pricing" className="hover:text-[#b94826] transition-colors">Pricing</a></li>
+            <p className="text-xs font-bold tracking-[0.25em] uppercase text-[#b94826] mb-6">Products</p>
+            <ul className="space-y-5 text-base">
+              <li><a href="#research"       className="text-[#fff0df]/90 hover:text-[#fff0df] transition-colors">Research</a></li>
+              <li><a href="#drafting"       className="text-[#fff0df]/90 hover:text-[#fff0df] transition-colors">Drafting</a></li>
+              <li><a href="/dashboard/tsr"  className="text-[#fff0df]/90 hover:text-[#fff0df] transition-colors">TSR</a></li>
             </ul>
           </div>
 
-          {/* Company */}
+          {/* Col 3: Information */}
           <div>
-            <h4 className="font-serif text-[#fff0df] font-semibold mb-4">Company</h4>
-            <ul className="space-y-2.5 text-sm">
-              <li><a href="/about" className="hover:text-[#b94826] transition-colors">About Us</a></li>
-              <li><a href="/#blog" className="hover:text-[#b94826] transition-colors">Blog</a></li>
-              <li><a href="/careers" className="hover:text-[#b94826] transition-colors">Careers</a></li>
-              <li><a href="/#contact" className="hover:text-[#b94826] transition-colors">Contact</a></li>
-              <li><a href="/#faq" className="hover:text-[#b94826] transition-colors">FAQ</a></li>
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div>
-            <h4 className="font-serif text-[#fff0df] font-semibold mb-4">Legal</h4>
-            <ul className="space-y-2.5 text-sm">
-              <li><a href="/privacy" className="hover:text-[#b94826] transition-colors">Privacy Policy</a></li>
-              <li><a href="/terms" className="hover:text-[#b94826] transition-colors">Terms of Service</a></li>
-              <li><a href="/refund-policy" className="hover:text-[#b94826] transition-colors">Refund Policy</a></li>
-              <li><a href="/cookies" className="hover:text-[#b94826] transition-colors">Cookie Policy</a></li>
+            <p className="text-xs font-bold tracking-[0.25em] uppercase text-[#b94826] mb-6">Information</p>
+            <ul className="space-y-5 text-base">
+              <li><a href="/blog"    className="text-[#fff0df]/90 hover:text-[#fff0df] transition-colors">Blog</a></li>
+              <li><a href="#pricing" className="text-[#fff0df]/90 hover:text-[#fff0df] transition-colors">Pricing</a></li>
+              <li><a href="#faq"     className="text-[#fff0df]/90 hover:text-[#fff0df] transition-colors">FAQ</a></li>
             </ul>
           </div>
         </div>
 
+        {/* Divider */}
+        <div className="mt-12 border-t border-[#fff0df]/10" />
+
         {/* Bottom bar */}
-        <div className="mt-14 pt-8 border-t border-[#fff0df]/10 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-[#fff0df]/50">
+        <div className="mt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-sm text-[#fff0df]/70">
+          <span>© {new Date().getFullYear()} Ramasubramanian AI Software Pvt. Ltd. — Built in India, for Indian advocates.</span>
           <div className="flex items-center gap-4">
-            <span>© {new Date().getFullYear()} Ramasubramanian AI Software Pvt. Ltd.</span>
-            <span className="hidden sm:inline text-[#fff0df]/30">·</span>
-            <span className="hidden sm:inline">Built in India. For Indian advocates.</span>
-          </div>
-          <div className="flex items-center gap-5">
-            <a href="https://twitter.com/lexram" target="_blank" rel="noopener noreferrer" className="hover:text-[#b94826] transition-colors">Twitter</a>
-            <a href="https://linkedin.com/company/lexram" target="_blank" rel="noopener noreferrer" className="hover:text-[#b94826] transition-colors">LinkedIn</a>
-            <span className="text-[#fff0df]/20">Made with reverence for the rule of law</span>
+            <a href="/privacy"       className="hover:text-[#fff0df] transition-colors">Privacy</a>
+            <a href="/terms"         className="hover:text-[#fff0df] transition-colors">Terms</a>
+            <a href="/refund-policy" className="hover:text-[#fff0df] transition-colors">Refund</a>
           </div>
         </div>
       </div>
     </footer>
   );
 }
-
 /* ============================================================
    Page
    ============================================================ */

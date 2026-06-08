@@ -40,6 +40,60 @@ function rowToSession(row: SupabaseSessionRow): ResearchSession {
   };
 }
 
+// ─── Backend-history → frontend Message[] recovery ──────────────────────────
+// The LexRam backend keeps the full conversation at GET /sessions/{id}/history
+// as plain { role, content } turns. When the Supabase mirror is empty (a save
+// failed, or an older session), we rebuild the thread from there so drafted
+// petitions etc. are never truly lost. The content is markdown; we classify
+// assistant turns into a draft/plan/prose block with the same lightweight
+// heuristics the live stream uses as its fallback.
+function histGenId(): string {
+  return `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+function histLooksLikeDraft(text: string): boolean {
+  if (!text) return false;
+  const head = text.slice(0, 900);
+  return /\b(IN THE (HON(')?BLE )?(COURT|HIGH COURT|SESSIONS|TRIBUNAL|FORUM)|BEFORE THE (HON(')?BLE )?(COURT|JUDGE|MAGISTRATE)|RESPECTFULLY SHOWETH|MOST RESPECTFULLY SHOWETH|MEMORANDUM OF|PETITION (FOR|UNDER))\b/i.test(head);
+}
+function histLooksLikePlan(text: string): boolean {
+  if (!text) return false;
+  if (/^[\s*#>-]*(?:Drafting Plan|Draft Plan)\b/im.test(text)) return true;
+  return /\bdrafting plan\b|\bproposed structure\b|\bproceed with drafting\b/i.test(text);
+}
+export function mapHistoryToMessages(
+  hist: { role: string; content: string }[]
+): Message[] {
+  const out: Message[] = [];
+  for (const h of hist) {
+    const content = String(h?.content ?? '');
+    if (!content.trim()) continue; // skip empty turns (e.g. interrupted nodes)
+    const ts = new Date().toISOString();
+    if (h?.role !== 'assistant') {
+      out.push({ id: histGenId(), role: 'user', content, timestamp: ts });
+      continue;
+    }
+    const base = {
+      shortAnswer: '',
+      reasoning: '',
+      authorityStrength: 'Moderate' as const,
+      divergenceStatus: 'Split' as const,
+    };
+    let response;
+    // Plan is checked BEFORE draft: a plan turn ("Drafting Plan: …") often
+    // mentions court/petition terms that would otherwise match the draft test,
+    // whereas the finished petition has no "drafting plan" heading.
+    if (histLooksLikePlan(content)) {
+      response = { ...base, streamText: '', uiBlocks: [{ type: 'plan' as const, data: content }] };
+    } else if (histLooksLikeDraft(content)) {
+      response = { ...base, streamText: '', draftReady: content, uiBlocks: [{ type: 'draft' as const, data: content }] };
+    } else {
+      response = { ...base, streamText: content };
+    }
+    out.push({ id: histGenId(), role: 'ai', content: '', timestamp: ts, response });
+  }
+  return out;
+}
+
 function lexramToSession(s: LexramSession, messages: Message[] = []): ResearchSession {
   const id = lexramSessionId(s);
   const now = new Date().toISOString();
@@ -95,6 +149,19 @@ export const chatSessionRepository = {
         err
       );
       return listFromSupabaseFallback();
+    }
+  },
+
+  // ── Recover a session's messages from the backend history ─────────────────
+  // Used when the Supabase mirror has no messages for a session (failed save,
+  // legacy row). Returns [] on any failure so callers can fall back silently.
+  async getMessagesFromBackend(id: string): Promise<Message[]> {
+    try {
+      const hist = await lexramSessionRepository.history(id);
+      return mapHistoryToMessages(hist);
+    } catch (err) {
+      console.warn('[chatSessionRepository.getMessagesFromBackend] failed', err);
+      return [];
     }
   },
 
@@ -164,11 +231,33 @@ export const chatSessionRepository = {
   // ── Replace the messages array of an existing session ─────────────────────
   // LexRam has no PUT-messages endpoint, so this is always Supabase-only.
   async updateMessages(id: string, messages: Message[]): Promise<void> {
-    const { error } = await supabase()
+    // .select() lets us detect a 0-row update — which happens when the Supabase
+    // mirror row was never created (e.g. the create-time upsert failed). A bare
+    // .update().eq() in that case silently affects nothing, so the messages
+    // (including generated drafts) are NEVER persisted and vanish on reload.
+    const { data, error } = await supabase()
       .from('chat_sessions')
       .update({ messages })
-      .eq('id', id);
-    if (error) console.error('[chatSessionRepository.updateMessages]', error);
+      .eq('id', id)
+      .select('id');
+    if (error) {
+      console.error('[chatSessionRepository.updateMessages]', error);
+      return;
+    }
+    if (data && data.length > 0) return;
+
+    // No row was updated — the mirror is missing. Create it now so the messages
+    // actually persist. `title` is only applied on insert (the row didn't
+    // exist), so this can't clobber an existing title.
+    const { data: userData } = await supabase().auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) return;
+    const { error: upsertErr } = await supabase()
+      .from('chat_sessions')
+      .upsert({ id, user_id: userId, title: 'New Chat', messages }, { onConflict: 'id' });
+    if (upsertErr) {
+      console.error('[chatSessionRepository.updateMessages] mirror recreate failed', upsertErr);
+    }
   },
 
   // ── Rename a session (LexRam + Supabase mirror) ───────────────────────────

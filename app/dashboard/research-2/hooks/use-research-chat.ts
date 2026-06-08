@@ -664,11 +664,47 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
             mindmap?: any;
             mind_map?: any;
             mermaid?: any;
+            // Draft-mode response classifier (per the backend integration
+            // guide). Tells us authoritatively whether this is a clarifying
+            // question, the drafting plan awaiting approval, or the finished
+            // draft — replacing the brittle client-side heuristics below.
+            response_type?: "question" | "plan" | "draft" | string;
+            // Suggested-answer chips can ride along on the done event (esp.
+            // with a "question" response_type).
+            suggestedAnswers?: any;
+            suggested_answers?: any;
+            suggestedAnswersHeading?: any;
+            suggested_answers_heading?: any;
+            suggestedAnswersVariant?: any;
+            suggested_answers_variant?: any;
           }
         | null;
 
       const doneFinalAnswer =
         (done?.final_answer || done?.answer || done?.response || "").trim();
+      // Authoritative draft-mode classifier from the backend (may be absent on
+      // older builds or non-draft modes → null → keep existing behaviour).
+      const responseType = (done?.response_type ?? null) as
+        | "question"
+        | "plan"
+        | "draft"
+        | null;
+      // Suggested answers shipped on the done event (snake_case or camelCase).
+      const doneSuggested: string[] = Array.isArray(done?.suggestedAnswers)
+        ? done!.suggestedAnswers
+        : Array.isArray(done?.suggested_answers)
+        ? done!.suggested_answers
+        : [];
+      const doneSuggestedList = doneSuggested
+        .map((s: any) => String(s ?? "").trim())
+        .filter((s: string) => s.length > 0)
+        .slice(0, 6);
+      const doneSuggestedHeading = String(
+        done?.suggestedAnswersHeading ?? done?.suggested_answers_heading ?? "",
+      ).trim();
+      const doneSuggestedVariantRaw = String(
+        done?.suggestedAnswersVariant ?? done?.suggested_answers_variant ?? "",
+      ).trim();
       // New wire format: backend ships authorities as a structured array on
       // the `done` event instead of an inline <source>...</source> block.
       // parseLexramSources can't see them, so merge them in directly here.
@@ -805,14 +841,18 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         }
       };
 
-      if (finalText) {
-        // Normal streaming path — real tokens already painted live.
-        answer = applySources(finalText);
-      } else if (doneFinalAnswer) {
-        // Backend dropped the whole answer in done.final_answer — animate it
-        // into the live UI before committing the message.
-        await simulateStreaming(doneFinalAnswer);
+      if (doneFinalAnswer) {
+        // ALWAYS prefer done.final_answer over the accumulated tokens: per the
+        // backend integration guide the streamed tokens can still contain raw
+        // LEXRAM_* tag text at the very end (before stripping), whereas
+        // final_answer is the clean, stripped version. The tokens already gave
+        // the live typing feel; we now commit the clean text. If nothing
+        // streamed live (backend skipped tokens), animate final_answer in.
+        if (!finalText) await simulateStreaming(doneFinalAnswer);
         answer = applySources(doneFinalAnswer);
+      } else if (finalText) {
+        // No final_answer on the done event — fall back to streamed tokens.
+        answer = applySources(finalText);
       } else if (done?.query_type === "CLARIFICATION_NEEDED") {
         // No tokens AND no final_answer — show a friendly clarification.
         answer = normalizeAnswer({
@@ -860,7 +900,52 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         ];
       }
 
-      // Draft-mode safety net: when the user explicitly picked the Draft pill
+      // Merge suggested-answer chips shipped on the done event. The backend
+      // sends these alongside a "question" response_type (and sometimes on
+      // other turns). They take precedence over anything normalizeAnswer
+      // derived from the prose.
+      if (doneSuggestedList.length > 0) {
+        answer.suggestedAnswers = doneSuggestedList;
+        if (doneSuggestedHeading) answer.suggestedAnswersHeading = doneSuggestedHeading;
+        if (
+          doneSuggestedVariantRaw === "inline" ||
+          doneSuggestedVariantRaw === "popup" ||
+          doneSuggestedVariantRaw === "list" ||
+          doneSuggestedVariantRaw === "buttons"
+        ) {
+          answer.suggestedAnswersVariant = doneSuggestedVariantRaw;
+        }
+      }
+
+      // ── Draft-mode response classification ──────────────────────────────
+      // When the backend tells us the response_type authoritatively, use it to
+      // place the answer into the right UI block (no guessing):
+      //   • "plan"  → Drafting-Plan card with a Proceed button
+      //   • "draft" → document block rendered in the draft editor / viewer
+      //   • "question" → leave as prose + suggested-answer chips (no block)
+      // The brittle text heuristics below are kept ONLY as a fallback for
+      // backend builds that don't emit response_type yet.
+      if (responseType === "plan" || responseType === "draft") {
+        const blockText = (answer.draftReady || answer.streamText || doneFinalAnswer || "").trim();
+        if (blockText) {
+          if (responseType === "plan") {
+            const otherBlocks = (answer.uiBlocks ?? []).filter(
+              (b) => b.type !== "draft" && b.type !== "plan",
+            );
+            answer.uiBlocks = [...otherBlocks, { type: "plan", data: blockText }];
+          } else {
+            answer.draftReady = blockText;
+            const otherBlocks = (answer.uiBlocks ?? []).filter((b) => b.type !== "draft");
+            answer.uiBlocks = [...otherBlocks, { type: "draft", data: blockText }];
+          }
+          // Content now lives in the block only — clear streamText so it isn't
+          // also duplicated in the chat bubble.
+          answer.streamText = "";
+        }
+      }
+
+      // Draft-mode safety net (FALLBACK — only when the backend did NOT send a
+      // response_type): when the user explicitly picked the Draft pill
       // AND the backend actually produced something that *looks* like a
       // petition / memo / notice, promote it into a Draft UiBlock so
       // InlineDraftEditor renders it. The earlier version of this block
@@ -887,7 +972,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         if (/\b(following plan|formulated.*plan|plan.*formulated|one critical question|proceed with drafting\?|proposed structure|placeholders? for missing)\b/i.test(text)) return true;
         return false;
       };
-      if (effectiveMode === "draft") {
+      if (!responseType && effectiveMode === "draft") {
         const hasDraftBlock = answer.uiBlocks?.some((b) => b.type === "draft");
         const hasPlanBlock  = answer.uiBlocks?.some((b) => b.type === "plan");
         const explicitDraft = (answer.draftReady || "").trim();

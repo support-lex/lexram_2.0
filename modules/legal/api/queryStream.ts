@@ -88,10 +88,43 @@ export async function streamLexramQuery(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  // Set once the backend emits its terminal `done` event. We then STOP reading
+  // immediately instead of waiting for the HTTP connection to close. Some SSE
+  // backends (uvicorn/FastAPI keep-alive) hold the stream open after `done`,
+  // which left reader.read() pending forever — so streamLexramQuery never
+  // returned, isSearching never flipped false, and the chat sat on "working…"
+  // indefinitely even though the full answer had already arrived.
+  let streamDone = false;
+
+  // Idle watchdog. Distinct from the `streamDone` keep-alive guard above: that
+  // one handles a backend that finishes (emits `done`) but holds the socket
+  // open. THIS handles a backend that accepts the SSE connection and then goes
+  // SILENT — no token, no status, no `done` (e.g. the Draft pipeline stalling
+  // on a clarification turn). Without it, reader.read() blocks forever,
+  // streamLexramQuery never resolves, the caller's finally never clears
+  // isSearching, and the chat sits on "Working…" indefinitely. We race each
+  // read against a timeout so a stalled stream self-aborts and surfaces a
+  // retryable error. Any received chunk (incl. periodic status pings) resets
+  // the window by resolving the read, so a legitimately slow-but-alive stream
+  // is never killed.
+  const IDLE_TIMEOUT_MS = 60000;
 
   try {
-    while (true) {
-      const { done, value } = await reader.read();
+    while (!streamDone) {
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+      const idle = new Promise<never>((_, reject) => {
+        idleTimer = setTimeout(
+          () => reject(new Error("The server stopped responding. Please try again.")),
+          IDLE_TIMEOUT_MS,
+        );
+      });
+      let result: ReadableStreamReadResult<Uint8Array>;
+      try {
+        result = await Promise.race([reader.read(), idle]);
+      } finally {
+        if (idleTimer) clearTimeout(idleTimer);
+      }
+      const { done, value } = result;
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
@@ -125,6 +158,7 @@ export async function streamLexramQuery(
               break;
             case "done":
               callbacks.onDone?.(event as QueryStreamDoneEvent);
+              streamDone = true;
               break;
             case "error":
               callbacks.onError?.(String(event.message ?? "Unknown error"));
@@ -136,9 +170,19 @@ export async function streamLexramQuery(
         } catch (err) {
           console.warn("[streamLexramQuery] failed to parse SSE line", payload, err);
         }
+        // Terminal event seen — stop processing any trailing keep-alive lines.
+        if (streamDone) break;
       }
     }
   } finally {
+    // Close the connection explicitly. If the backend keeps the SSE stream
+    // open after `done`, cancel() releases it so the fetch settles and the
+    // caller's finally{} (which clears isSearching) actually runs.
+    try {
+      await reader.cancel();
+    } catch {
+      /* noop */
+    }
     try {
       reader.releaseLock();
     } catch {

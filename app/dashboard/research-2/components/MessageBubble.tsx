@@ -390,6 +390,15 @@ export default function MessageBubble({
 
   const contentText = response.streamText || response.shortAnswer;
 
+  // Inline multi-question form (parsed from prose). When present (2+
+  // consecutive numbered questions), it's the comprehensive answer surface —
+  // it covers every question the assistant asked. The `suggestedAnswers`
+  // chips/list/buttons (and the floating popup) typically only address the
+  // FIRST question, so rendering both is redundant and confusing. We let the
+  // form win and suppress the chips whenever the form is active.
+  const inlineQuestions = onSuggestedAnswer ? parseNumberedQuestions(contentText) : [];
+  const hasInlineQuestionForm = inlineQuestions.length >= 2;
+
   const inlineAuthorities = (() => {
     const fromBlocks = response.uiBlocks?.find((b) => b.type === "authorities");
     if (fromBlocks && fromBlocks.type === "authorities") return fromBlocks.data;
@@ -673,7 +682,10 @@ export default function MessageBubble({
                       key={`draft-${bi}`}
                       icon={<FileText className="w-3.5 h-3.5" />}
                       label="View Draft"
-                      defaultOpen={false}
+                      // Open by default — a generated petition/document is the
+                      // deliverable, so show it immediately (the document
+                      // viewer) rather than hiding it behind a collapsed toggle.
+                      defaultOpen={true}
                     >
                       <InlineDraftEditor
                         content={block.data}
@@ -695,16 +707,12 @@ export default function MessageBubble({
             and pushes them through onSuggestedAnswer just like a chip
             click would. Parser returns [] when the pattern isn't there,
             so this is a no-op for ordinary AI prose. */}
-        {(() => {
-          const parsed = parseNumberedQuestions(contentText);
-          if (parsed.length < 2 || !onSuggestedAnswer) return null;
-          return (
-            <InlineQuestionsForm
-              questions={parsed}
-              onProceed={(formatted) => onSuggestedAnswer(formatted)}
-            />
-          );
-        })()}
+        {hasInlineQuestionForm && (
+          <InlineQuestionsForm
+            questions={inlineQuestions}
+            onProceed={(formatted) => onSuggestedAnswer!(formatted)}
+          />
+        )}
 
         {/* Suggested answers — quick-reply chips shown when the assistant
             is asking the user a clarifying question. Clicking auto-submits
@@ -713,7 +721,7 @@ export default function MessageBubble({
             The `popup` variant is intentionally NOT rendered here — it's
             painted as a floating bar above the chat input by the page. */}
         {response.suggestedAnswers && response.suggestedAnswers.length > 0 &&
-          response.suggestedAnswersVariant !== "popup" && (() => {
+          response.suggestedAnswersVariant !== "popup" && !hasInlineQuestionForm && (() => {
           const variant = response.suggestedAnswersVariant ?? "inline";
           const heading = response.suggestedAnswersHeading ?? "Suggested answers";
           const splitOption = (a: string): { title: string; detail?: string } => {

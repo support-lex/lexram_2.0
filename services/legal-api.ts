@@ -13,9 +13,10 @@ legalApi.interceptors.request.use(async (config) => {
   // handlers below.
   activityBegin();
   if (typeof window !== "undefined") {
-    const { supabase } = await import("@/lib/supabase/client");
-    const { data } = await supabase().auth.getSession();
-    const token = data.session?.access_token;
+    // Single auth source — awaits session hydration so this can't fire before
+    // the JWT is ready (the cold-load 401 that silently emptied /cases etc.).
+    const { getAccessToken } = await import("@/lib/auth-store");
+    const token = await getAccessToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
   }
   return config;

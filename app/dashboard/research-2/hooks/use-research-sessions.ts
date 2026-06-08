@@ -7,7 +7,8 @@ import {
   pinnedSessionRepository,
   archivedSessionRepository,
 } from "@/modules/chat/repository/feedback.repository";
-import { supabase } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/auth-provider";
+import { authStore } from "@/lib/auth-store";
 import { getStoredData, setStoredData, STORAGE_KEYS } from "@/lib/storage";
 import type { Message, ResearchSession } from "../types";
 
@@ -62,6 +63,47 @@ function isTempId(id: string | null | undefined): boolean {
   return !!id && id.startsWith("temp_");
 }
 
+// ── Sidebar history cache (stale-while-revalidate) ──────────────────────────
+// The history sidebar used to stay on skeletons until GET /sessions returned
+// (auth-gated, network round-trip — often a second or more). We now persist the
+// last successful list to localStorage, keyed by user, and paint it instantly
+// on the next load while a fresh fetch revalidates in the background.
+//
+// Capped to the most-recent sessions so a heavy user (hundreds of threads with
+// long messages) can't blow the ~5 MB localStorage quota; older threads fill in
+// once the background refresh completes.
+const SESSIONS_CACHE_CAP = 60;
+
+interface SessionsCache {
+  userId: string;
+  sessions: ResearchSession[];
+  cachedAt: number;
+}
+
+function readSessionsCache(userId: string): ResearchSession[] | null {
+  const cached = getStoredData<SessionsCache | null>(STORAGE_KEYS.SESSIONS_CACHE, null);
+  if (!cached || cached.userId !== userId || !Array.isArray(cached.sessions)) return null;
+  return cached.sessions;
+}
+
+function writeSessionsCache(userId: string, sessions: ResearchSession[]) {
+  // Most-recent first (the repository already returns newest-first, but sort
+  // defensively) then cap. CRUCIALLY we strip `messages` to an empty array:
+  // the cache is ONLY for painting the sidebar list (title/date/case) fast.
+  // Caching message content was unsafe — opening a session would load the
+  // cached copy, and the debounced auto-save would then write that (possibly
+  // stale) copy back over the server's newer messages, destroying drafts.
+  const trimmed = [...sessions]
+    .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
+    .slice(0, SESSIONS_CACHE_CAP)
+    .map((s) => ({ ...s, messages: [] as Message[] }));
+  setStoredData<SessionsCache>(STORAGE_KEYS.SESSIONS_CACHE, {
+    userId,
+    sessions: trimmed,
+    cachedAt: Date.now(),
+  });
+}
+
 export function useResearchSessions(selectedMatterId: string) {
   const [sessions, setSessions] = useState<ResearchSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -79,6 +121,14 @@ export function useResearchSessions(selectedMatterId: string) {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sessionsRef = useRef<ResearchSession[]>([]);
   const titleGeneratedRef = useRef<Set<string>>(new Set());
+  // A session the user selected before its real messages were loaded (the
+  // sidebar paints from a metadata-only cache, so message content arrives only
+  // when refresh() returns). refresh() fills the thread once the authoritative
+  // messages land — but only if the user hasn't started a new chat there.
+  const pendingSelectRef = useRef<string | null>(null);
+  // Mirrors currentSessionId so async callbacks (backend-history recovery) can
+  // check the user hasn't navigated away before applying loaded messages.
+  const currentSessionIdRef = useRef<string | null>(null);
   // True while ensureSession() is mid-flight creating a session. The debounced
   // auto-save effect must NOT race it with a second create — otherwise we end
   // up with duplicate sessions in the sidebar (the bug this guards against).
@@ -87,22 +137,25 @@ export function useResearchSessions(selectedMatterId: string) {
   // backend session once per page load (first time we learn the user is
   // authed, whether from the initial getUser() probe or a later auth event).
   const migrationDoneRef = useRef(false);
-  // Dedupe ref: tracks the last user id we ran refresh() for. Both the
-  // getUser() probe and onAuthStateChange(INITIAL_SESSION) fire on mount, and
-  // TOKEN_REFRESHED fires hourly — without this guard each one would re-issue
-  // a parallel GET /sessions, racing each other and (when one silently falls
-  // back to Supabase) intermittently wiping the sidebar.
-  const lastRefreshedForUserRef = useRef<string | null>(null);
+  // Tracks the user id we have SUCCESSFULLY loaded sessions for. Only set after
+  // refresh() returns true, so a failed first load (e.g. a transient backend
+  // blip) leaves this null and the next auth event retries — unlike the old
+  // dedupe that marked the id up-front and permanently cached an empty load.
+  const loadedForUserRef = useRef<string | null>(null);
 
   // ── Load all sessions for the current user from Supabase ───────────────────
-  const refresh = useCallback(async () => {
+  // Returns true when it produced an authoritative result (either a list, or a
+  // deliberate "keep existing data" no-op), false when the fetch threw. The
+  // auth-driven effect uses that to decide whether to mark the user as loaded
+  // or leave the door open for a retry on the next auth event.
+  const refresh = useCallback(async (): Promise<boolean> => {
     let list: ResearchSession[];
     try {
       list = await chatSessionRepository.list();
     } catch (err) {
       console.error('[useResearchSessions.refresh] failed', err);
       setSessionsReady(true);
-      return;
+      return false;
     }
     // Race safety: if we already have sessions in state and this call came
     // back empty (e.g. the repository's silent Supabase fallback fired during
@@ -110,11 +163,32 @@ export function useResearchSessions(selectedMatterId: string) {
     // will replace; until then the user keeps seeing their real history.
     if (list.length === 0 && sessionsRef.current.length > 0) {
       setSessionsReady(true);
-      return;
+      return true;
     }
     setSessions(list);
     sessionsRef.current = list;
     setSessionsReady(true);
+
+    // Fill a deferred selection: the user opened a session (sidebar/URL) before
+    // its real messages were available. Now that the authoritative list is in,
+    // load that thread's messages — but ONLY if the user hasn't already started
+    // typing/streaming there (functional guard: still empty), so we never
+    // clobber an in-flight chat.
+    if (pendingSelectRef.current) {
+      const sel = list.find((s) => s.id === pendingSelectRef.current);
+      if (sel && sel.messages.length > 0) {
+        setMessages((cur) => (cur.length === 0 ? sel.messages : cur));
+        pendingSelectRef.current = null;
+      }
+    }
+
+    // Persist a LIGHTWEIGHT (no-messages) snapshot so the next load paints the
+    // sidebar list instantly. Messages are intentionally excluded — caching
+    // them risked the auto-save writing a stale cached copy back over the
+    // server's newer messages (drafts), so message content always comes from
+    // this authoritative refresh, never the cache.
+    const uid = authStore.getSnapshot().user?.id;
+    if (uid) writeSessionsCache(uid, list);
 
     // Seed SESSION_CASES localStorage cache from backend case_id so
     // the sidebar and page can read case assignments even after a cache clear.
@@ -127,6 +201,7 @@ export function useResearchSessions(selectedMatterId: string) {
       }
     });
     if (dirty) setStoredData(STORAGE_KEYS.SESSION_CASES, casesMap);
+    return true;
   }, []);
 
   // Swap a guest `temp_*` session in localStorage for a real LexRam + Supabase
@@ -171,52 +246,63 @@ export function useResearchSessions(selectedMatterId: string) {
     }
   }, []);
 
+  // Auth comes from the single source of truth (lib/auth-store via useAuth).
+  // `authReady` flips once the first getSession() resolves AND, crucially, the
+  // token layers now await that same readiness — so the GET /sessions below
+  // can never fire token-less and 401 into an empty sidebar. We load exactly
+  // once per successfully-loaded user id; a failed load leaves the door open
+  // for the next auth event (TOKEN_REFRESHED, focus) to retry.
+  const { user: authUser, ready: authReady } = useAuth();
+  const authUserId = authUser?.id ?? null;
   useEffect(() => {
-    let mounted = true;
+    setIsAuthed(!!authUserId);
+    if (!authReady) return;
 
-    // Single entry point for "user is signed in, load their data". Both the
-    // getUser() probe and onAuthStateChange fire on mount; the userId-keyed
-    // ref makes this a no-op for the second caller so we issue exactly one
-    // GET /sessions per user, not two racing each other.
-    const runRefreshForUser = async (userId: string) => {
-      if (lastRefreshedForUserRef.current === userId) return;
-      lastRefreshedForUserRef.current = userId;
+    if (!authUserId) {
+      // Signed out / guest: clear the (authed) sidebar + its cache and allow a
+      // future sign-in to reload. The guest temp-session flow lives in the
+      // auto-save effect, not here.
+      setSessions([]);
+      sessionsRef.current = [];
+      loadedForUserRef.current = null;
+      setStoredData<SessionsCache | null>(STORAGE_KEYS.SESSIONS_CACHE, null);
+      setSessionsReady(true);
+      return;
+    }
+
+    if (loadedForUserRef.current === authUserId) return;
+
+    // Instant paint: seed the sidebar from the cached list (if any) for this
+    // user before the network fetch returns. The background refresh() below
+    // then revalidates and overwrites both state and cache. Only seed when we
+    // don't already have sessions in memory (e.g. from a guest→auth migration).
+    if (sessionsRef.current.length === 0) {
+      const cachedSessions = readSessionsCache(authUserId);
+      if (cachedSessions && cachedSessions.length > 0) {
+        setSessions(cachedSessions);
+        sessionsRef.current = cachedSessions;
+        setSessionsReady(true);
+      }
+    }
+
+    let cancelled = false;
+    (async () => {
       await migrateTempSessionIfNeeded();
       hydratePinAndArchive();
-      refresh();
-    };
-
-    supabase().auth.getUser().then(async ({ data }) => {
-      if (!mounted) return;
-      const user = data.user;
-      setIsAuthed(!!user);
-      if (user) await runRefreshForUser(user.id);
-    });
-
-    const { data: sub } = supabase().auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      const user = session?.user ?? null;
-      const signedIn = !!user;
-      setIsAuthed(signedIn);
-      if (signedIn) {
-        await runRefreshForUser(user!.id);
-        return;
-      }
-      // Only wipe the sidebar on an explicit SIGNED_OUT. Supabase's JWT
-      // refresh can transiently emit events where session?.user is undefined
-      // before the new token lands — without this guard the history briefly
-      // disappears mid-session.
-      if (event === 'SIGNED_OUT') {
-        setSessions([]);
-        sessionsRef.current = [];
-        lastRefreshedForUserRef.current = null;
-      }
-    });
+      const ok = await refresh();
+      if (!cancelled && ok) loadedForUserRef.current = authUserId;
+    })();
     return () => {
-      mounted = false;
-      sub.subscription.unsubscribe();
+      cancelled = true;
     };
-  }, [refresh, migrateTempSessionIfNeeded, hydratePinAndArchive]);
+  }, [authReady, authUserId, refresh, migrateTempSessionIfNeeded, hydratePinAndArchive]);
+
+  // Keep the ref mirror of currentSessionId current for async guards (e.g. the
+  // backend-history recovery in handleSelectSession), covering every code path
+  // that flips currentSessionId (ensureSession, delete, sign-out, …).
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
   // NOTE: there is intentionally no useEffect on `currentSessionId` to load
   // messages from cache. Loading is driven explicitly by handleSelectSession
@@ -309,34 +395,56 @@ export function useResearchSessions(selectedMatterId: string) {
     async (titleHint: string): Promise<string | null> => {
       if (currentSessionId) return currentSessionId;
 
-      if (!isAuthed) {
-        const tempId = generateTempSessionId();
-        setCurrentSessionId(tempId);
-        return tempId;
-      }
-
-      // Mark create-in-flight so the debounced auto-save effect doesn't race
-      // and POST a second session for the same thread.
+      // Claim the create slot SYNCHRONOUSLY — before the first `await` below.
+      // ensureSession() and the debounced auto-save effect BOTH create the
+      // session for a brand-new thread; `creatingSessionRef` is how they avoid
+      // POSTing two. It used to be set only AFTER `await authStore.whenReady()`,
+      // but on a cold load (the very first chat right after the page opens) auth
+      // isn't ready yet, so whenReady() suspends here long enough for the 600ms
+      // auto-save timer to fire, observe the flag still false, and create its
+      // OWN competing session. Streaming then targeted one session while
+      // currentSessionId pointed at the other — the "first message does nothing
+      // / session not created" bug. Setting the flag before any await closes
+      // that window; the finally{} always releases it.
       creatingSessionRef.current = true;
-      const created = await chatSessionRepository.create({
-        // See debounced-auto-save sibling: must be literally "New Chat" so
-        // the backend's Groq auto-title hook fires on first query.
-        title: "New Chat",
-        messages: [],
-        matter_id: selectedMatterId !== "all" ? selectedMatterId : null,
-        case_id: pendingCaseId,
-      });
-      creatingSessionRef.current = false;
-      if (!created) return null;
-      // Pure id swap — no effect reads from sessionsRef on this transition,
-      // so the user's already-rendered first message stays put.
-      sessionsRef.current = [created, ...sessionsRef.current];
-      setCurrentSessionId(created.id);
-      setSessions((prev) => [created, ...prev]);
-      setPendingCaseId(null);
-      return created.id;
+      try {
+        // Resolve the AUTHORITATIVE auth state before choosing guest vs. real.
+        // `isAuthed` is React state that only flips a tick AFTER the auth store
+        // becomes ready; submitting the very first query in that window fell
+        // through to the guest/temp branch below, and startResearch then refuses
+        // to stream a temp_ session ("Please sign in") — i.e. the first chat does
+        // nothing and only works after a refresh. Awaiting readiness and reading
+        // the store snapshot directly here closes that race for an authed user.
+        await authStore.whenReady();
+        const authed = !!authStore.getSnapshot().user;
+
+        if (!authed) {
+          const tempId = generateTempSessionId();
+          setCurrentSessionId(tempId);
+          return tempId;
+        }
+
+        const created = await chatSessionRepository.create({
+          // See debounced-auto-save sibling: must be literally "New Chat" so
+          // the backend's Groq auto-title hook fires on first query.
+          title: "New Chat",
+          messages: [],
+          matter_id: selectedMatterId !== "all" ? selectedMatterId : null,
+          case_id: pendingCaseId,
+        });
+        if (!created) return null;
+        // Pure id swap — no effect reads from sessionsRef on this transition,
+        // so the user's already-rendered first message stays put.
+        sessionsRef.current = [created, ...sessionsRef.current];
+        setCurrentSessionId(created.id);
+        setSessions((prev) => [created, ...prev]);
+        setPendingCaseId(null);
+        return created.id;
+      } finally {
+        creatingSessionRef.current = false;
+      }
     },
-    [currentSessionId, isAuthed, selectedMatterId, pendingCaseId]
+    [currentSessionId, selectedMatterId, pendingCaseId]
   );
 
   // ── Delete a session ───────────────────────────────────────────────────────
@@ -419,6 +527,8 @@ export function useResearchSessions(selectedMatterId: string) {
   );
 
   const handleNewSession = () => {
+    pendingSelectRef.current = null;
+    currentSessionIdRef.current = null;
     setCurrentSessionId(null);
     setMessages([]);
     // Clear any case the user pre-selected for an earlier "New chat" attempt
@@ -427,15 +537,44 @@ export function useResearchSessions(selectedMatterId: string) {
   };
 
   const handleSelectSession = (id: string) => {
-    // Load this session's cached messages (Supabase mirror, populated by
-    // refresh() on mount) before flipping currentSessionId. Inlined here so
+    // Load this session's messages from the authoritative in-memory list
+    // (populated by refresh() from the Supabase mirror). Inlined here so
     // ensureSession() can also set currentSessionId without ever triggering
-    // a cache read that would clobber an in-flight chat.
-    const cached = sessionsRef.current.find((s) => s.id === id);
-    setMessages(cached?.messages ?? []);
+    // a read that would clobber an in-flight chat.
+    const loaded = sessionsRef.current.find((s) => s.id === id);
+    currentSessionIdRef.current = id;
     setCurrentSessionId(id);
     // Selecting an existing session moots any pending case from the picker.
     setPendingCaseId(null);
+
+    if (loaded && loaded.messages.length > 0) {
+      // Rich messages already in memory (from the Supabase mirror) — show them.
+      setMessages(loaded.messages);
+      pendingSelectRef.current = null;
+      return;
+    }
+
+    // No messages in memory: show empty now (the auto-save's length-0 guard
+    // means this can never overwrite the server's real messages) and recover
+    // from the backend history — the LexRam thread is authoritative and holds
+    // the full conversation (incl. drafted petitions) even when the Supabase
+    // mirror is empty. refresh()'s pending-fill is the secondary fallback.
+    pendingSelectRef.current = id;
+    setMessages([]);
+    chatSessionRepository.getMessagesFromBackend(id).then((recovered) => {
+      if (recovered.length === 0) return;
+      // Only apply if the user is still on this session.
+      if (currentSessionIdRef.current !== id) return;
+      // Only fill if still empty — never clobber an in-flight chat the user
+      // may have started in the meantime.
+      setMessages((cur) => (cur.length === 0 ? recovered : cur));
+      // Cache in memory so re-selection is instant; the debounced auto-save
+      // then re-persists the recovered thread into the Supabase mirror.
+      sessionsRef.current = sessionsRef.current.map((s) =>
+        s.id === id ? { ...s, messages: recovered } : s
+      );
+      pendingSelectRef.current = null;
+    }).catch(() => { /* silent — refresh() pending-fill still applies */ });
   };
 
   const historyContextValue = {

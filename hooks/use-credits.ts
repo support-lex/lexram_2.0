@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/auth-provider";
 import { creditsApi } from "@/services/credits";
 import type { BillingMode, DeductResult } from "@/lib/billing";
 
@@ -63,45 +63,28 @@ export function useCredits(): UseCreditsResult {
     }
   }, [adoptBalance]);
 
+  // Auth comes from the single source of truth. We refetch the balance when
+  // auth becomes ready and whenever the user id changes.
+  //
+  // NEVER reset the ceiling on a refetch: the auth snapshot updates on
+  // INITIAL_SESSION (every mount) and TOKEN_REFRESHED (hourly); resetting
+  // ceiling to DEFAULT_CEILING and then fetching a balance ≥ default made
+  // adoptBalance grow the ceiling to match — leaving the meter at "X / X"
+  // (looks full) on every refresh. The ceiling is the historical max and only
+  // ever grows (inside adoptBalance), never shrinks.
+  const { user, ready: authReady } = useAuth();
+  const uid = user?.id ?? null;
   useEffect(() => {
-    let mounted = true;
-    supabase()
-      .auth.getUser()
-      .then(({ data }) => {
-        if (!mounted) return;
-        const uid = data.user?.id ?? null;
-        setUserId(uid);
-        if (uid) fetchBalance();
-        setReady(true);
-      });
-
-    const { data: sub } = supabase().auth.onAuthStateChange((event, session) => {
-      const uid = session?.user?.id ?? null;
-      setUserId(uid);
-      if (uid) {
-        // NEVER reset the ceiling here. This event fires on INITIAL_SESSION
-        // (every page mount) and TOKEN_REFRESHED (hourly while signed in);
-        // resetting ceiling to DEFAULT_CEILING and then fetching a balance
-        // ≥ default made `adoptBalance` grow the ceiling to match the
-        // current balance — leaving the meter at "X / X" (looks full) on
-        // every refresh and once an hour during a session. The ceiling
-        // represents the user's HISTORICAL maximum and only ever needs to
-        // grow (handled inside adoptBalance), never shrink.
-        fetchBalance();
-      } else if (event === "SIGNED_OUT") {
-        // Only zero the balance on a real sign-out, not on transient
-        // non-authed events (Supabase occasionally emits one during token
-        // refresh). Keeps cached numbers in place across the auth
-        // refresh window.
-        adoptBalance(0);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      sub.subscription.unsubscribe();
-    };
-  }, [adoptBalance, fetchBalance]);
+    if (!authReady) return;
+    setUserId(uid);
+    if (uid) {
+      fetchBalance();
+    } else {
+      // Signed out / guest. Zero the live balance but keep the cached ceiling.
+      adoptBalance(0);
+    }
+    setReady(true);
+  }, [authReady, uid, adoptBalance, fetchBalance]);
 
   // Called after each AI response — refreshes balance from the server
   // (the backend deducts credits automatically on each query).

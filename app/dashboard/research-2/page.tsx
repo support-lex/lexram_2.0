@@ -30,6 +30,7 @@ import AuthoritiesPanel from "./components/AuthoritiesPanel";
 import ShortcutsModal from "./components/ShortcutsModal";
 import DocumentDialog from "./components/DocumentDialog";
 import SuggestionsPopup from "./components/SuggestionsPopup";
+import { parseNumberedQuestions } from "./components/InlineQuestionsForm";
 import demoConversation from "./demo-conversation.json";
 import type { Message } from "./types";
 import CaseSelector, { type Case as CaseItem } from "@/components/CaseSelector";
@@ -53,6 +54,10 @@ export default function Research2Page() {
   const pathname = usePathname();
   const pendingQueryHandled = useRef(false);
   const [showDocumentDialog, setShowDocumentDialog] = useState(false);
+  // Bumped after a successful upload in DocumentDialog so the Case Hub
+  // (CasesPanel) re-fetches its document list immediately, instead of showing
+  // stale docs until the user switches cases or reloads.
+  const [docsRefreshKey, setDocsRefreshKey] = useState(0);
   const [showProfileModal, setShowProfileModal] = useState(false);
   // Sticky one-shot flag: once the modal has been shown (whether dismissed
   // or saved) in this page load, don't re-trigger on every subsequent user
@@ -122,7 +127,12 @@ export default function Research2Page() {
       setSharedCases(list);
     } catch { /* silently ignore — components fall back to their own fetch */ }
   }, []);
-  useEffect(() => { fetchSharedCases(); }, [fetchSharedCases]);
+  // Only fetch once authenticated, and refetch when auth flips true. Firing on
+  // bare mount used to race session hydration → 401 → empty case dropdown that
+  // only filled in after a manual refresh. Guests have no cases, so skip.
+  useEffect(() => {
+    if (isAuthenticated) fetchSharedCases();
+  }, [isAuthenticated, fetchSharedCases]);
 
   const handleCaseChange = useCallback((id: string | null) => {
     // Belt-and-suspenders isolation guard. Every "Unassigned" case is
@@ -266,17 +276,25 @@ export default function Research2Page() {
     }
   }, [query, handleSubmitRef]);
 
-  // ── Load session from ?session= URL param — fires once when sessions load ──
+  // ── Load session from ?session= URL param — restore once it's loadable ──
+  // We DON'T burn the one-shot until the target session actually exists in the
+  // loaded list. Previously this fired the moment sessionsReady flipped true —
+  // which could be off an empty/racing list — so handleSelectSession set an
+  // empty thread and the flag was spent before the real data arrived (blank
+  // chat until refresh). Now it re-runs as `sessions` populates and restores
+  // the thread the first time the id is present.
   const searchParams = useSearchParams();
   const sessionFromUrl = useRef(false);
   useEffect(() => {
     if (sessionFromUrl.current || !sessionsReady) return;
-    sessionFromUrl.current = true;
     const sid = searchParams.get("session");
-    if (sid) handleSelectSession(sid);
-    // intentionally omit searchParams/handleSelectSession — one-shot on load
+    if (!sid) { sessionFromUrl.current = true; return; }
+    if (!sessions.some((s) => s.id === sid)) return; // not loaded yet — retry
+    sessionFromUrl.current = true;
+    handleSelectSession(sid);
+    // handleSelectSession identity is unstable; the ref guard makes that safe.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionsReady]);
+  }, [sessionsReady, sessions, searchParams]);
 
   // ── Keep URL in sync with active session so refresh restores the same chat ─
   useEffect(() => {
@@ -343,12 +361,16 @@ export default function Research2Page() {
       goToSignUp();
       return;
     }
-    if (paywallEnabled && balance <= 0) {
+    // Only enforce the paywall once credits have actually loaded. `balance`
+    // seeds from cache as 0, so gating on `balance <= 0` before the fetch
+    // resolves would wrongly pop the paywall (and skip the API call) on the
+    // first query of a fresh load — another "works only after refresh" race.
+    if (paywallEnabled && creditsReady && balance <= 0) {
       setShowPaywall(true);
       return;
     }
     handleSubmit();
-  }, [isAuthenticated, paywallEnabled, balance, handleSubmit, goToSignUp]);
+  }, [isAuthenticated, paywallEnabled, creditsReady, balance, handleSubmit, goToSignUp]);
   useEffect(() => { handleSubmitRef.current = gatedSubmit; }, [gatedSubmit, handleSubmitRef]);
 
 
@@ -525,9 +547,15 @@ export default function Research2Page() {
   // The last AI message — used to decide whether to render the floating
   // suggestions popup above the chat input.
   const lastAiMessage = [...messages].reverse().find((m) => m.role === "ai");
+  // Suppress the floating popup when the same turn already renders the inline
+  // multi-question form (2+ numbered questions). The form is the comprehensive
+  // surface; the popup would only re-offer an answer to the first question.
+  const lastAiText =
+    lastAiMessage?.response?.streamText || lastAiMessage?.response?.shortAnswer || "";
   const showSuggestionsPopup =
     !!lastAiMessage?.response?.suggestedAnswers?.length &&
-    lastAiMessage.response.suggestedAnswersVariant === "popup";
+    lastAiMessage.response.suggestedAnswersVariant === "popup" &&
+    parseNumberedQuestions(lastAiText).length < 2;
 
   const chatInputProps = {
     query, setQuery, mode, setMode, queryMode, setQueryMode,
@@ -750,7 +778,7 @@ export default function Research2Page() {
                   onShareSession={() => setShowShareDialog(true)}
                   onPinSession={() => { if (currentSessionId) pinnedSessionRepository.pin(currentSessionId); }}
                   onEditMessage={(content) => { setQuery(content); setTimeout(() => queryTextareaRef.current?.focus(), 0); }}
-                  onProceedWithDraft={() => { setQuery("yes"); setTimeout(() => handleSubmitRef.current?.(), 50); }}
+                  onProceedWithDraft={() => { setQuery("proceed"); setTimeout(() => handleSubmitRef.current?.(), 50); }}
                 />
               ) : (
                 <EmptyState
@@ -824,6 +852,7 @@ export default function Research2Page() {
           onCaseChange={handleCaseChange}
           externalCases={sharedCases}
           onCasesChanged={fetchSharedCases}
+          documentsRefreshKey={docsRefreshKey}
           onAttachDocs={(docs) => {
             // attachCaseDocs expects { id, name, mime_type? } — map from CasesPanel's CaseDoc format
             attachCaseDocs(docs.map((d) => ({
@@ -875,6 +904,9 @@ export default function Research2Page() {
           attachCaseDocs(docs);
           setShowDocumentDialog(false);
         }}
+        // Refresh the Case Hub's document list as soon as an upload succeeds,
+        // so the new file shows up immediately instead of after a reload.
+        onUploaded={() => setDocsRefreshKey((k) => k + 1)}
       />
 
 

@@ -31,6 +31,22 @@ function inlineMd(raw: string): string {
     );
 }
 
+// Markdown table helpers: split a "| a | b |" row into cells, and recognise the
+// "| --- | --- |" separator that distinguishes a real table from a stray pipe.
+function parseTableRow(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
+function isTableSeparator(line: string): boolean {
+  const t = line.trim();
+  return t.includes("|") && t.includes("-") && /^\|?[\s:|-]+\|?$/.test(t);
+}
+
 function markdownToHtml(md: string): string {
   const lines = md.replace(/\r\n/g, "\n").split("\n");
   const out: string[] = [];
@@ -54,14 +70,37 @@ function markdownToHtml(md: string): string {
     }
   };
 
-  for (const raw of lines) {
-    const line = raw.replace(/\t/g, "    ");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/\t/g, "    ");
     const trimmed = line.trim();
 
     // Blank line → close paragraph + lists
     if (!trimmed) {
       flushP();
       closeLists();
+      continue;
+    }
+    // Table: a "| … |" header row immediately followed by a separator row.
+    if (
+      /^\|.*\|?\s*$/.test(trimmed) &&
+      i + 1 < lines.length &&
+      isTableSeparator(lines[i + 1])
+    ) {
+      flushP();
+      closeLists();
+      const header = parseTableRow(trimmed);
+      const bodyRows: string[][] = [];
+      let j = i + 2;
+      while (j < lines.length && lines[j].trim().startsWith("|")) {
+        bodyRows.push(parseTableRow(lines[j]));
+        j++;
+      }
+      const thead = `<tr>${header.map((c) => `<th>${inlineMd(c)}</th>`).join("")}</tr>`;
+      const tbody = bodyRows
+        .map((row) => `<tr>${row.map((c) => `<td>${inlineMd(c)}</td>`).join("")}</tr>`)
+        .join("");
+      out.push(`<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`);
+      i = j - 1;
       continue;
     }
     // Heading
@@ -119,11 +158,23 @@ function markdownToHtml(md: string): string {
   return out.join("\n");
 }
 
+// Detect *real* HTML markup (a known tag), not just any stray "<" character.
+// AI drafts routinely contain bare "<" — placeholder tokens like "<Name>" or
+// comparisons like "amount < 10 lakh". Treating those as HTML caused the whole
+// markdown draft to be dumped into the editor verbatim, so "### Heading" and
+// "**bold**" rendered as raw text instead of being converted.
+const HTML_TAG_RE =
+  /<\/?(?:p|div|span|br|hr|h[1-6]|ul|ol|li|a|b|i|u|em|strong|blockquote|code|pre|table|thead|tbody|tr|td|th|mark|sub|sup|ins|del|img)\b[^>]*>/i;
+
+function containsHtmlMarkup(s: string): boolean {
+  return HTML_TAG_RE.test(s);
+}
+
 // Normalize incoming content for contentEditable: pass HTML through untouched,
 // convert markdown to HTML, and fall back to plain text with line breaks.
 function normalizeForEditor(content: string): string {
   if (!content) return "";
-  if (content.includes("<")) return content;
+  if (containsHtmlMarkup(content)) return content;
   if (looksLikeMarkdown(content)) return markdownToHtml(content);
   return content.replace(/\n/g, "<br />");
 }
@@ -221,6 +272,105 @@ function htmlToParagraphs(html: string) {
     .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+// ─── HTML → DOCX ───────────────────────────────────────────────────────────
+// The editor content is rich HTML (the markdown the AI emits is normalized to
+// HTML on entry — see markdownToHtml above). Exporting via innerText threw all
+// of that away, so DOCX/PDF came out as flat plain text. These helpers walk the
+// HTML and reproduce headings, bold/italic/underline runs, and bullet/numbered
+// lists in the exported document instead.
+
+type InlineFmt = { bold?: boolean; italics?: boolean; underline?: boolean };
+
+// `docx` is the dynamically-imported module; typed loosely to avoid pulling its
+// types into the bundle for a single call site.
+function inlineRuns(node: Node, fmt: InlineFmt, docx: any): any[] {
+  const { TextRun } = docx;
+  const runs: any[] = [];
+  node.childNodes.forEach((child) => {
+    if (child.nodeType === Node.TEXT_NODE) {
+      const text = child.textContent ?? "";
+      if (text) {
+        runs.push(new TextRun({
+          text,
+          bold: fmt.bold,
+          italics: fmt.italics,
+          underline: fmt.underline ? {} : undefined,
+        }));
+      }
+      return;
+    }
+    if (child.nodeType !== Node.ELEMENT_NODE) return;
+    const el = child as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    if (tag === "br") { runs.push(new TextRun({ break: 1 })); return; }
+    const next: InlineFmt = { ...fmt };
+    if (tag === "strong" || tag === "b") next.bold = true;
+    if (tag === "em" || tag === "i") next.italics = true;
+    if (tag === "u" || tag === "ins") next.underline = true;
+    runs.push(...inlineRuns(el, next, docx));
+  });
+  return runs;
+}
+
+function htmlToDocxParagraphs(html: string, docx: any): any[] {
+  const { Paragraph, HeadingLevel, TextRun } = docx;
+  const headingFor: Record<string, unknown> = {
+    h1: HeadingLevel.HEADING_1,
+    h2: HeadingLevel.HEADING_2,
+    h3: HeadingLevel.HEADING_3,
+    h4: HeadingLevel.HEADING_4,
+    h5: HeadingLevel.HEADING_5,
+    h6: HeadingLevel.HEADING_6,
+  };
+  const body = new DOMParser().parseFromString(html, "text/html").body;
+  const paragraphs: any[] = [];
+
+  const childrenOrEmpty = (el: HTMLElement) => {
+    const runs = inlineRuns(el, {}, docx);
+    return runs.length ? runs : [new TextRun("")];
+  };
+
+  const walk = (parent: Node) => {
+    parent.childNodes.forEach((node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const t = (node.textContent ?? "").trim();
+        if (t) paragraphs.push(new Paragraph({ children: [new TextRun(t)] }));
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const el = node as HTMLElement;
+      const tag = el.tagName.toLowerCase();
+
+      if (headingFor[tag]) {
+        paragraphs.push(new Paragraph({ heading: headingFor[tag] as never, children: childrenOrEmpty(el) }));
+      } else if (tag === "p" || tag === "div") {
+        paragraphs.push(new Paragraph({ children: childrenOrEmpty(el) }));
+      } else if (tag === "ul" || tag === "ol") {
+        const ordered = tag === "ol";
+        el.querySelectorAll(":scope > li").forEach((li) => {
+          paragraphs.push(new Paragraph({
+            children: inlineRuns(li, {}, docx),
+            ...(ordered
+              ? { numbering: { reference: "ol-list", level: 0 } }
+              : { bullet: { level: 0 } }),
+          }));
+        });
+      } else if (tag === "blockquote") {
+        paragraphs.push(new Paragraph({ children: childrenOrEmpty(el), indent: { left: 720 } }));
+      } else if (tag === "hr") {
+        paragraphs.push(new Paragraph({ thematicBreak: true, children: [] }));
+      } else if (tag === "br") {
+        // standalone line break between blocks — ignore
+      } else {
+        walk(el); // unknown container: descend
+      }
+    });
+  };
+
+  walk(body);
+  return paragraphs.length ? paragraphs : [new Paragraph({ children: [new TextRun("")] })];
 }
 
 type EditorComment = {
@@ -712,27 +862,30 @@ export function EditorArtifact({
   };
 
   const exportDocx = async () => {
-    const { Document, Packer, Paragraph, HeadingLevel, TextRun, AlignmentType } = await import("docx");
-    const text = (editorRef.current?.innerText || "").trim();
-    const blocks = text.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
-
-    const paragraphs = blocks.map((block, index) => {
-      const textRun = new TextRun(block);
-
-      if (index === 0) {
-        return new Paragraph({
-          heading: HeadingLevel.HEADING_1,
-          alignment: AlignmentType.LEFT,
-          children: [textRun],
-        });
-      }
-      return new Paragraph({
-        alignment: AlignmentType.LEFT,
-        children: [textRun],
-      });
-    });
+    const docx = await import("docx");
+    const { Document, Packer, AlignmentType, LevelFormat } = docx;
+    const html = editorRef.current?.innerHTML || editorHtml || "";
+    const paragraphs = htmlToDocxParagraphs(html, docx);
 
     const doc = new Document({
+      // Ordered-list (<ol>) items reference this numbering definition so they
+      // render as 1. 2. 3. instead of losing their sequence.
+      numbering: {
+        config: [
+          {
+            reference: "ol-list",
+            levels: [
+              {
+                level: 0,
+                format: LevelFormat.DECIMAL,
+                text: "%1.",
+                alignment: AlignmentType.START,
+                style: { paragraph: { indent: { left: 720, hanging: 360 } } },
+              },
+            ],
+          },
+        ],
+      },
       sections: [
         {
           properties: {},
@@ -750,8 +903,35 @@ export function EditorArtifact({
     URL.revokeObjectURL(url);
   };
 
+  // Print → "Save as PDF" using ONLY the formatted document HTML (not the whole
+  // app chrome). Preserves headings, bold/italic, and lists in the PDF.
+  const printDocument = () => {
+    const html = editorRef.current?.innerHTML || editorHtml || "";
+    const win = window.open("", "_blank", "width=820,height=920");
+    if (!win) { window.print(); return; }
+    win.document.write(
+      `<!doctype html><html><head><meta charset="utf-8"><title>lexram-draft</title>` +
+      `<style>` +
+      `body{font-family:Georgia,'Times New Roman',serif;line-height:1.6;color:#111;max-width:720px;margin:48px auto;padding:0 24px;}` +
+      `h1,h2,h3,h4,h5,h6{font-family:Arial,Helvetica,sans-serif;line-height:1.25;margin:1.2em 0 .5em;}` +
+      `h1{font-size:1.7em;}h2{font-size:1.4em;}h3{font-size:1.2em;}` +
+      `p{margin:.6em 0;}ul,ol{padding-left:1.5em;margin:.6em 0;}li{margin:.25em 0;}` +
+      `a{color:#1a3d7c;text-decoration:underline;}` +
+      `blockquote{border-left:3px solid #ccc;margin:.6em 0;padding-left:1em;color:#444;}` +
+      `hr{border:none;border-top:1px solid #ccc;margin:1.4em 0;}` +
+      `@media print{body{margin:0;}}` +
+      `</style></head><body>${html}</body></html>`
+    );
+    win.document.close();
+    win.focus();
+    const triggerPrint = () => { try { win.print(); } catch { /* ignore */ } };
+    win.onload = triggerPrint;
+    // Fallback in case the load event already fired before the handler attached.
+    setTimeout(triggerPrint, 400);
+  };
+
   const wordCount = (() => {
-    const text = (editorHtml || (content.includes("<") ? content : content.replace(/\n/g, "<br />")))
+    const text = (editorHtml || normalizeForEditor(content))
       .replace(/<[^>]+>/g, " ")
       .replace(/&nbsp;/g, " ")
       .replace(/\s+/g, " ")
@@ -760,7 +940,7 @@ export function EditorArtifact({
     return text.split(/\s+/).filter(Boolean).length;
   })();
 
-  const baselineHtml = versions[0]?.html || (content.includes("<") ? content : content.replace(/\n/g, "<br />"));
+  const baselineHtml = versions[0]?.html || normalizeForEditor(content);
   const baselineParagraphs = htmlToParagraphs(baselineHtml);
   const currentParagraphs = htmlToParagraphs(editorHtml || baselineHtml);
 
@@ -904,7 +1084,7 @@ export function EditorArtifact({
         <button onClick={() => exportDocument("html")} className="rounded p-1.5 hover:bg-[var(--surface-hover)]" aria-label="Export HTML" title="Export as HTML"><Download className="w-4 h-4" /></button>
         <button onClick={() => exportDocument("txt")} className="rounded p-1.5 hover:bg-[var(--surface-hover)] text-xs px-2" aria-label="Export plain text" title="Export as TXT">TXT</button>
         <button onClick={() => exportDocx().catch(() => undefined)} className="rounded px-2 py-1.5 hover:bg-[var(--surface-hover)] text-xs font-medium" aria-label="Export DOCX" title="Export as DOCX">DOCX</button>
-        <button onClick={() => window.print()} className="rounded p-1.5 hover:bg-[var(--surface-hover)]" aria-label="Print" title="Print"><Printer className="w-4 h-4" /></button>
+        <button onClick={printDocument} className="rounded p-1.5 hover:bg-[var(--surface-hover)]" aria-label="Print / Save as PDF" title="Print / Save as PDF"><Printer className="w-4 h-4" /></button>
         <button onMouseDown={saveSelection} onClick={insertCurrentDate} className="rounded p-1.5 hover:bg-[var(--surface-hover)]" aria-label="Insert date" title="Insert Current Date"><Calendar className="w-4 h-4" /></button>
         <button onClick={toggleFullscreen} className={`rounded p-1.5 ${isFullscreen ? "bg-[var(--bg-sidebar)] text-white" : "hover:bg-[var(--surface-hover)]"}`} aria-label="Fullscreen" title="Toggle Fullscreen"><Maximize2 className="w-4 h-4" /></button>
         <button onMouseDown={saveSelection} onClick={addComment} className="rounded p-1.5 hover:bg-[var(--surface-hover)]" aria-label="Add comment" title="Add Comment"><MessageSquareQuote className="w-4 h-4" /></button>

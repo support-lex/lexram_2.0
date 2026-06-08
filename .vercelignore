@@ -1,0 +1,3 @@
+# The per-org TSR tenant app is a separate Next.js project, deployed on its own
+# (one deploy per org). Keep it out of the main lexram app's deploy bundle.
+tsr-tenant-app

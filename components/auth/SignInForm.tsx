@@ -47,16 +47,30 @@ export default function SignInForm() {
   const [sessionChecked, setSessionChecked] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    supabase().auth.getUser().then(({ data }) => {
-      if (cancelled) return;
-      const u = data.user;
-      if (u && u.phone_confirmed_at) {
-        router.replace(redirectPath);
-        return;
-      }
-      setSessionChecked(true);
-    });
-    return () => { cancelled = true; };
+    const showForm = () => { if (!cancelled) setSessionChecked(true); };
+    // Failsafe: NEVER trap the user on the loading spinner if the auth probe
+    // stalls. Supabase's auth client serialises getSession()/getUser() behind a
+    // navigator Web Lock; with several lexram tabs open (or a stale lock held by
+    // a suspended tab) that acquire can hang indefinitely BEFORE any network
+    // request, leaving this gate unresolved and the sign-in form never rendered
+    // — observed in production as a permanent spinner with no API calls. After
+    // 2.5s we render the form regardless so the user can always sign in.
+    const failsafe = setTimeout(showForm, 2500);
+    // getSession() (cache-first) instead of getUser() (server round-trip): the
+    // middleware is the authoritative auth gate, so a cached session is enough
+    // to decide whether to bounce an already-signed-in user to the dashboard.
+    supabase().auth.getSession()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const u = data.session?.user;
+        if (u && u.phone_confirmed_at) {
+          router.replace(redirectPath);
+          return;
+        }
+        showForm();
+      })
+      .catch(showForm);
+    return () => { cancelled = true; clearTimeout(failsafe); };
   }, [router, redirectPath]);
 
   // Sign-in

@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const sb = supabaseAdmin();
   const { data: org, error: orgErr } = await sb
     .from("organizations")
-    .select("id, name, slug, plan, status, seat_limit, admin_email, admin_name, created_at")
+    .select("*")
     .eq("id", id).maybeSingle();
   if (orgErr) return NextResponse.json({ error: orgErr.message }, { status: 500 });
   if (!org)   return NextResponse.json({ error: "Organisation not found" }, { status: 404 });
@@ -75,4 +75,35 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const { data, error } = await sb.from("organizations").update(patch).eq("id", id).select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
+}
+
+// Re-run provisioning (schema + exposure) for a failed/pending org.
+export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const s = await getSessionCtx();
+  if (!s?.is_super) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { id } = await ctx.params;
+
+  const sb = supabaseAdmin();
+  const { data: org } = await sb.from("organizations").select("id, schema_name").eq("id", id).maybeSingle();
+  if (!org) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!org.schema_name) return NextResponse.json({ error: "Org has no schema_name" }, { status: 400 });
+
+  const { error: provErr } = await sb.rpc("provision_org_schema", { p_schema: org.schema_name });
+  if (provErr) {
+    await sb.from("organizations").update({ provision_status: "failed", provision_error: provErr.message }).eq("id", id);
+    return NextResponse.json({ error: `Provisioning failed: ${provErr.message}` }, { status: 500 });
+  }
+
+  const manual_steps: string[] = [];
+  const { data: exposed } = await sb.rpc("expose_org_schema", { p_schema: org.schema_name });
+  const schema_exposed = exposed === true;
+  if (!schema_exposed) {
+    manual_steps.push(`Add "${org.schema_name}" under Supabase → Settings → API → Exposed schemas, then reload the schema cache.`);
+  }
+
+  const { data: finalOrg } = await sb.from("organizations")
+    .update({ provision_status: "provisioned", provision_error: null, provisioned_at: new Date().toISOString() })
+    .eq("id", id).select("*").single();
+
+  return NextResponse.json({ org: finalOrg, schema_exposed, manual_steps });
 }

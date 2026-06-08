@@ -19,6 +19,8 @@ export type OrgPlan        = "trial" | "standard" | "enterprise";
 export type OrgStatus      = "active" | "suspended";
 export type OrgAccountType = "individual" | "organization";
 
+export type ProvisionStatus = "pending" | "provisioned" | "failed";
+
 export interface Organization {
   id:           string;
   name:         string;
@@ -30,6 +32,22 @@ export interface Organization {
   admin_name:   string | null;
   account_type: OrgAccountType;
   created_at:   string;
+
+  // Schema-per-tenant provisioning + branding (see 20260601 migration).
+  schema_name?:              string | null;
+  logo_url?:                 string | null;
+  entity_type?:              string | null;
+  organization_pan?:         string | null;
+  gstin?:                    string | null;
+  address?:                  string | null;
+  billing_email?:            string | null;
+  office_website?:           string | null;
+  primary_banks_served?:     string[];
+  default_language?:         string;
+  estimated_monthly_volume?: string | null;
+  provision_status?:         ProvisionStatus;
+  provision_error?:          string | null;
+  provisioned_at?:           string | null;
 }
 
 export interface OrganizationWithStats extends Organization {
@@ -266,14 +284,44 @@ export const getOrganizationDetail = (id: string) =>
     fetch(`/api/admin/orgs/${id}`, { credentials: "include" }),
   );
 
-export const createOrganization = (payload: {
-  name: string; admin_email: string; admin_name: string; plan: OrgPlan; seat_limit: number;
-}) => ok<{ org: Organization; invite_sent: boolean }>(
-  fetch("/api/admin/orgs", {
-    method: "POST", credentials: "include",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
-  }),
-);
+export interface CreateOrgResult {
+  org: Organization;
+  invite_sent: boolean;
+  schema_exposed: boolean;
+  manual_steps: string[];
+}
+
+/** One-click create: provisions the per-org schema, uploads the logo, invites
+ *  the admin. Posts multipart/form-data so the logo file can ride along. */
+export const createOrganization = (fd: FormData) =>
+  ok<CreateOrgResult>(fetch("/api/admin/orgs", { method: "POST", credentials: "include", body: fd }));
+
+/** Re-run provisioning (schema + exposure) for a failed/pending org. */
+export const reprovisionOrganization = (id: string) =>
+  ok<{ org: Organization; schema_exposed: boolean; manual_steps: string[] }>(
+    fetch(`/api/admin/orgs/${id}`, { method: "POST", credentials: "include" }),
+  );
+
+// ── Schema-name sanitizer (mirrors public.sanitize_schema_name in SQL) ───────
+export function sanitizeSchemaName(raw: string): string {
+  let s = (raw ?? "").toLowerCase();
+  s = s.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (!s) return "";
+  if (/^[0-9]/.test(s)) s = "o_" + s;
+  return s.slice(0, 48);
+}
+
+const RESERVED_SCHEMAS = new Set([
+  "public", "auth", "storage", "graphql", "graphql_public", "realtime",
+  "vault", "extensions", "pgsodium", "information_schema",
+]);
+
+export function schemaNameError(s: string): string | null {
+  if (!s) return "Enter a name to derive the schema.";
+  if (RESERVED_SCHEMAS.has(s) || s.startsWith("pg_")) return `"${s}" is a reserved schema name.`;
+  if (!/^[a-z][a-z0-9_]*$/.test(s)) return "Schema must be lowercase letters, digits, underscores.";
+  return null;
+}
 
 export const updateOrganization = (id: string, payload: Partial<Pick<Organization, "status" | "plan" | "seat_limit" | "name">>) =>
   ok<Organization>(fetch(`/api/admin/orgs/${id}`, {

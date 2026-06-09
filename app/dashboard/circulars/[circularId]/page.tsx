@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -11,7 +11,7 @@ import {
   ExternalLink,
   FileText,
 } from 'lucide-react';
-import { LexramAPI, unwrap, type Circular } from '@/lib/lexram/api';
+import { LexRamAPI, unwrap, type Circular } from '@/lib/lexram/api';
 
 export default function CircularDetailPage() {
   const params = useParams<{ circularId: string }>();
@@ -32,11 +32,11 @@ export default function CircularDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await LexramAPI.circular(id);
+      const data = await LexRamAPI.circular(id);
       setCircular(data);
       if (data?.ministry) {
         try {
-          const r = await LexramAPI.circulars({ limit: 4, ministry: data.ministry });
+          const r = await LexRamAPI.circulars({ limit: 4, ministry: data.ministry });
           setRelated(unwrap(r).filter((c) => String(c.id) !== String(data.id)).slice(0, 3));
         } catch {
           setRelated([]);

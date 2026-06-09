@@ -1,8 +1,8 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FileText, Calendar, Loader2 } from 'lucide-react';
-import { LexramAPI, unwrap, type Schedule } from '@/lib/lexram/api';
+import { LexRamAPI, unwrap, type Schedule } from '@/lib/lexram/api';
 import { cn } from '@/lib/utils';
 
 type FilterType = 'all' | 'acts' | 'sub-legislation';
@@ -19,7 +19,7 @@ export default function SchedulesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await LexramAPI.schedules({ limit: 100 });
+      const res = await LexRamAPI.schedules({ limit: 100 });
       setSchedules(unwrap(res));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load schedules');

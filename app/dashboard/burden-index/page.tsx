@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -27,7 +27,7 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { LexramAPI, type BurdenIndustry } from '@/lib/lexram/api';
+import { LexRamAPI, type BurdenIndustry } from '@/lib/lexram/api';
 
 const COMPONENT_COLORS = {
   acts: '#d97706',
@@ -54,7 +54,7 @@ export default function BurdenIndexPage() {
       setLoading(true);
       setError(null);
       try {
-        const rows = await LexramAPI.burdenIndex();
+        const rows = await LexRamAPI.burdenIndex();
         if (cancelled) return;
         setData(Array.isArray(rows) ? rows : []);
       } catch (e) {

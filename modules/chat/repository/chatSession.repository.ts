@@ -1,4 +1,4 @@
-// Hybrid chat-session repository.
+﻿// Hybrid chat-session repository.
 //
 // • LexRam Legal Research backend (HTTP) is the source-of-truth for the
 //   list of sessions and their lifecycle (create / rename / delete).
@@ -14,7 +14,7 @@ import { supabase } from '@/lib/supabase/client';
 import {
   lexramSessionRepository,
   lexramSessionId,
-  type LexramSession,
+  type LexRamSession,
 } from '@/modules/legal/repository/session.repository';
 import { getStoredData, setStoredData, STORAGE_KEYS } from '@/lib/storage';
 import type { Message, ResearchSession } from '@/app/dashboard/research-3/types';
@@ -40,7 +40,7 @@ function rowToSession(row: SupabaseSessionRow): ResearchSession {
   };
 }
 
-function lexramToSession(s: LexramSession, messages: Message[] = []): ResearchSession {
+function lexramToSession(s: LexRamSession, messages: Message[] = []): ResearchSession {
   const id = lexramSessionId(s);
   const now = new Date().toISOString();
   return {

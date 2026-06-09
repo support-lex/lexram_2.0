@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Lightweight analytics dispatcher used by the landing page.
  * Forwards events to:
  *  - window.dataLayer (GTM-compatible)
@@ -16,7 +16,8 @@ export type AnalyticsEvent =
   | "contact_form_submit"
   | "faq_toggle"
   | "pricing_plan_hover"
-  | "pricing_plan_click";
+  | "pricing_plan_click"
+  | "cta_start_drafting_click";
 
 type Props = Record<string, string | number | boolean | null | undefined>;
 

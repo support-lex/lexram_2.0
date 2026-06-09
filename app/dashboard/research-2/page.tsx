@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
@@ -798,7 +798,7 @@ export default function Research2Page() {
               {/* Bottom ChatInput — hidden in empty state since the hero
                   EmptyState renders its own large center input. Once a
                   thread is started, this returns as the persistent input.
-                  The "Lexram can make mistakes" disclaimer now lives
+                  The "LexRam can make mistakes" disclaimer now lives
                   OUTSIDE the rounded chat card (below the inner row). */}
               {hasThread && (
                 <div className="px-3 md:px-6 pb-2">
@@ -841,7 +841,7 @@ export default function Research2Page() {
           it doesn't open up dead space between the input pill and the
           bottom of the viewport. */}
       <div className="flex-shrink-0 text-center pt-1.5 pb-0 text-[10px] text-[var(--text-muted)] font-medium tracking-wide uppercase leading-none">
-        Lexram can make mistakes. Verify legal data.
+        LexRam can make mistakes. Verify legal data.
       </div>
       </div>
 

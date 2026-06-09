@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { Search, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
 import {
-  LexramAPI,
+  LexRamAPI,
   unwrap,
   type Circular,
   type SubLegislation,
@@ -36,8 +36,8 @@ export default function GovDocumentsPage() {
     setLoading(true);
     setError(null);
     Promise.all([
-      LexramAPI.circulars({ limit: 100 }),
-      LexramAPI.subLegislation({ limit: 100 }),
+      LexRamAPI.circulars({ limit: 100 }),
+      LexRamAPI.subLegislation({ limit: 100 }),
     ])
       .then(([c, s]) => {
         if (cancelled) return;

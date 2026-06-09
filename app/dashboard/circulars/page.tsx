@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Search, X, ChevronLeft, ChevronRight, FileText, Loader2 } from 'lucide-react';
-import { LexramAPI, unwrap, type Circular } from '@/lib/lexram/api';
+import { LexRamAPI, unwrap, type Circular } from '@/lib/lexram/api';
 import { cn } from '@/lib/utils';
 
 const TYPES = [
@@ -31,7 +31,7 @@ export default function CircularsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await LexramAPI.circulars({
+      const res = await LexRamAPI.circulars({
         limit: PAGE_SIZE,
         offset,
         ministry: ministry || undefined,
@@ -52,7 +52,7 @@ export default function CircularsPage() {
   }, [load, nonce]);
 
   useEffect(() => {
-    LexramAPI.circularMinistries()
+    LexRamAPI.circularMinistries()
       .then((m) => setMinistries(Array.isArray(m) ? m : []))
       .catch(() => setMinistries([]));
   }, []);

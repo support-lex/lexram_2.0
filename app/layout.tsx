@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from 'next';
-import { Libre_Baskerville, Geist, Geist_Mono, Cormorant_Garamond, Playfair_Display, Inter } from 'next/font/google';
+import { Libre_Baskerville, Geist, Geist_Mono, Cormorant_Garamond, Playfair_Display, DM_Sans } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import './globals.css';
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/lib/query-provider";
+import { ScrollSystem } from "@/components/scroll-system";
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
@@ -20,7 +21,7 @@ const libreBaskerville = Libre_Baskerville({
 
 // Cormorant Garamond — used by the prior editorial landing variant
 const cormorant = Cormorant_Garamond({
-  weight: ['400', '500', '600'],
+  weight: ['300', '400', '500', '600', '700'],
   style: ['normal', 'italic'],
   subsets: ['latin'],
   variable: '--font-editorial',
@@ -34,8 +35,8 @@ const playfair = Playfair_Display({
   variable: '--font-landing-display',
 });
 
-// Inter — body sans for the landing page
-const inter = Inter({
+// DM Sans — body sans for the landing page
+const dmSans = DM_Sans({
   weight: ['300', '400', '500', '600', '700'],
   subsets: ['latin'],
   variable: '--font-landing-sans',
@@ -147,7 +148,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-IN" className={cn("scroll-smooth", "h-full", geist.variable, geistMono.variable, libreBaskerville.variable, cormorant.variable, playfair.variable, inter.variable, "font-sans")} suppressHydrationWarning>
+    <html lang="en-IN" className={cn("scroll-smooth", "h-full", geist.variable, geistMono.variable, libreBaskerville.variable, cormorant.variable, playfair.variable, dmSans.variable, "font-sans")} suppressHydrationWarning>
       <head>
         {/* Preconnect to the LexRam Legal Research API so the TLS handshake
             (~400–800 ms cold) overlaps with the page's initial paint instead
@@ -278,6 +279,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         }} />
       </head>
       <body className="font-sans antialiased h-full bg-[var(--bg-primary)] text-[var(--text-primary)] selection:bg-[var(--accent)]/30 transition-colors duration-300" suppressHydrationWarning>
+        <ScrollSystem />
         <QueryProvider>
           {children}
         </QueryProvider>

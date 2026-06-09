@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -12,7 +12,7 @@ import {
   RefreshCcw,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { LexramAPI, type IndustryRelation } from '@/lib/lexram/api';
+import { LexRamAPI, type IndustryRelation } from '@/lib/lexram/api';
 
 const TOP_N = 25;
 
@@ -39,7 +39,7 @@ export default function CrossIndustryPage() {
       setLoading(true);
       setError(null);
       try {
-        const rows = await LexramAPI.industryRelations();
+        const rows = await LexRamAPI.industryRelations();
         if (cancelled) return;
         setAll(Array.isArray(rows) ? rows : []);
       } catch (e) {
@@ -63,7 +63,7 @@ export default function CrossIndustryPage() {
     (async () => {
       setFilterLoading(true);
       try {
-        const rows = await LexramAPI.industryRelationsFor(selectedCode);
+        const rows = await LexRamAPI.industryRelationsFor(selectedCode);
         if (cancelled) return;
         setFiltered(Array.isArray(rows) ? rows : []);
       } catch {

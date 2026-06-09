@@ -1,4 +1,4 @@
-// Repository for /sessions on the LexRam Legal Research backend.
+﻿// Repository for /sessions on the LexRam Legal Research backend.
 // All calls go through the Next.js rewrite (`/legal-api/*`) so the HTTPS
 // frontend can reach the HTTP origin without mixed-content blocking.
 //
@@ -17,7 +17,7 @@ export interface QueryResponseEnvelope {
   [k: string]: unknown;
 }
 
-export interface LexramSession {
+export interface LexRamSession {
   /** id is the same value the docs call thread_id. */
   id?: string;
   thread_id?: string;
@@ -27,13 +27,13 @@ export interface LexramSession {
   [k: string]: unknown;
 }
 
-function extractList(raw: unknown): LexramSession[] {
-  if (Array.isArray(raw)) return raw as LexramSession[];
+function extractList(raw: unknown): LexRamSession[] {
+  if (Array.isArray(raw)) return raw as LexRamSession[];
   if (raw && typeof raw === "object") {
     const r = raw as Record<string, unknown>;
-    if (Array.isArray(r.sessions)) return r.sessions as LexramSession[];
-    if (Array.isArray(r.data)) return r.data as LexramSession[];
-    if (Array.isArray(r.items)) return r.items as LexramSession[];
+    if (Array.isArray(r.sessions)) return r.sessions as LexRamSession[];
+    if (Array.isArray(r.data)) return r.data as LexRamSession[];
+    if (Array.isArray(r.items)) return r.items as LexRamSession[];
   }
   return [];
 }
@@ -47,7 +47,7 @@ async function lexramRename(id: string, title: string): Promise<void> {
 
 export const lexramSessionRepository = {
   /** GET /sessions — list all sessions for the logged-in user. */
-  async list(): Promise<LexramSession[]> {
+  async list(): Promise<LexRamSession[]> {
     const raw = await lexramRequest<unknown>("/sessions");
     return extractList(raw);
   },
@@ -69,10 +69,10 @@ export const lexramSessionRepository = {
   async create(
     title: string = "New Chat",
     opts: { case_id?: string | null } = {}
-  ): Promise<LexramSession> {
+  ): Promise<LexRamSession> {
     const body: { title: string; case_id?: string } = { title };
     if (opts.case_id) body.case_id = opts.case_id;
-    const created = await lexramRequest<LexramSession>("/sessions", {
+    const created = await lexramRequest<LexRamSession>("/sessions", {
       method: "POST",
       body,
     });
@@ -125,6 +125,6 @@ export const lexramSessionRepository = {
   },
 };
 
-export function lexramSessionId(s: LexramSession): string {
+export function lexramSessionId(s: LexRamSession): string {
   return String(s.id ?? s.thread_id ?? "");
 }

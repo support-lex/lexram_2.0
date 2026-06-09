@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
-import { LexramAPI, type Industry } from '@/lib/lexram/api';
+import { LexRamAPI, type Industry } from '@/lib/lexram/api';
 
 const DEFAULT_COLOR = '#94A3B8';
 
@@ -40,7 +40,7 @@ export default function IndustryDashboardPage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await LexramAPI.industries();
+        const data = await LexRamAPI.industries();
         if (cancelled) return;
         setIndustries(Array.isArray(data) ? data : []);
       } catch (e) {
@@ -65,7 +65,7 @@ export default function IndustryDashboardPage() {
       setDetailLoading(true);
       setDetailError(null);
       try {
-        const data = await LexramAPI.industry(selectedCode);
+        const data = await LexRamAPI.industry(selectedCode);
         if (cancelled) return;
         setDetail(data);
       } catch (e) {

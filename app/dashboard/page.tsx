@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -17,7 +17,7 @@ import { supabase as lexramSupabase } from '@/lib/supabase/client';
 import { supabase as tsrSupabase } from '@/utils/supabase/client';
 import api from '@/services/legal-api';
 import {
-  LexramAPI,
+  LexRamAPI,
   type DashboardStats as DashboardStatsData,
   type DashboardRecent,
   type DashboardDomain,
@@ -394,10 +394,10 @@ export default function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      LexramAPI.dashboardStats(),
-      LexramAPI.dashboardRecent(),
-      LexramAPI.dashboardDomains(),
-      LexramAPI.dashboardMinistries(),
+      LexRamAPI.dashboardStats(),
+      LexRamAPI.dashboardRecent(),
+      LexRamAPI.dashboardDomains(),
+      LexRamAPI.dashboardMinistries(),
     ])
       .then(([s, r, d, m]) => {
         if (cancelled) return;

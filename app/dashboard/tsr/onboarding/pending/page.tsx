@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { Clock, Mail, RefreshCw, ArrowLeft, AlertCircle, Loader2, CheckCircle2, XCircle } from "lucide-react";
@@ -53,10 +53,10 @@ export default function PendingRequestPage() {
             <div>
               <div className="text-[10px] tracking-[0.22em] uppercase text-amber-700 font-bold">Under review</div>
               <h1 className="font-display text-2xl md:text-3xl font-bold text-amber-900 mt-1 leading-tight">
-                Your organisation request is with Lexram
+                Your organisation request is with LexRam
               </h1>
               <p className="text-sm text-amber-800/90 mt-3 leading-relaxed">
-                Submitted {fmtDate(request.created_at)}. The Lexram team reviews requests manually — usually within one working day.
+                Submitted {fmtDate(request.created_at)}. The LexRam team reviews requests manually — usually within one working day.
                 You&apos;ll get an email at <strong>{request.contact_email}</strong> as soon as your organisation is provisioned.
               </p>
             </div>
@@ -93,7 +93,7 @@ export default function PendingRequestPage() {
             <div>
               <div className="text-[10px] tracking-[0.22em] uppercase text-red-700 font-bold">Request declined</div>
               <h1 className="font-display text-2xl md:text-3xl font-bold text-red-900 mt-1 leading-tight">
-                Lexram couldn&apos;t approve this request
+                LexRam couldn&apos;t approve this request
               </h1>
               {request.decision_reason && (
                 <p className="text-sm text-red-800/90 mt-3 leading-relaxed">

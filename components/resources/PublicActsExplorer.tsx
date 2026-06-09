@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -6,7 +6,7 @@ import {
   Search, X, ChevronDown, BookOpen, Sparkles, Loader2,
   ScrollText, Building2, Calendar, ArrowRight, Lock, Scale,
 } from "lucide-react";
-import { LexramV2, type ActV2, type FilterValuesV2, type SuggestItemV2 } from "@/lib/lexram/api";
+import { LexRamV2, type ActV2, type FilterValuesV2, type SuggestItemV2 } from "@/lib/lexram/api";
 import SignupPromptModal from "@/components/SignupPromptModal";
 
 const PAGE_SIZE = 24;
@@ -49,14 +49,14 @@ export default function PublicActsExplorer({ isAuthenticated }: Props) {
 
   // ── Fetch filters once ─────────────────────────────────────────
   useEffect(() => {
-    LexramV2.filters().then(setFilters).catch(() => setFilters(null));
+    LexRamV2.filters().then(setFilters).catch(() => setFilters(null));
   }, []);
 
   // ── Fetch acts list ────────────────────────────────────────────
   const fetchActs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await LexramV2.acts({
+      const res = await LexRamV2.acts({
         limit: PAGE_SIZE,
         page: 1,
         sort_by: "year",
@@ -82,7 +82,7 @@ export default function PublicActsExplorer({ isAuthenticated }: Props) {
   // ── Typeahead ──────────────────────────────────────────────────
   useEffect(() => {
     if (debounced.length < 2) { setSuggestions([]); return; }
-    LexramV2.suggest(debounced).then(setSuggestions).catch(() => setSuggestions([]));
+    LexRamV2.suggest(debounced).then(setSuggestions).catch(() => setSuggestions([]));
   }, [debounced]);
 
   // ── Scroll detector for bottom banner ─────────────────────────

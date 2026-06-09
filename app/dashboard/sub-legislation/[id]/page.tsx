@@ -1,11 +1,11 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, ExternalLink, FileText, Download, Loader2 } from 'lucide-react';
 import {
-  LexramAPI,
+  LexRamAPI,
   unwrap,
   type SubLegislation,
   type Circular,
@@ -37,12 +37,12 @@ export default function SubLegDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const item = await LexramAPI.subLegislationItem(id);
+      const item = await LexRamAPI.subLegislationItem(id);
       setData(item);
       // Best-effort related loads
       if (item?.ministry) {
         try {
-          const cRes = await LexramAPI.circulars({ limit: 5, ministry: item.ministry });
+          const cRes = await LexRamAPI.circulars({ limit: 5, ministry: item.ministry });
           setCirculars(unwrap(cRes));
         } catch {
           setCirculars([]);
@@ -50,7 +50,7 @@ export default function SubLegDetailPage() {
       }
       if (item?.act_id) {
         try {
-          const sRes = await LexramAPI.schedules({ limit: 20, act_id: item.act_id });
+          const sRes = await LexRamAPI.schedules({ limit: 20, act_id: item.act_id });
           setSchedules(unwrap(sRes));
         } catch {
           setSchedules([]);

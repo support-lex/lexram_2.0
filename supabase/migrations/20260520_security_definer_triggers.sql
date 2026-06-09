@@ -1,4 +1,4 @@
--- Lexram Network — fix RLS rejection inside trigger functions.
+﻿-- LexRam Network — fix RLS rejection inside trigger functions.
 --
 -- ROOT CAUSE: The original 20260516_network.sql created seven trigger
 -- functions WITHOUT `SECURITY DEFINER`. That means they run with the calling

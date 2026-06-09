@@ -1,4 +1,4 @@
-// Parses the LexRam backend's inline citation + source-block format into
+﻿// Parses the LexRam backend's inline citation + source-block format into
 // structured authorities the rest of the UI already knows how to render.
 //
 // The format looks like:
@@ -18,7 +18,7 @@
 
 import type { Authority } from "@/app/dashboard/research-3/types";
 
-export interface ParsedLexramAnswer {
+export interface ParsedLexRamAnswer {
   /** The original answer with `<source>...</source>` removed but `<cite>` tags kept inline. */
   cleanText: string;
   /** Structured sources, indexed 1-based to match the inline `[N]` markers. */
@@ -52,7 +52,7 @@ function looksLikeStatute(title: string): boolean {
   return /\b(Act|Sanhita|Code|Constitution|Rules?|Regulations?|Notification|Ordinance)\b/i.test(title);
 }
 
-export function parseLexramSources(raw: string): ParsedLexramAnswer {
+export function parseLexRamSources(raw: string): ParsedLexRamAnswer {
   if (!raw) return { cleanText: "", authorities: [] };
 
   const sourceMatch = raw.match(SOURCE_BLOCK_RE);

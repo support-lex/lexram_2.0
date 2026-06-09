@@ -1,8 +1,8 @@
-# Lexram — Feature Requirements Document (UI / UX)
+﻿# LexRam — Feature Requirements Document (UI / UX)
 
 **Document purpose:** Define every functional capability the product must support, in platform-agnostic terms, so designers can produce UI/UX without being constrained by the current visual implementation. This document describes *what* the product does and *what the user must be able to accomplish*, not *how it currently looks*.
 
-**Product:** Lexram — AI-powered legal research, drafting, and practice-management platform for Indian legal professionals.
+**Product:** LexRam — AI-powered legal research, drafting, and practice-management platform for Indian legal professionals.
 **Primary users:** Practicing advocates, in-house counsel, law firm partners, paralegals, legal researchers, students.
 **Secondary users:** Platform administrators, content editors.
 
@@ -47,7 +47,7 @@ Role transitions (e.g., upgrading to admin) are out of scope for self-serve UX.
 
 ## 2. Onboarding
 
-- A first-time signed-in user must see a **guided welcome** that sets context: what Lexram does, the trial credit balance, and the three primary jobs (Research, Draft, Track).
+- A first-time signed-in user must see a **guided welcome** that sets context: what LexRam does, the trial credit balance, and the three primary jobs (Research, Draft, Track).
 - Onboarding must offer a **skip** path and must not block access to any free-tier feature.
 - The user must be able to complete or revisit profile setup (firm name, practice area, jurisdiction) at any time, not just on first login.
 - The onboarding should highlight the keyboard shortcut palette and the search entry point at least once.
@@ -381,7 +381,7 @@ The user must be able to manage their own document collection.
 - Extracted text view.
 - "Ask AI about this document" — opens a research session pre-grounded on the document.
 - Annotations / highlights persisted per user.
-- Version history if the document was edited within Lexram.
+- Version history if the document was edited within LexRam.
 
 ### 12.4 Document actions
 - Download in original format.
@@ -651,7 +651,7 @@ The product must meet **WCAG 2.1 AA**, including:
 ## 24. Information-Architecture Map (Conceptual)
 
 ```
-Lexram
+LexRam
 ├── Public site
 │   ├── Home, Features, Pricing, About, Careers, Contact, FAQ
 │   ├── Blog
@@ -732,7 +732,7 @@ The following are deliberately not in the v1 feature set but the IA should not p
 - Public marketplace of templates from third-party authors.
 - Voice input / dictation.
 - Native mobile applications (iOS / Android).
-- Browser extension for clipping web content into Lexram.
+- Browser extension for clipping web content into LexRam.
 
 ---
 

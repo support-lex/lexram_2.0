@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Maximize2, X } from "lucide-react";
 
-// Detect active Lexram theme from the <html data-theme="..."> attribute.
+// Detect active LexRam theme from the <html data-theme="..."> attribute.
 function getTheme(): "light" | "dark" {
   if (typeof document === "undefined") return "light";
   const t = document.documentElement.dataset.theme ?? "";

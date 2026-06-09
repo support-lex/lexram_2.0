@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen, Gavel, Bell, Loader2, AlertCircle } from 'lucide-react';
 import {
-  LexramAPI,
+  LexRamAPI,
   unwrap,
   type Act,
   type Circular,
@@ -72,7 +72,7 @@ export default function MinistryHubPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([LexramAPI.dashboardMinistries(), LexramAPI.circularMinistries()])
+    Promise.all([LexRamAPI.dashboardMinistries(), LexRamAPI.circularMinistries()])
       .then(([dashMinistries, circMinistries]) => {
         if (cancelled) return;
         const map = new Map<string, MinistryEntry>();
@@ -122,8 +122,8 @@ export default function MinistryHubPage() {
     setDetailLoading(true);
     setDetailError(null);
     Promise.all([
-      LexramAPI.acts({ ministry: selected, limit: 50 }).catch(() => [] as Act[]),
-      LexramAPI.circulars({ ministry: selected, limit: 50 }).catch(
+      LexRamAPI.acts({ ministry: selected, limit: 50 }).catch(() => [] as Act[]),
+      LexRamAPI.circulars({ ministry: selected, limit: 50 }).catch(
         () => [] as Circular[],
       ),
     ])

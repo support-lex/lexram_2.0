@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, type RefObject } from "react";
 import {
@@ -242,7 +242,7 @@ export default function ChatInput({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={hasThread ? "Inquire further..." : "Ask Lexram anything..."}
+            placeholder={hasThread ? "Inquire further..." : "Ask LexRam anything..."}
             rows={1}
             className="flex-1 resize-none bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 outline-none border-0 appearance-none focus:outline-none focus:ring-0 leading-6 max-h-[120px] overflow-y-auto custom-scrollbar py-1.5"
           />

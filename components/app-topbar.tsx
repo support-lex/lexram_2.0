@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import Image from "next/image"
@@ -189,12 +189,12 @@ export function AppTopBar() {
         {/* ── Left: brand logo ──────────────────────────────── */}
         <Link
           href="/dashboard"
-          aria-label="Lexram"
+          aria-label="LexRam"
           className="flex items-center shrink-0 transition-transform duration-300 hover:scale-[1.04]"
         >
           <Image
             src="/lexram-logo.png"
-            alt="Lexram"
+            alt="LexRam"
             width={116}
             height={40}
             priority

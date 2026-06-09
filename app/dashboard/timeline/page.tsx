@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertCircle } from 'lucide-react';
-import { LexramAPI, type PulseEvent } from '@/lib/lexram/api';
+import { LexRamAPI, type PulseEvent } from '@/lib/lexram/api';
 
 interface Bucket {
   decade: number;
@@ -33,7 +33,7 @@ export default function LegislativeTimelinePage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    LexramAPI.dashboardPulse()
+    LexRamAPI.dashboardPulse()
       .then((r) => {
         if (!cancelled) setEvents(r);
       })

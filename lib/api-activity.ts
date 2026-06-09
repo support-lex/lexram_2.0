@@ -1,7 +1,7 @@
-// Tiny subscribable in-flight-request counter.
+﻿// Tiny subscribable in-flight-request counter.
 //
 // Every API entry point (axios + fetch-based lexramRequest + the SSE
-// streamLexramQuery) calls begin()/end() around its request lifetime.
+// streamLexRamQuery) calls begin()/end() around its request lifetime.
 // UI components subscribe to render a progress bar (or any indicator)
 // whenever count > 0. No external store dep — vanilla pub/sub works fine
 // because there's exactly one counter for the whole app.

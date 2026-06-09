@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   BookOpen,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -13,7 +14,6 @@ import {
   LayoutList,
   Plus,
   Search,
-  Sparkles,
   Tag as TagIcon,
   X,
 } from "lucide-react";
@@ -26,13 +26,15 @@ interface Props {
   isAdmin: boolean;
 }
 
-type Sort = "latest" | "trending";
+type SortField = "date" | "views";
+type SortDir = "desc" | "asc";
 const HERO_INTERVAL_MS = 6000;
 const TOP_TAGS = 8;
 
 export default function BlogExplorer({ posts, isAdmin }: Props) {
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<Sort>("latest");
+  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
 
   // Drafts are only seen by admins (RLS ensures non-admins never get them).
@@ -76,56 +78,52 @@ export default function BlogExplorer({ posts, isAdmin }: Props) {
       );
     }
     if (tagFilter) rows = rows.filter((p) => p.tags.includes(tagFilter));
+    const sign = sortDir === "asc" ? -1 : 1;
     rows.sort((a, b) =>
-      sort === "trending"
-        ? (b.view_count ?? 0) - (a.view_count ?? 0)
-        : sortByPublished(a, b),
+      sortField === "views"
+        ? sign * ((b.view_count ?? 0) - (a.view_count ?? 0))
+        : sign * sortByPublished(a, b),
     );
     return rows;
-  }, [posts, query, tagFilter, sort]);
+  }, [posts, query, tagFilter, sortField, sortDir]);
 
   const hasFilters = query !== "" || tagFilter !== null;
   const clearFilters = () => { setQuery(""); setTagFilter(null); };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-[1400px] mx-auto">
+    <div className="px-4 sm:px-6 lg:px-10 py-3 sm:py-4 max-w-[1400px] mx-auto">
       {/* ── Header ──────────────────────────────────────────────── */}
-      <header className="mb-5 sm:mb-6 flex items-start justify-between gap-3 sm:gap-4 flex-wrap">
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#b94826]">
-            Blog
-          </p>
-          <h1 className="mt-1 text-2xl sm:text-3xl md:text-4xl font-serif font-light tracking-tight text-[#680318]">
+      <header className="mb-3 sm:mb-4">
+        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#b94826]">
+          Blog
+        </p>
+        <div className="mt-1 flex items-center gap-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-serif font-light tracking-tight text-[#680318] shrink-0">
             Insights &amp; dispatches
           </h1>
-          <p className="mt-2 max-w-2xl text-[13px] sm:text-sm text-[#680318]/75 leading-relaxed">
-            Notes on legal technology, AI-assisted research, and the future of practice in India.
-          </p>
-        </div>
-
-        {isAdmin && (
-          <div className="shrink-0 flex flex-wrap items-center gap-2">
-            <Link
-              href="/blog/admin"
-              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium border border-[#680318]/25 bg-[#fff7ec] text-[#680318] hover:border-[#b94826]/50 hover:bg-[#680318]/8 transition-colors"
-            >
-              <LayoutList className="h-4 w-4" /> Manage
-            </Link>
-            {drafts.length > 0 && <ScheduleQueueButton drafts={drafts} />}
-            <Link
-              href="/blog/create"
-              className="inline-flex items-center gap-1.5 px-4 h-9 rounded-full text-sm font-semibold bg-[#b94826]text-[#fff0df] hover:bg-[#8f3318] shadow-sm transition-colors"
-            >
-              <Plus className="h-4 w-4" /> New post
-            </Link>
+          <div className="flex-1">
+            <SearchInput value={query} onChange={setQuery} />
           </div>
-        )}
+          <SortPill field={sortField} dir={sortDir} onField={setSortField} onDir={setSortDir} />
+          {isAdmin && (
+            <div className="shrink-0 flex items-center gap-2">
+              <Link
+                href="/blog/admin"
+                className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-sm font-medium border border-[#680318]/25 bg-[#fff7ec] text-[#680318] hover:border-[#b94826]/50 hover:bg-[#680318]/8 transition-colors"
+              >
+                <LayoutList className="h-4 w-4" /> Manage
+              </Link>
+              {drafts.length > 0 && <ScheduleQueueButton drafts={drafts} />}
+              <Link
+                href="/blog/create"
+                className="inline-flex items-center gap-1.5 px-4 h-9 rounded-full text-sm font-semibold bg-[#b94826] text-[#fff0df] hover:bg-[#8f3318] shadow-sm transition-colors"
+              >
+                <Plus className="h-4 w-4" /> New post
+              </Link>
+            </div>
+          )}
+        </div>
       </header>
-
-      {/* ── Search ──────────────────────────────────────────────── */}
-      <div className="mb-8">
-        <SearchInput value={query} onChange={setQuery} />
-      </div>
 
       {/* ── Hero carousel ───────────────────────────────────────── */}
       {heroPosts.length > 0 && !hasFilters && <HeroCarousel posts={heroPosts} />}
@@ -143,7 +141,6 @@ export default function BlogExplorer({ posts, isAdmin }: Props) {
       {/* ── Filters bar ─────────────────────────────────────────── */}
       <section className="mt-12">
         <div className="flex flex-wrap items-center gap-3 mb-5">
-          <SortTabs value={sort} onChange={setSort} />
           {tagFilter && (
             <button
               type="button"
@@ -185,7 +182,7 @@ export default function BlogExplorer({ posts, isAdmin }: Props) {
           <EmptyState onClear={hasFilters ? clearFilters : undefined} isAdmin={isAdmin} />
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {list.map((p) => <PostCard key={p.id} post={p} highlight={sort === "trending"} />)}
+            {list.map((p) => <PostCard key={p.id} post={p} highlight={sortField === "views"} />)}
           </div>
         )}
       </section>
@@ -197,16 +194,16 @@ export default function BlogExplorer({ posts, isAdmin }: Props) {
 // Sub-components
 // ─────────────────────────────────────────────────────────────────
 
-function SearchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function SearchInput({ value, onChange, compact }: { value: string; onChange: (v: string) => void; compact?: boolean }) {
   return (
     <div className="relative">
-      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#680318]/55 pointer-events-none" aria-hidden />
+      <Search className={`absolute left-3 top-1/2 -translate-y-1/2 text-[#680318]/55 pointer-events-none ${compact ? "h-3.5 w-3.5" : "h-4 w-4"}`} aria-hidden />
       <input
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Search posts, tags, categories..."
-        className="w-full h-11 pl-10 pr-10 rounded-full border border-[#680318]/12 bg-[#fff7ec] text-sm text-[#680318] placeholder:text-[#680318]/40 outline-none focus:border-[#b94826] focus:ring-2 focus:ring-[#b94826]/30 transition-all"
+        placeholder="Search posts, tags, categories…"
+        className={`w-full pl-8 pr-8 rounded-full border border-[#680318]/12 bg-[#fff7ec] text-[#680318] placeholder:text-[#680318]/40 outline-none focus:border-[#b94826] focus:ring-2 focus:ring-[#b94826]/30 transition-all ${compact ? "h-8 text-xs" : "h-11 text-sm pr-10"}`}
       />
       {value && (
         <button
@@ -237,7 +234,8 @@ function HeroCarousel({ posts }: { posts: BlogPost[] }) {
 
   return (
     <section
-      className="relative rounded-2xl overflow-hidden border border-[#680318]/15 bg-[#fff7ec] shadow-md aspect-[16/9] sm:aspect-[16/7] md:aspect-[2.4/1]"
+      className="relative rounded-2xl overflow-hidden border border-[#680318]/15 bg-[#fff7ec] shadow-md"
+      style={{ height: "calc(100vh - 170px)" }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       aria-roledescription="carousel"
@@ -378,29 +376,37 @@ function TodayCard({ post }: { post: BlogPost }) {
   );
 }
 
-function SortTabs({ value, onChange }: { value: Sort; onChange: (v: Sort) => void }) {
-  const items: Array<{ id: Sort; label: string; icon: React.ReactNode }> = [
-    { id: "latest", label: "Latest", icon: <Sparkles className="h-3.5 w-3.5" /> },
-    { id: "trending", label: "Trending", icon: <Flame className="h-3.5 w-3.5" /> },
-  ];
+function SortPill({
+  field, dir, onField, onDir,
+}: {
+  field: SortField; dir: SortDir;
+  onField: (v: SortField) => void; onDir: (v: SortDir) => void;
+}) {
   return (
-    <div role="tablist" className="inline-flex items-center p-1 rounded-full bg-[#fff7ec] border border-[#680318]/15">
-      {items.map((it) => (
-        <button
-          key={it.id}
-          type="button"
-          role="tab"
-          aria-selected={value === it.id}
-          onClick={() => onChange(it.id)}
-          className={`inline-flex items-center gap-1.5 px-3.5 h-7 rounded-full text-xs font-semibold transition-all
-            ${value === it.id
-              ? "bg-[#680318] text-[#fff0df] shadow-[0_10px_30px_-10px_rgba(104,3,24,0.18)]"
-              : "text-[#680318]/75 hover:text-[#680318]"
-            }`}
+    <div className="inline-flex items-center rounded-full border border-[#680318]/20 bg-[#fff7ec] shrink-0">
+      <div className="relative flex items-center">
+        <select
+          value={field}
+          onChange={(e) => onField(e.target.value as SortField)}
+          className="h-9 pl-3.5 pr-7 text-sm text-[#680318]/80 bg-transparent border-0 outline-none cursor-pointer appearance-none font-medium"
         >
-          {it.icon} {it.label}
-        </button>
-      ))}
+          <option value="date">By date</option>
+          <option value="views">By views</option>
+        </select>
+        <ChevronDown className="absolute right-2 h-3.5 w-3.5 text-[#680318]/45 pointer-events-none" />
+      </div>
+      <div className="w-px h-5 bg-[#680318]/20 shrink-0" />
+      <div className="relative flex items-center">
+        <select
+          value={dir}
+          onChange={(e) => onDir(e.target.value as SortDir)}
+          className="h-9 pl-3.5 pr-7 text-sm text-[#680318]/80 bg-transparent border-0 outline-none cursor-pointer appearance-none font-medium"
+        >
+          <option value="desc">Descending</option>
+          <option value="asc">Ascending</option>
+        </select>
+        <ChevronDown className="absolute right-2 h-3.5 w-3.5 text-[#680318]/45 pointer-events-none" />
+      </div>
     </div>
   );
 }

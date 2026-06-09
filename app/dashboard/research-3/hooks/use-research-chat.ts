@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useRef, useState, type DragEvent } from "react";
 import { extractPdfText } from "@/lib/pdf-extract";
 import { generateId } from "@/lib/utils";
 import { setStoredData } from "@/lib/storage";
-import { streamLexramQuery, type QueryMode } from "@/modules/legal/api/queryStream";
-import { parseLexramSources } from "@/modules/legal/usecase/parseLexramSources";
+import { streamLexRamQuery, type QueryMode } from "@/modules/legal/api/queryStream";
+import { parseLexRamSources } from "@/modules/legal/usecase/parseLexRamSources";
 import {
   PROMPT_PRESETS,
   type AnalysisDepth,
@@ -534,7 +534,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       raw.replace(/<source>[\s\S]*?(?:<\/source>|$)/i, "").replace(/<follow_up>[\s\S]*?(?:<\/follow_up>|$)/i, "").trimEnd();
 
     try {
-      await streamLexramQuery(
+      await streamLexRamQuery(
         sessionId,
         prompt,
         queryMode,
@@ -589,7 +589,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         (done?.final_answer || done?.answer || done?.response || "").trim();
       // New wire format: backend ships authorities as a structured array on
       // the `done` event instead of an inline <source>...</source> block.
-      // parseLexramSources can't see them, so merge them in directly here.
+      // parseLexRamSources can't see them, so merge them in directly here.
       const doneSources: Authority[] = Array.isArray(done?.sources)
         ? done!.sources!.map(mapBackendSource).slice(0, 8)
         : [];
@@ -654,7 +654,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         // Strip the <follow_up> block from the displayed text
         cleanedText = cleanedText.replace(/<follow_up>[\s\S]*?<\/follow_up>/gi, "").replace(/\n{3,}/g, "\n\n").trim();
 
-        const parsed = parseLexramSources(cleanedText);
+        const parsed = parseLexRamSources(cleanedText);
         const a = normalizeAnswer({ streamText: parsed.cleanText });
         if (parsed.authorities.length > 0) {
           a.authorities = parsed.authorities;
@@ -673,7 +673,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       // ChatGPT/Perplexity feel even when the backend short-circuits the LLM.
       const simulateStreaming = async (text: string) => {
         if (!text) return;
-        const parsed = parseLexramSources(text);
+        const parsed = parseLexRamSources(text);
         const display = parsed.cleanText;
         if (!display) return;
 
@@ -721,7 +721,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       }
 
       // Merge structured `done.sources` from the backend. Prefer them over
-      // anything parseLexramSources may have salvaged from inline tags — the
+      // anything parseLexRamSources may have salvaged from inline tags — the
       // structured array is the authoritative list in the new wire format.
       if (doneSources.length > 0) {
         answer.authorities = doneSources;

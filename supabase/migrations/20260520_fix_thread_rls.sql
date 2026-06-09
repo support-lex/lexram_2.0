@@ -1,4 +1,4 @@
--- Lexram Network — fix RLS infinite-recursion on thread tables.
+﻿-- LexRam Network — fix RLS infinite-recursion on thread tables.
 -- The original 20260516_network.sql policy on network_thread_participants
 -- referenced the same table inside its own USING clause, which Postgres
 -- detects as recursive and rejects with a 500 / "infinite recursion in

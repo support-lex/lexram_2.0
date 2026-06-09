@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Search, X, ChevronLeft, ChevronRight, Scroll, Loader2 } from 'lucide-react';
-import { LexramAPI, unwrap, type SubLegislation } from '@/lib/lexram/api';
+import { LexRamAPI, unwrap, type SubLegislation } from '@/lib/lexram/api';
 import { cn } from '@/lib/utils';
 
 const DOC_TYPES: { key: string; label: string }[] = [
@@ -31,7 +31,7 @@ export default function SubLegislationPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await LexramAPI.subLegislation({
+      const res = await LexRamAPI.subLegislation({
         limit: PAGE_SIZE,
         offset,
         doc_type: docType !== 'all' ? docType : undefined,

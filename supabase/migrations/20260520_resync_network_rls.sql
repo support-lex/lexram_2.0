@@ -1,4 +1,4 @@
--- Lexram Network — idempotent re-sync of all network_* RLS policies.
+﻿-- LexRam Network — idempotent re-sync of all network_* RLS policies.
 --
 -- The original 20260516_network.sql had an ordering bug (network_notifications
 -- was added to the supabase_realtime publication BEFORE the table was created),

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -6,7 +6,7 @@ interface MermaidDiagramProps {
   source: string;
 }
 
-// Detect active Lexram theme from the <html data-theme="..."> attribute.
+// Detect active LexRam theme from the <html data-theme="..."> attribute.
 function getTheme(): "light" | "dark" {
   if (typeof document === "undefined") return "light";
   const t = document.documentElement.dataset.theme ?? "";

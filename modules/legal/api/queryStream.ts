@@ -1,4 +1,4 @@
-// SSE client for POST /legal-api/sessions/{session_id}/query/stream.
+﻿// SSE client for POST /legal-api/sessions/{session_id}/query/stream.
 //
 // EventSource only supports GET, so we use fetch + ReadableStream and parse
 // the SSE wire format manually:
@@ -42,7 +42,7 @@ export interface QueryStreamOptions {
   signal?: AbortSignal;
 }
 
-export async function streamLexramQuery(
+export async function streamLexRamQuery(
   sessionId: string,
   query: string,
   mode: QueryMode,
@@ -134,7 +134,7 @@ export async function streamLexramQuery(
               break;
           }
         } catch (err) {
-          console.warn("[streamLexramQuery] failed to parse SSE line", payload, err);
+          console.warn("[streamLexRamQuery] failed to parse SSE line", payload, err);
         }
       }
     }

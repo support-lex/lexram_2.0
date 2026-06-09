@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Clock, ArrowRight, GitBranch, Loader2 } from 'lucide-react';
-import { LexramAPI, unwrap, type Amendment } from '@/lib/lexram/api';
+import { LexRamAPI, unwrap, type Amendment } from '@/lib/lexram/api';
 
 function formatDate(d?: string | null) {
   if (!d) return '—';
@@ -30,7 +30,7 @@ export default function AmendmentsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await LexramAPI.amendments({ limit: 20 });
+      const res = await LexRamAPI.amendments({ limit: 20 });
       setAmendments(unwrap(res));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load amendments');

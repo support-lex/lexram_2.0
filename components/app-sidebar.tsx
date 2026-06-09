@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import Image from "next/image"
@@ -119,7 +119,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               >
                 <Image
                   src="/lexram-logo.png"
-                  alt="Lexram"
+                  alt="LexRam"
                   width={116}
                   height={40}
                   className="h-8 w-auto shrink-0"

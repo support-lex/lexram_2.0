@@ -1,4 +1,4 @@
-// Thin fetch wrapper for the LexRam Legal Research v2 backend.
+﻿// Thin fetch wrapper for the LexRam Legal Research v2 backend.
 //
 // Two modes, selected by NEXT_PUBLIC_LEGAL_API_BASE:
 //   - unset (default) → "/legal-api", routed through the Next.js rewrite to
@@ -27,7 +27,7 @@ export async function getAuthToken(): Promise<string | null> {
   }
 }
 
-export interface LexramRequestOptions {
+export interface LexRamRequestOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;          // JSON-stringified
   formData?: FormData;     // for multipart uploads
@@ -51,7 +51,7 @@ export function jsonAsciiSafe(value: unknown): string {
 
 export async function lexramRequest<T = unknown>(
   path: string,
-  opts: LexramRequestOptions = {}
+  opts: LexRamRequestOptions = {}
 ): Promise<T> {
   const token = await getAuthToken();
   const headers: Record<string, string> = {};

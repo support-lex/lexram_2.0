@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 // Super-admin TSR dashboard — User → Case → Document drill-down.
 // Mirrors the lex-doc-analyzer reference design: top-level user list, each
@@ -184,7 +184,7 @@ export default function SuperAdminTsrDashboard() {
         </div>
         <h1 className="font-display text-2xl font-bold text-maroon">Super admin only</h1>
         <p className="text-sm text-ink/60 mt-2 max-w-md">
-          The TSR dashboard is restricted to Lexram team accounts (app_metadata.role = super_admin).
+          The TSR dashboard is restricted to LexRam team accounts (app_metadata.role = super_admin).
         </p>
         <Link href="/dashboard/tsr/my-cases" className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-maroon text-cream text-sm font-semibold hover:bg-maroon-deep transition">
           Back to TSR

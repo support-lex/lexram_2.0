@@ -16,11 +16,11 @@ function SignInFormWithSuspense() {
 
 export default function SignIn() {
   return (
-    <div className="min-h-screen grid md:grid-cols-2 font-sans">
+    <div className="h-screen overflow-hidden grid md:grid-cols-2 font-sans">
       <SignInBranding />
 
       {/* Right Panel - Form */}
-      <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-24 bg-[#fff0df] relative">
+      <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-20 bg-[#fff0df] relative overflow-hidden">
         <div className="lg:hidden absolute top-8 left-8">
           <Link
             href="/"

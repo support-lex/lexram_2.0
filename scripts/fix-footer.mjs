@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "fs";
+﻿import { readFileSync, writeFileSync } from "fs";
 
 const file = "app/page.tsx";
 let c = readFileSync(file, "utf8");
@@ -26,7 +26,7 @@ const newFooter = `function Footer() {
           {/* Col 1: Brand + contact + social */}
           <div className="flex flex-col gap-6">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/lexram-logo.png" alt="Lexram" width={130} height={46} className="h-10 w-auto brightness-0 invert" />
+            <img src="/lexram-logo.png" alt="LexRam" width={130} height={46} className="h-10 w-auto brightness-0 invert" />
             <p className="text-sm leading-relaxed text-[#fff0df]/60 max-w-xs">
               &ldquo;You argue the case. We&apos;ll find the law.&rdquo;<br />
               Built exclusively on India&apos;s courts — statute to submission.

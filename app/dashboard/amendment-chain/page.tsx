@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
-import { LexramAPI, type AmendmentChainNode } from '@/lib/lexram/api';
+import { LexRamAPI, type AmendmentChainNode } from '@/lib/lexram/api';
 
 const DEFAULT_ID = 660;
 
@@ -54,7 +54,7 @@ export default function AmendmentChainPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await LexramAPI.amendmentChain(currentId);
+        const res = await LexRamAPI.amendmentChain(currentId);
         if (cancelled) return;
         const nodes = Array.isArray(res?.chain) ? res.chain : [];
         setChain(nodes);

@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowRight, Menu, X } from "lucide-react";
+import { ArrowRight, Facebook, Instagram, Linkedin, Mail, MapPin, Menu, Phone, X, Youtube } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
 export default function BlogLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div data-landing-v2 className="min-h-screen">
+    <div data-landing-v2 className="min-h-screen bg-[#fff0df]">
       <BlogNav />
       <main className="pt-16">{children}</main>
       <BlogFooter />
@@ -17,6 +17,7 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
 
 function BlogNav() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -24,6 +25,13 @@ function BlogNav() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, [open]);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const links = [
     { href: "/#research", label: "Research" },
@@ -35,7 +43,7 @@ function BlogNav() {
   ];
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-[#fff0df]/80 border-b border-[#680318]/10">
+    <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 backdrop-blur-md bg-[#fff0df]/90 border-b border-[#680318]/10 ${scrolled ? "shadow-sm" : ""}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
         <Link href="/" aria-label="LexRam" className="flex items-center shrink-0">
           <Image
@@ -123,46 +131,91 @@ function BlogNav() {
 }
 
 function BlogFooter() {
+  const socialLinks = [
+    { href: "https://linkedin.com/company/lexram", icon: Linkedin, label: "LinkedIn" },
+    { href: "https://youtube.com/@lexram", icon: Youtube, label: "YouTube" },
+    { href: "https://instagram.com/lexram.ai", icon: Instagram, label: "Instagram" },
+    { href: "https://facebook.com/lexram.ai", icon: Facebook, label: "Facebook" },
+  ];
+
   return (
     <footer className="bg-[#680318] text-[#fff0df]/70 py-16 border-t border-[#b94826]/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="grid md:grid-cols-4 gap-10">
-          <div className="md:col-span-2">
-            <div className="flex items-center mb-4">
-              <img
-                src="/lexram-logo-light.png"
-                alt="LexRam"
-                width={140}
-                height={48}
-                className="h-10 w-auto"
-              />
-            </div>
-            <p className="text-sm max-w-sm leading-relaxed">
-              &ldquo;You argue the case. We&apos;ll find the law.&rdquo; From statute to submission — built on India&apos;s courts alone.
-            </p>
-          </div>
+        <div className="grid md:grid-cols-[2fr_1fr_1fr_1fr] gap-10 lg:gap-14">
+
+          {/* Brand + contact */}
           <div>
-            <h4 className="font-serif text-[#fff0df] font-semibold mb-4">Product</h4>
-            <ul className="space-y-2 text-sm">
-              <li><Link href="/dashboard/research-2" className="hover:text-[#b94826]">Research</Link></li>
-              <li><Link href="/#drafting" className="hover:text-[#b94826]">Drafting</Link></li>
-              <li><Link href="/#pricing" className="hover:text-[#b94826] transition">Pricing</Link></li>
-              <li><Link href="/#faq" className="hover:text-[#b94826]">FAQ</Link></li>
+            <img src="/lexram-logo-light.png" alt="LexRam" className="h-10 w-auto mb-5" />
+            <p className="text-sm leading-relaxed mb-6">
+              &ldquo;You argue the case. We&apos;ll find the law.&rdquo;<br />
+              Built exclusively on India&apos;s courts — statute to submission.
+            </p>
+            <ul className="space-y-3 text-sm mb-6">
+              <li className="flex items-start gap-3">
+                <Phone className="h-4 w-4 text-[#b94826] shrink-0 mt-0.5" />
+                <span>+91 87544 46066</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Mail className="h-4 w-4 text-[#b94826] shrink-0 mt-0.5" />
+                <span>hello@lexram.ai</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <MapPin className="h-4 w-4 text-[#b94826] shrink-0 mt-0.5" />
+                <span>
+                  G1 (Ground Floor), Bhaskara Apartments,<br />
+                  No. 28, Pycrofts Garden Road,<br />
+                  Nungambakkam, Chennai — 600 006
+                </span>
+              </li>
+            </ul>
+            <div className="flex items-center gap-2.5">
+              {socialLinks.map(({ href, icon: Icon, label }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[#fff0df]/15 text-[#fff0df]/60 hover:text-[#fff0df] hover:border-[#fff0df]/35 transition"
+                >
+                  <Icon className="h-4 w-4" />
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Products */}
+          <div>
+            <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#b94826] mb-4">Products</h4>
+            <ul className="space-y-2.5 text-sm">
+              <li><Link href="/research" className="hover:text-[#fff0df] transition">Research</Link></li>
+              <li><Link href="/drafting" className="hover:text-[#fff0df] transition">Drafting</Link></li>
+              <li><Link href="/sign-in" className="hover:text-[#fff0df] transition">TSR</Link></li>
             </ul>
           </div>
+
+          {/* Information */}
           <div>
-            <h4 className="font-serif text-[#fff0df] font-semibold mb-4">Company</h4>
-            <ul className="space-y-2 text-sm">
-              <li><Link href="/about" className="hover:text-[#b94826]">About</Link></li>
-              <li><Link href="/blog" className="hover:text-[#b94826]">Blog</Link></li>
-              <li><Link href="/privacy" className="hover:text-[#b94826]">Privacy (DPDP)</Link></li>
-              <li><Link href="/contact" className="hover:text-[#b94826]">Contact</Link></li>
+            <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#b94826] mb-4">Information</h4>
+            <ul className="space-y-2.5 text-sm">
+              <li><Link href="/blog" className="hover:text-[#fff0df] transition">Blog</Link></li>
+              <li><Link href="/#faq" className="hover:text-[#fff0df] transition">FAQ</Link></li>
+            </ul>
+          </div>
+
+          {/* Policy */}
+          <div>
+            <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#b94826] mb-4">Policy</h4>
+            <ul className="space-y-2.5 text-sm">
+              <li><Link href="/privacy" className="hover:text-[#fff0df] transition">Privacy</Link></li>
+              <li><Link href="/terms" className="hover:text-[#fff0df] transition">Terms</Link></li>
+              <li><Link href="/refund" className="hover:text-[#fff0df] transition">Refund</Link></li>
             </ul>
           </div>
         </div>
-        <div className="mt-12 pt-8 border-t border-[#fff0df]/10 flex flex-col md:flex-row justify-between gap-4 text-xs text-[#fff0df]/50">
-          <div>© {new Date().getFullYear()} LexRam AI. Built for Indian advocates.</div>
-          <div>Made with reverence for the rule of law.</div>
+
+        <div className="mt-12 pt-8 border-t border-[#fff0df]/10 text-xs text-[#fff0df]/45">
+          © 2026 Ramasubramanian AI Software Pvt. Ltd. — Built in India, for Indian advocates.
         </div>
       </div>
     </footer>

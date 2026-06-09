@@ -1,4 +1,4 @@
--- Lexram Network: profiles, connections, feed, jobs, messaging, notifications.
+﻿-- LexRam Network: profiles, connections, feed, jobs, messaging, notifications.
 -- Apply via Supabase SQL Editor or `supabase db push`.
 
 -- ─────────────────────────────────────────────────────────────────────────────

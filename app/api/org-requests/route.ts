@@ -1,4 +1,4 @@
-// User-facing: submit a new org-join request (4-section onboarding form).
+﻿// User-facing: submit a new org-join request (4-section onboarding form).
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCtx } from "@/lib/auth-helpers";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     .eq("requested_by", ctx.user_id)
     .eq("status", "pending");
   if ((pendingCount ?? 0) > 0) {
-    return NextResponse.json({ error: "You already have a pending request. Wait for Lexram to review it." }, { status: 409 });
+    return NextResponse.json({ error: "You already have a pending request. Wait for LexRam to review it." }, { status: 409 });
   }
 
   /* Normalise + clamp the AI / operational fields. Anything we don't

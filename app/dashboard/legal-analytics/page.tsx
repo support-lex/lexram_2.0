@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -19,7 +19,7 @@ import {
   Legend,
 } from 'recharts';
 import {
-  LexramAPI,
+  LexRamAPI,
   type DashboardStats,
   type DashboardDomain,
   type DashboardMinistry,
@@ -77,10 +77,10 @@ export default function LegalAnalyticsPage() {
       setError(null);
       try {
         const [s, p, d, m] = await Promise.all([
-          LexramAPI.dashboardStats(),
-          LexramAPI.dashboardPulse(),
-          LexramAPI.dashboardDomains(),
-          LexramAPI.dashboardMinistries(),
+          LexRamAPI.dashboardStats(),
+          LexRamAPI.dashboardPulse(),
+          LexRamAPI.dashboardDomains(),
+          LexRamAPI.dashboardMinistries(),
         ]);
         if (cancelled) return;
         setStats(s);

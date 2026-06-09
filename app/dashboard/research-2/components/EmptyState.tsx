@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef } from "react";
 import { Scale, Paperclip, ArrowRight, Mic, MicOff } from "lucide-react";
@@ -86,7 +86,7 @@ export default function EmptyState({
             <span className="text-[var(--lex-ink)]">?</span>
           </h1>
           <p className="mt-2 sm:mt-3 text-[13px] sm:text-[15px] text-[var(--text-muted)] max-w-xl mx-auto leading-relaxed">
-            Ask in plain English. Lexram parses the question, surfaces grounded authority,
+            Ask in plain English. LexRam parses the question, surfaces grounded authority,
             and drafts your memo with verifiable citations.
           </p>
         </div>
@@ -189,7 +189,7 @@ export default function EmptyState({
                   submit();
                 }}
                 disabled={isGenerating}
-                aria-label="Ask Lexram"
+                aria-label="Ask LexRam"
                 className={`group/send inline-flex items-center gap-2 pl-3 pr-2.5 sm:pl-5 sm:pr-3.5 h-10 rounded-full text-[14px] font-semibold text-[var(--lex-cream)] transition-all duration-200 ${
                   query.trim()
                     ? "shadow-[var(--lex-shadow-elevated)] hover:opacity-95 hover:-translate-y-0.5"
@@ -200,7 +200,7 @@ export default function EmptyState({
                     "linear-gradient(135deg, var(--lex-maroon) 0%, var(--lex-rust) 100%)",
                 }}
               >
-                <span className="hidden sm:inline">Ask Lexram</span>
+                <span className="hidden sm:inline">Ask LexRam</span>
                 <span className="grid place-items-center size-6 rounded-full bg-white/15 transition-transform duration-200 group-hover/send:translate-x-0.5">
                   <ArrowRight className="size-3.5" strokeWidth={2.5} />
                 </span>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -122,7 +122,7 @@ export default function OrganizationRequestPage() {
           Tell us about your firm
         </h1>
         <p className="text-sm text-ink/65 mt-2 max-w-xl">
-          Lexram reviews each request manually to keep onboarding clean.
+          LexRam reviews each request manually to keep onboarding clean.
           You&apos;ll hear back within one working day via email at <strong className="text-ink/80">{form.contact_email || "the email you provide below"}</strong>.
         </p>
       </div>
@@ -136,7 +136,7 @@ export default function OrganizationRequestPage() {
 
       <form onSubmit={onSubmit} className="space-y-6">
         {/* ── Section 1 ────────────────────────────────────────────────── */}
-        <Section number="1" title="Organisation Identity" subtitle="The legal entity Lexram is contracting with.">
+        <Section number="1" title="Organisation Identity" subtitle="The legal entity LexRam is contracting with.">
           <Field
             label="Legal firm name" required icon={Building2}
             value={form.organization_name}
@@ -200,7 +200,7 @@ export default function OrganizationRequestPage() {
         </Section>
 
         {/* ── Section 3 ────────────────────────────────────────────────── */}
-        <Section number="3" title="AI & Operational Configuration" subtitle="Helps Lexram tune the workspace for your panel work.">
+        <Section number="3" title="AI & Operational Configuration" subtitle="Helps LexRam tune the workspace for your panel work.">
           <div>
             <label className="block text-[11px] font-semibold tracking-wide text-ink/70 mb-2 uppercase">
               <span className="inline-flex items-center gap-1.5">
@@ -336,7 +336,7 @@ export default function OrganizationRequestPage() {
           <div className="pt-3">
             <label className="block text-[11px] font-semibold tracking-wide text-ink/70 mb-1.5 uppercase">Anything else? (optional)</label>
             <textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Special workflow, integration needs, anything Lexram should know…"
+              placeholder="Special workflow, integration needs, anything LexRam should know…"
               className="w-full px-3.5 py-2.5 text-sm rounded-md border border-maroon/15 bg-cream text-ink placeholder:text-ink/35 focus:outline-none focus:border-maroon focus:ring-2 focus:ring-maroon/15 transition resize-none" />
           </div>
         </Section>

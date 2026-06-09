@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -83,7 +83,7 @@ export default function TeamPage() {
         </div>
         <button onClick={() => setInviteOpen(true)} disabled={activeMembers >= org.seat_limit}
           className="inline-flex items-center justify-center gap-2 bg-maroon hover:bg-maroon-deep disabled:bg-maroon/40 disabled:cursor-not-allowed text-cream px-4 py-2.5 rounded-lg text-sm font-semibold transition shadow-[0_10px_24px_-12px_rgba(104,3,24,0.55)]"
-          title={activeMembers >= org.seat_limit ? "Seat limit reached. Contact Lexram." : "Invite a new member"}>
+          title={activeMembers >= org.seat_limit ? "Seat limit reached. Contact LexRam." : "Invite a new member"}>
           <Plus className="w-4 h-4" />Invite member
         </button>
       </div>
@@ -268,7 +268,7 @@ function InviteModal({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
-    if (seatsRemaining <= 0) { setErr("Seat limit reached. Contact Lexram."); return; }
+    if (seatsRemaining <= 0) { setErr("Seat limit reached. Contact LexRam."); return; }
     setBusy(true);
     try {
       const member = await inviteMember({ org_id: orgId, email, name, role });

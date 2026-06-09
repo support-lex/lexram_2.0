@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import {
@@ -115,7 +115,7 @@ import type {
 } from "@/types/network";
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Lexram Network — LinkedIn structure with Indeed appearance.
+   LexRam Network — LinkedIn structure with Indeed appearance.
    Maroon + cream palette.
    Home tab is wired to live Supabase data; other tabs still use seed data
    pending migration.
@@ -246,7 +246,7 @@ type FeedPost = {
 function adaptPost(p: NetworkPost, currentUserId: string): FeedPost {
   return {
     id: p.id,
-    author: p.author?.display_name || "Lexram member",
+    author: p.author?.display_name || "LexRam member",
     authorTitle: p.author?.headline || "",
     avatarUrl: p.author?.avatar_url ?? null,
     postedAgo: formatAgo(p.created_at),
@@ -265,7 +265,7 @@ function adaptPost(p: NetworkPost, currentUserId: string): FeedPost {
 function adaptComment(c: PostComment, currentUserId: string): FeedComment {
   return {
     id: c.id,
-    author: c.author?.display_name || "Lexram member",
+    author: c.author?.display_name || "LexRam member",
     authorTitle: c.author?.headline || "",
     avatarUrl: c.author?.avatar_url ?? null,
     body: c.body,
@@ -840,7 +840,7 @@ export default function NetworkPage() {
           author: {
             id: userId,
             display_name: userName,
-            headline: "Lexram member",
+            headline: "LexRam member",
             avatar_url: null,
           },
         },
@@ -984,7 +984,7 @@ export default function NetworkPage() {
           author: {
             id: userId,
             display_name: userName,
-            headline: "Lexram member",
+            headline: "LexRam member",
             avatar_url: myAvatarUrl,
           },
         },
@@ -1057,7 +1057,7 @@ export default function NetworkPage() {
       <div className="h-full grid place-items-center" style={{ background: "#faf7f4" }}>
         <div className="bg-white border rounded-lg p-8 max-w-md text-center" style={{ borderColor: "#ecdfd6" }}>
           <h1 className="text-lg font-semibold" style={{ color: MAROON_DEEP }}>
-            Sign in to Lexram Network
+            Sign in to LexRam Network
           </h1>
           <p className="text-sm text-neutral-500 mt-2">
             Connect with peers, share updates, and find work.
@@ -1080,7 +1080,7 @@ export default function NetworkPage() {
       <div className="px-6 pt-6 pb-4 border-b" style={{ background: "white", borderColor: "#ecdfd6" }}>
         <div className="max-w-6xl mx-auto">
           <h1 className="text-xl font-semibold" style={{ color: MAROON_DEEP }}>
-            Lexram Network
+            LexRam Network
           </h1>
           <p className="text-xs text-neutral-500 mt-0.5">
             Connect with peers, find work, and grow your practice.
@@ -1183,7 +1183,7 @@ export default function NetworkPage() {
               .slice(0, 5)
               .map<Suggestion>((p) => ({
                 id: p.id,
-                name: p.display_name || "Lexram member",
+                name: p.display_name || "LexRam member",
                 title: (p.headline || "").split(" · ")[0] || p.headline || "",
                 firm: (p.headline || "").includes(" · ")
                   ? (p.headline || "").split(" · ").slice(1).join(" · ")
@@ -1402,7 +1402,7 @@ function HomeView(props: {
           toggleInvite={props.toggleInvite}
           dismissSuggestion={props.dismissSuggestion}
         />
-        <LexramPulse />
+        <LexRamPulse />
       </aside>
     </div>
   );
@@ -1500,7 +1500,7 @@ function ProfileMiniCard({
           {userName}
         </h3>
         <p className="text-xs text-neutral-600 mt-1 line-clamp-2">
-          {profile?.headline || "Lexram member"}
+          {profile?.headline || "LexRam member"}
         </p>
         {profile?.location && (
           <p className="text-[11px] text-neutral-400 mt-1 truncate">
@@ -1657,7 +1657,7 @@ const PULSE_TOPICS: Array<{ tag: string; count: string }> = [
   { tag: "#TaxLaw", count: "1,210 discussions" },
 ];
 
-function LexramPulse() {
+function LexRamPulse() {
   return (
     <div
       className="bg-white border rounded-xl p-4 shadow-sm"
@@ -1665,7 +1665,7 @@ function LexramPulse() {
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold inline-flex items-center gap-1.5">
-          <TrendingUp className="size-3.5" style={{ color: MAROON }} /> Lexram
+          <TrendingUp className="size-3.5" style={{ color: MAROON }} /> LexRam
           Pulse
         </h3>
         <span className="text-[10px] text-neutral-400 uppercase tracking-wide">
@@ -2330,7 +2330,7 @@ function NetworkView(props: {
         ) : (
           <div className="space-y-3">
             {props.invitations.map((i) => {
-              const name = i.other?.display_name || "Lexram member";
+              const name = i.other?.display_name || "LexRam member";
               const headline = i.other?.headline || "";
               return (
                 <div key={i.id} className="flex items-center gap-3">
@@ -2371,7 +2371,7 @@ function NetworkView(props: {
           </h2>
           <div className="space-y-3">
             {props.outgoing.map((o) => {
-              const name = o.other?.display_name || "Lexram member";
+              const name = o.other?.display_name || "LexRam member";
               const headline = o.other?.headline || "";
               return (
                 <div key={o.id} className="flex items-center gap-3">
@@ -2413,7 +2413,7 @@ function NetworkView(props: {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {props.connections.map((c) => {
-              const name = c.other?.display_name || "Lexram member";
+              const name = c.other?.display_name || "LexRam member";
               const headline = c.other?.headline || "";
               return (
                 <div
@@ -2471,12 +2471,12 @@ function NetworkView(props: {
                   style={{ borderColor: "#ecdfd6" }}
                 >
                   <Avatar
-                    name={s.display_name || "Lexram member"}
+                    name={s.display_name || "LexRam member"}
                     avatarUrl={s.avatar_url}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">
-                      {s.display_name || "Lexram member"}
+                      {s.display_name || "LexRam member"}
                     </div>
                     <div className="text-xs text-neutral-500 truncate">
                       {s.headline || ""}
@@ -2764,7 +2764,7 @@ function MessagingView(props: {
   }, [props.messages, props.activeThreadId]);
 
   const active = props.threads.find((t) => t.id === props.activeThreadId);
-  const otherName = active?.participants[0]?.display_name || "Lexram member";
+  const otherName = active?.participants[0]?.display_name || "LexRam member";
   const otherHeadline = active?.participants[0]?.headline || "";
   const otherAvatar = active?.participants[0]?.avatar_url ?? null;
 
@@ -2782,7 +2782,7 @@ function MessagingView(props: {
           </div>
         ) : (
           props.threads.map((t) => {
-            const name = t.participants[0]?.display_name || "Lexram member";
+            const name = t.participants[0]?.display_name || "LexRam member";
             const headline = t.participants[0]?.headline || "";
             const unread = t.unread_count ?? 0;
             return (

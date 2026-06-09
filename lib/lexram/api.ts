@@ -1,4 +1,4 @@
-// Client-side API wrapper. All calls go through the /api/lexram/[...path]
+﻿// Client-side API wrapper. All calls go through the /api/lexram/[...path]
 // Next.js proxy route which forwards to the backend at https://139.59.74.49
 // (self-signed TLS, IP-only — browser cannot call it directly).
 
@@ -286,7 +286,7 @@ export interface Judgment {
 
 // ----- Strongly-typed fetchers -----
 
-export const LexramAPI = {
+export const LexRamAPI = {
   dashboardStats: () => apiGet<DashboardStats>('dashboard/stats'),
   dashboardPulse: () => apiGet<PulseEvent[]>('dashboard/pulse'),
   dashboardRecent: () => apiGet<DashboardRecent>('dashboard/recent'),
@@ -416,7 +416,7 @@ export interface ActsV2Params {
   fields?: string;
 }
 
-export const LexramV2 = {
+export const LexRamV2 = {
   acts: (params?: ActsV2Params) =>
     apiGet<PaginatedActsV2>('v2/acts', params as Record<string, string | number | undefined>),
 

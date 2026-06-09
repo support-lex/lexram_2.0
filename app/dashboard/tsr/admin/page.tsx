@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -82,7 +82,7 @@ export default function AdminOrganizationsPage() {
         </div>
         <h1 className="font-display text-2xl font-bold text-maroon">Super admin only</h1>
         <p className="text-sm text-ink/60 mt-2 max-w-md">
-          This view is restricted to Lexram team accounts (app_metadata.role = super_admin).
+          This view is restricted to LexRam team accounts (app_metadata.role = super_admin).
         </p>
         <Link href="/dashboard/tsr" className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-maroon text-cream text-sm font-semibold hover:bg-maroon-deep transition">
           Back to TSR
@@ -101,7 +101,7 @@ export default function AdminOrganizationsPage() {
           </div>
           <h1 className="font-display text-3xl md:text-4xl font-bold leading-tight text-maroon">Organisations</h1>
           <p className="text-sm text-ink/65 mt-2">
-            Every tenant on Lexram. Drill in to view members, suspend, or change a plan.
+            Every tenant on LexRam. Drill in to view members, suspend, or change a plan.
           </p>
         </div>
         <Link

@@ -1,8 +1,8 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { Scale, BookOpen, Loader2, AlertCircle } from 'lucide-react';
-import { LexramAPI, unwrap, type Court, type Judgment } from '@/lib/lexram/api';
+import { LexRamAPI, unwrap, type Court, type Judgment } from '@/lib/lexram/api';
 
 interface StatsLike {
   judgments?: number;
@@ -28,9 +28,9 @@ export default function CaseLawPage() {
     setError(null);
 
     Promise.all([
-      LexramAPI.courts(),
-      LexramAPI.judgments({ limit: 50 }),
-      LexramAPI.stats().catch(() => null),
+      LexRamAPI.courts(),
+      LexRamAPI.judgments({ limit: 50 }),
+      LexRamAPI.stats().catch(() => null),
     ])
       .then(([c, j, s]) => {
         if (cancelled) return;

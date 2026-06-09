@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Network, Loader2, AlertTriangle, RefreshCcw } from 'lucide-react';
-import { LexramAPI, type Act } from '@/lib/lexram/api';
+import { LexRamAPI, type Act } from '@/lib/lexram/api';
 
 interface GraphShape {
   nodes: Array<{ id?: string | number; label?: string; type?: string; [k: string]: unknown }>;
@@ -47,14 +47,14 @@ export default function CrossRefsPage() {
       setLoading(true);
       setError(null);
       try {
-        const acts = await LexramAPI.acts({ limit: 1 });
+        const acts = await LexRamAPI.acts({ limit: 1 });
         const first = Array.isArray(acts) ? acts[0] : null;
         if (!first) throw new Error('No acts available');
         if (cancelled) return;
         setAct(first);
         const [eco, lnk] = await Promise.all([
-          LexramAPI.actEcosystem(first.id).catch(() => null),
-          LexramAPI.actLinked(first.id).catch(() => null),
+          LexRamAPI.actEcosystem(first.id).catch(() => null),
+          LexRamAPI.actLinked(first.id).catch(() => null),
         ]);
         if (cancelled) return;
         setEcosystem(eco);

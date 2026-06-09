@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ReactNode } from "react";
 import { useState, useEffect } from "react";
@@ -472,7 +472,7 @@ export default function MessageBubble({
       <div className="flex-1 min-w-0">
         {/* Name + timestamp */}
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm font-semibold text-[var(--text-primary)] oracle-serif italic">Lexram</span>
+          <span className="text-sm font-semibold text-[var(--text-primary)] oracle-serif italic">LexRam</span>
           <span className="text-[11px] text-[var(--text-muted)]">
             {formatDate(message.timestamp)}
           </span>

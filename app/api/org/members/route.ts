@@ -1,4 +1,4 @@
-// Org-admin invite endpoint.
+﻿// Org-admin invite endpoint.
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCtx } from "@/lib/auth-helpers";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   if (!org) return NextResponse.json({ error: "Organisation not found" }, { status: 404 });
   if (org.status === "suspended") return NextResponse.json({ error: "Organisation is suspended" }, { status: 403 });
   if ((seatsUsed ?? 0) >= org.seat_limit) {
-    return NextResponse.json({ error: "Seat limit reached. Contact Lexram to add more seats." }, { status: 409 });
+    return NextResponse.json({ error: "Seat limit reached. Contact LexRam to add more seats." }, { status: 409 });
   }
 
   const { data: { users } } = await sb.auth.admin.listUsers();

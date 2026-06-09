@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, GitBranch, Loader2 } from 'lucide-react';
-import { LexramAPI, unwrap, type Amendment } from '@/lib/lexram/api';
+import { LexRamAPI, unwrap, type Amendment } from '@/lib/lexram/api';
 import { cn } from '@/lib/utils';
 
 type ViewMode = 'by-act' | 'timeline' | 'table';
@@ -38,7 +38,7 @@ export default function AmendmentsTrackerPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await LexramAPI.amendments({ limit: 200 });
+      const res = await LexRamAPI.amendments({ limit: 200 });
       setAll(unwrap(res));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load amendments');

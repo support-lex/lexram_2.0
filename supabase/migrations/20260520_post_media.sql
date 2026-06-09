@@ -1,4 +1,4 @@
--- Lexram Network: post media (photo / video) + article title.
+﻿-- LexRam Network: post media (photo / video) + article title.
 -- Apply via Supabase SQL Editor.
 
 -- ─────────────────────────────────────────────────────────────────────────────

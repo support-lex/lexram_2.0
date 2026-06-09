@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
-import { LexramAPI } from '@/lib/lexram/api';
+import { LexRamAPI } from '@/lib/lexram/api';
 import { cn } from '@/lib/utils';
 
 type EventType = 'circular' | 'notification' | 'amendment' | 'rules' | 'orders' | 'version';
@@ -113,7 +113,7 @@ function VersionTrackerContent() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    LexramAPI.actVersions(actId)
+    LexRamAPI.actVersions(actId)
       .then((r) => {
         if (cancelled) return;
         setRaw(r);

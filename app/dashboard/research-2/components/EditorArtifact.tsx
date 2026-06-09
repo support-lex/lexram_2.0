@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 // legal drafts. Lists (bullet + numbered), headings h1-h6, bold/italic/inline
 // code, links, horizontal rules, paragraphs with soft <br> line breaks.
 function looksLikeMarkdown(s: string): boolean {
-  return /(^\s*#{1,6}\s)|(\*\*[^*\n]+\*\*)|(^\s*[-*•]\s+)|(^\s*\d+\.\s+)|(\[[^\]]+\]\([^)]+\))/m.test(s);
+  return /(^\s*#{1,6}\s)|(\*\*[^*]+\*\*)|(^\s*[-*•]\s+)|(^\s*\d+\.\s+)|(\[[^\]]+\]\([^)]+\))/m.test(s);
 }
 
 function escapeHtml(s: string): string {
@@ -22,7 +22,7 @@ function escapeHtml(s: string): string {
 
 function inlineMd(raw: string): string {
   return escapeHtml(raw)
-    .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*\w])\*([^*\n]+)\*/g, "$1<em>$2</em>")
     .replace(/`([^`\n]+)`/g, "<code>$1</code>")
     .replace(
@@ -32,7 +32,11 @@ function inlineMd(raw: string): string {
 }
 
 function markdownToHtml(md: string): string {
-  const lines = md.replace(/\r\n/g, "\n").split("\n");
+  // Join bold/italic spans that were split across two lines
+  const normalized = md
+    .replace(/\r\n/g, "\n")
+    .replace(/\*\*([^*]*)\n([^*]*)\*\*/g, "**$1 $2**");
+  const lines = normalized.split("\n");
   const out: string[] = [];
   let inUl = false;
   let inOl = false;
@@ -119,11 +123,16 @@ function markdownToHtml(md: string): string {
   return out.join("\n");
 }
 
-// Normalize incoming content for contentEditable: pass HTML through untouched,
-// convert markdown to HTML, and fall back to plain text with line breaks.
+// Normalize incoming content for contentEditable: pass HTML through with inline
+// markdown still converted, convert pure markdown to HTML, fall back to plain text.
 function normalizeForEditor(content: string): string {
   if (!content) return "";
-  if (content.includes("<")) return content;
+  if (content.includes("<")) {
+    // Has HTML already — still convert any remaining **bold** and *italic* markers
+    return content
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|[^*\w])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  }
   if (looksLikeMarkdown(content)) return markdownToHtml(content);
   return content.replace(/\n/g, "<br />");
 }

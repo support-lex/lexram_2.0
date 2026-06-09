@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+/* Lexram brand tokens (mirrors the parent app). Per-org logo/name are injected
+   at runtime from org branding; colours stay consistent across tenants. */
+@theme {
+  --color-maroon:      #680318;
+  --color-maroon-deep: #4D0212;
+  --color-rust:        #b94826;
+  --color-rust-deep:   #8F3318;
+  --color-cream:       #fff0df;
+  --color-cream-soft:  #FFF7EC;
+  --color-cream-warm:  #FCEBD9;
+  --color-ink:         #2a1f1e;
+
+  --shadow-soft: 0 10px 30px -15px rgba(104, 3, 24, 0.25);
+  --font-display: ui-serif, Georgia, "Times New Roman", serif;
+
+  /* Consumed by ported TSR markup that references CSS vars. */
+  --bg-primary: #fff0df;
+  --accent:     #b94826;
+}
+
+html, body {
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+* { border-color: rgba(104, 3, 24, 0.12); }

@@ -33,7 +33,6 @@ import InlineBlock from "./inline/InlineBlock";
 import MermaidDiagram from "./inline/MermaidDiagram";
 import InlineAuthorities from "./inline/InlineAuthorities";
 import InlineDraftEditor from "./inline/InlineDraftEditor";
-import InlineQuestionsForm, { parseNumberedQuestions } from "./InlineQuestionsForm";
 import ProceduralTimeline from "./ProceduralTimeline";
 import { ExternalLink } from "lucide-react";
 import { feedbackRepository, type FeedbackRating } from "@/modules/chat/repository/feedback.repository";
@@ -673,7 +672,10 @@ export default function MessageBubble({
                       key={`draft-${bi}`}
                       icon={<FileText className="w-3.5 h-3.5" />}
                       label="View Draft"
-                      defaultOpen={false}
+                      // Open by default — a generated petition/document is the
+                      // deliverable, so show it immediately (the document
+                      // viewer) rather than hiding it behind a collapsed toggle.
+                      defaultOpen={true}
                     >
                       <InlineDraftEditor
                         content={block.data}
@@ -687,24 +689,6 @@ export default function MessageBubble({
             </div>
           )}
         </div>
-
-        {/* Inline questions form — rendered when the AI's prose contains a
-            consecutive numbered list of questions (drafting flow's "TRACK 1
-            — Essential Facts" pattern). Each question gets its own text
-            input; Proceed bundles the answers into "1. ans\n2. ans\n…"
-            and pushes them through onSuggestedAnswer just like a chip
-            click would. Parser returns [] when the pattern isn't there,
-            so this is a no-op for ordinary AI prose. */}
-        {(() => {
-          const parsed = parseNumberedQuestions(contentText);
-          if (parsed.length < 2 || !onSuggestedAnswer) return null;
-          return (
-            <InlineQuestionsForm
-              questions={parsed}
-              onProceed={(formatted) => onSuggestedAnswer(formatted)}
-            />
-          );
-        })()}
 
         {/* Suggested answers — quick-reply chips shown when the assistant
             is asking the user a clarifying question. Clicking auto-submits

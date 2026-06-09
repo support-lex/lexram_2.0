@@ -10,6 +10,9 @@ export const STORAGE_KEYS = {
   TRACKED_CASES: 'lexram_tracked_cases',
   CASE_STATUSES: 'lexram_case_statuses',
   SESSION_CASES: 'lexram_session_cases',
+  // Stale-while-revalidate cache of the research session list so the history
+  // sidebar paints instantly on load instead of waiting for the /sessions API.
+  SESSIONS_CACHE: 'lexram_sessions_cache_v1',
 } as const;
 
 let storageWarningShown = false;
@@ -34,6 +37,40 @@ export function getStoredData<T>(key: string, fallback: T): T {
     console.error(`Error parsing stored data for key ${key}:`, e);
     return fallback;
   }
+}
+
+// Keys that older builds wrote but nothing writes anymore. `lexram_research_sessions`
+// in particular used to hold FULL sessions including message bodies (case
+// authorities, reasoning, draft text) — easily several MB for a heavy user — and
+// is now superseded by the lightweight SESSIONS_CACHE plus the backend. Since
+// nothing repopulates these keys, the stale data just sits there forever and is
+// the dominant cause of the "Storage usage at N%" warning. Purged once on
+// dashboard mount (see app/dashboard/layout.tsx).
+const LEGACY_STORAGE_KEYS: string[] = [STORAGE_KEYS.RESEARCH_SESSIONS];
+
+// Caches safe to drop when localStorage fills up: the stale-while-revalidate
+// sidebar snapshot (re-fetched from the backend on next load) and the one-shot
+// draft hand-off slot. Dropping them frees space without losing any
+// authoritative, server-backed data.
+const EVICTABLE_STORAGE_KEYS: string[] = [STORAGE_KEYS.SESSIONS_CACHE, 'lexram_draft_import'];
+
+/** Remove dead legacy keys. Safe to call on every load; only touches keys nothing writes. */
+export function purgeLegacyStorage(): void {
+  if (typeof window === 'undefined') return;
+  for (const key of LEGACY_STORAGE_KEYS) {
+    try { localStorage.removeItem(key); } catch { /* ignore */ }
+  }
+  // Re-arm the one-shot warning so it can fire again later if storage refills.
+  storageWarningShown = false;
+}
+
+/** Drop legacy + evictable caches to relieve storage pressure (quota exceeded). */
+export function evictStaleStorage(): void {
+  if (typeof window === 'undefined') return;
+  for (const key of [...LEGACY_STORAGE_KEYS, ...EVICTABLE_STORAGE_KEYS]) {
+    try { localStorage.removeItem(key); } catch { /* ignore */ }
+  }
+  storageWarningShown = false;
 }
 
 export function setStoredData<T>(key: string, data: T): boolean {

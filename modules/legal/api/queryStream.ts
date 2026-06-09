@@ -53,25 +53,69 @@ export async function streamLexRamQuery(
   if (sessionId.startsWith("temp_")) throw new Error("Cannot stream query for an unsaved session — please sign in.");
   if (!query?.trim()) throw new Error("Empty query");
 
+  // The caller may have already pressed Stop while we were getting here (e.g.
+  // during a slow ensureSession round trip). Bail before doing any work.
+  if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
   const token = await getAuthToken();
+  // getAuthToken() awaits Supabase's cross-tab auth lock; Stop pressed during
+  // that window must still cancel the turn before we open the socket.
+  if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
   const headers: Record<string, string> = {
     "Content-Type": "application/json; charset=utf-8",
     Accept: "text/event-stream",
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(
-    `${LEXRAM_BASE}/sessions/${encodeURIComponent(sessionId)}/query/stream`,
-    {
-      method: "POST",
-      headers,
-      // ASCII-safe encoding — see jsonAsciiSafe doc for the backend bug we work around.
-      body: jsonAsciiSafe({ query, mode }),
-      signal: options.signal,
+  // Connect timeout. The idle watchdog below only starts AFTER we hold a reader,
+  // so it can't help if the POST is sent but the backend never returns response
+  // headers (cold start, proxy buffering, dropped socket) — fetch() would hang
+  // forever and the chat would sit on "Working…". Abort the fetch if headers
+  // don't arrive in time, surfacing a clean retryable error instead. We chain
+  // the caller's signal so the user's Stop still works.
+  const CONNECT_TIMEOUT_MS = 30000;
+  const connectController = new AbortController();
+  const onCallerAbort = () => connectController.abort();
+  if (options.signal) {
+    if (options.signal.aborted) connectController.abort();
+    else options.signal.addEventListener("abort", onCallerAbort, { once: true });
+  }
+  const connectTimer = setTimeout(() => connectController.abort(), CONNECT_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(
+      `${LEXRAM_BASE}/sessions/${encodeURIComponent(sessionId)}/query/stream`,
+      {
+        method: "POST",
+        headers,
+        // ASCII-safe encoding — see jsonAsciiSafe doc for the backend bug we work around.
+        body: jsonAsciiSafe({ query, mode }),
+        signal: connectController.signal,
+      }
+    );
+  } catch (err) {
+    // Connect failed/aborted — tear down the caller-abort wiring before bailing.
+    clearTimeout(connectTimer);
+    options.signal?.removeEventListener("abort", onCallerAbort);
+    // Distinguish a connect-timeout abort (retryable server problem) from a
+    // genuine user Stop (clean cancel) so the caller shows the right thing.
+    if (
+      (err as { name?: string })?.name === "AbortError" &&
+      !options.signal?.aborted
+    ) {
+      throw new Error("The server took too long to respond. Please try again.");
     }
-  );
+    throw err;
+  }
+  // Headers arrived — disarm the connect timer, but KEEP the caller-abort →
+  // connectController link wired: the response body below was opened with
+  // connectController.signal, so the user's Stop must still propagate to it.
+  // The wiring is torn down in the reader cleanup finally at the end.
+  clearTimeout(connectTimer);
 
   if (!res.ok) {
+    options.signal?.removeEventListener("abort", onCallerAbort);
     let detail = `HTTP ${res.status}`;
     try {
       const errBody = await res.json();
@@ -83,15 +127,51 @@ export async function streamLexRamQuery(
     throw new Error(detail);
   }
 
-  if (!res.body) throw new Error("No response body for query stream");
+  if (!res.body) {
+    options.signal?.removeEventListener("abort", onCallerAbort);
+    throw new Error("No response body for query stream");
+  }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  // Set once the backend emits its terminal `done` event. We then STOP reading
+  // immediately instead of waiting for the HTTP connection to close. Some SSE
+  // backends (uvicorn/FastAPI keep-alive) hold the stream open after `done`,
+  // which left reader.read() pending forever — so streamLexramQuery never
+  // returned, isSearching never flipped false, and the chat sat on "working…"
+  // indefinitely even though the full answer had already arrived.
+  let streamDone = false;
+
+  // Idle watchdog. Distinct from the `streamDone` keep-alive guard above: that
+  // one handles a backend that finishes (emits `done`) but holds the socket
+  // open. THIS handles a backend that accepts the SSE connection and then goes
+  // SILENT — no token, no status, no `done` (e.g. the Draft pipeline stalling
+  // on a clarification turn). Without it, reader.read() blocks forever,
+  // streamLexramQuery never resolves, the caller's finally never clears
+  // isSearching, and the chat sits on "Working…" indefinitely. We race each
+  // read against a timeout so a stalled stream self-aborts and surfaces a
+  // retryable error. Any received chunk (incl. periodic status pings) resets
+  // the window by resolving the read, so a legitimately slow-but-alive stream
+  // is never killed.
+  const IDLE_TIMEOUT_MS = 60000;
 
   try {
-    while (true) {
-      const { done, value } = await reader.read();
+    while (!streamDone) {
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+      const idle = new Promise<never>((_, reject) => {
+        idleTimer = setTimeout(
+          () => reject(new Error("The server stopped responding. Please try again.")),
+          IDLE_TIMEOUT_MS,
+        );
+      });
+      let result: ReadableStreamReadResult<Uint8Array>;
+      try {
+        result = await Promise.race([reader.read(), idle]);
+      } finally {
+        if (idleTimer) clearTimeout(idleTimer);
+      }
+      const { done, value } = result;
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
@@ -125,6 +205,7 @@ export async function streamLexRamQuery(
               break;
             case "done":
               callbacks.onDone?.(event as QueryStreamDoneEvent);
+              streamDone = true;
               break;
             case "error":
               callbacks.onError?.(String(event.message ?? "Unknown error"));
@@ -136,9 +217,22 @@ export async function streamLexRamQuery(
         } catch (err) {
           console.warn("[streamLexRamQuery] failed to parse SSE line", payload, err);
         }
+        // Terminal event seen — stop processing any trailing keep-alive lines.
+        if (streamDone) break;
       }
     }
   } finally {
+    // Detach the caller-abort listener now the stream is over (success, idle
+    // timeout, or user Stop) so we don't leak it on the caller's signal.
+    options.signal?.removeEventListener("abort", onCallerAbort);
+    // Close the connection explicitly. If the backend keeps the SSE stream
+    // open after `done`, cancel() releases it so the fetch settles and the
+    // caller's finally{} (which clears isSearching) actually runs.
+    try {
+      await reader.cancel();
+    } catch {
+      /* noop */
+    }
     try {
       reader.releaseLock();
     } catch {

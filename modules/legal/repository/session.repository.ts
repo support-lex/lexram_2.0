@@ -8,6 +8,13 @@
 import { lexramRequest } from "../api/lexram.api";
 import type { QueryMode } from "../api/queryStream";
 
+// Cap on session create/rename so a cold-starting or hung LexRam backend can't
+// leave ensureSession() awaiting forever (the research chat then spins on
+// "working…" indefinitely on the first message). On timeout the request throws,
+// the create path falls back to the Supabase-only mirror, and the chat surfaces
+// an error instead of hanging. Generous enough to ride out a normal cold start.
+const SESSION_LIFECYCLE_TIMEOUT_MS = 15000;
+
 export interface QueryResponseEnvelope {
   session_id?: string;
   query_type?: string;
@@ -42,6 +49,7 @@ async function lexramRename(id: string, title: string): Promise<void> {
   await lexramRequest(`/sessions/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: { title },
+    timeoutMs: SESSION_LIFECYCLE_TIMEOUT_MS,
   });
 }
 
@@ -50,6 +58,34 @@ export const lexramSessionRepository = {
   async list(): Promise<LexRamSession[]> {
     const raw = await lexramRequest<unknown>("/sessions");
     return extractList(raw);
+  },
+
+  /**
+   * GET /sessions/{id}/history — the backend's authoritative conversation
+   * record: `{ session_id, messages: [{ role, content }] }`. Used to recover a
+   * thread (including drafted petitions) when the Supabase message mirror is
+   * empty/missing — the LexRam backend keeps the full history regardless.
+   */
+  async history(
+    id: string
+  ): Promise<{ role: string; content: string }[]> {
+    const raw = await lexramRequest<unknown>(
+      `/sessions/${encodeURIComponent(id)}/history`
+    );
+    const msgs = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === "object" && Array.isArray((raw as Record<string, unknown>).messages)
+      ? ((raw as Record<string, unknown>).messages as unknown[])
+      : [];
+    return msgs
+      .filter(
+        (m): m is { role: unknown; content: unknown } =>
+          !!m && typeof m === "object" && "content" in m
+      )
+      .map((m) => ({
+        role: String((m as { role?: unknown }).role ?? ""),
+        content: String((m as { content?: unknown }).content ?? ""),
+      }));
   },
 
   /**
@@ -75,6 +111,7 @@ export const lexramSessionRepository = {
     const created = await lexramRequest<LexRamSession>("/sessions", {
       method: "POST",
       body,
+      timeoutMs: SESSION_LIFECYCLE_TIMEOUT_MS,
     });
 
     const id = lexramSessionId(created);

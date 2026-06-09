@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/auth-provider";
 import type { UserRole } from "@/types/law-firm";
 
 interface AuthGuardProps {
@@ -11,22 +11,14 @@ interface AuthGuardProps {
   fallback?: ReactNode;
 }
 
+// Role is derived in the single auth store from user_metadata.role and stays
+// reactive across SIGNED_IN / TOKEN_REFRESHED. Previously this hook fired a
+// one-shot getUser() with no listener, so a probe that resolved before session
+// hydration left `role` null until a manual refresh (the admin "Make blog"
+// button was the visible casualty).
 export function useUserRole(): { role: UserRole | null; loading: boolean } {
-  const [role, setRole] = useState<UserRole | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase().auth.getUser();
-      if (!data.user) { setLoading(false); return; }
-      // Role is stored in user_metadata.role (set during signup or by admin)
-      const r = (data.user.user_metadata?.role as UserRole) || "advocate";
-      setRole(r);
-      setLoading(false);
-    })();
-  }, []);
-
-  return { role, loading };
+  const { role, ready } = useAuth();
+  return { role, loading: !ready };
 }
 
 export function AuthGuard({ children, allowedRoles, fallback }: AuthGuardProps) {

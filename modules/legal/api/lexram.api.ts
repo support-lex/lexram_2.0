@@ -11,20 +11,19 @@
 // Auth: HTTPBearer. We use the Supabase access token by default; callers can
 // override by passing an explicit token.
 
-import { supabase } from "@/lib/supabase/client";
+import { getAccessToken } from "@/lib/auth-store";
 import { begin as activityBegin, end as activityEnd } from "@/lib/api-activity";
 
 export const LEXRAM_BASE =
   process.env.NEXT_PUBLIC_LEGAL_API_BASE || "/legal-api";
 const BASE = LEXRAM_BASE;
 
+// Delegates to the single auth source. getAccessToken() AWAITS auth readiness
+// before resolving, so the very first authenticated request can't go out
+// token-less (the 401-on-cold-load that silently emptied the sidebar / case
+// dropdown). Kept as a named export because queryStream imports it.
 export async function getAuthToken(): Promise<string | null> {
-  try {
-    const { data } = await supabase().auth.getSession();
-    return data.session?.access_token ?? null;
-  } catch {
-    return null;
-  }
+  return getAccessToken();
 }
 
 export interface LexRamRequestOptions {
@@ -32,6 +31,15 @@ export interface LexRamRequestOptions {
   body?: unknown;          // JSON-stringified
   formData?: FormData;     // for multipart uploads
   signal?: AbortSignal;
+  /**
+   * Abort the request after this many ms. Used by lifecycle calls (e.g. session
+   * create / rename) so a hung or cold-starting backend surfaces as a thrown
+   * error instead of leaving the caller awaiting forever — which manifested as
+   * the research chat spinning on "working…" indefinitely when POST /sessions
+   * never responded and ensureSession() therefore never resolved. Ignored when
+   * an explicit `signal` is supplied (the caller owns abort in that case).
+   */
+  timeoutMs?: number;
 }
 
 /**
@@ -68,6 +76,12 @@ export async function lexramRequest<T = unknown>(
     headers["Content-Type"] = "application/json; charset=utf-8";
   }
 
+  // An explicit signal wins; otherwise fall back to a timeout-based abort so a
+  // hung backend can't leave the request (and its caller) pending forever.
+  const signal =
+    opts.signal ??
+    (opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined);
+
   // Bump the global in-flight counter so the top progress bar shows for
   // every LexRam API call (matched in the finally below).
   activityBegin();
@@ -76,7 +90,7 @@ export async function lexramRequest<T = unknown>(
       method: opts.method ?? "GET",
       headers,
       body,
-      signal: opts.signal,
+      signal,
     });
 
     if (!res.ok) {

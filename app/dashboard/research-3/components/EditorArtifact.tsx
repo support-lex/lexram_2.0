@@ -31,6 +31,22 @@ function inlineMd(raw: string): string {
     );
 }
 
+// Markdown table helpers: split a "| a | b |" row into cells, and recognise the
+// "| --- | --- |" separator that distinguishes a real table from a stray pipe.
+function parseTableRow(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
+function isTableSeparator(line: string): boolean {
+  const t = line.trim();
+  return t.includes("|") && t.includes("-") && /^\|?[\s:|-]+\|?$/.test(t);
+}
+
 function markdownToHtml(md: string): string {
   const lines = md.replace(/\r\n/g, "\n").split("\n");
   const out: string[] = [];
@@ -54,14 +70,37 @@ function markdownToHtml(md: string): string {
     }
   };
 
-  for (const raw of lines) {
-    const line = raw.replace(/\t/g, "    ");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/\t/g, "    ");
     const trimmed = line.trim();
 
     // Blank line → close paragraph + lists
     if (!trimmed) {
       flushP();
       closeLists();
+      continue;
+    }
+    // Table: a "| … |" header row immediately followed by a separator row.
+    if (
+      /^\|.*\|?\s*$/.test(trimmed) &&
+      i + 1 < lines.length &&
+      isTableSeparator(lines[i + 1])
+    ) {
+      flushP();
+      closeLists();
+      const header = parseTableRow(trimmed);
+      const bodyRows: string[][] = [];
+      let j = i + 2;
+      while (j < lines.length && lines[j].trim().startsWith("|")) {
+        bodyRows.push(parseTableRow(lines[j]));
+        j++;
+      }
+      const thead = `<tr>${header.map((c) => `<th>${inlineMd(c)}</th>`).join("")}</tr>`;
+      const tbody = bodyRows
+        .map((row) => `<tr>${row.map((c) => `<td>${inlineMd(c)}</td>`).join("")}</tr>`)
+        .join("");
+      out.push(`<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`);
+      i = j - 1;
       continue;
     }
     // Heading
@@ -119,11 +158,23 @@ function markdownToHtml(md: string): string {
   return out.join("\n");
 }
 
+// Detect *real* HTML markup (a known tag), not just any stray "<" character.
+// AI drafts routinely contain bare "<" — placeholder tokens like "<Name>" or
+// comparisons like "amount < 10 lakh". Treating those as HTML caused the whole
+// markdown draft to be dumped into the editor verbatim, so "### Heading" and
+// "**bold**" rendered as raw text instead of being converted.
+const HTML_TAG_RE =
+  /<\/?(?:p|div|span|br|hr|h[1-6]|ul|ol|li|a|b|i|u|em|strong|blockquote|code|pre|table|thead|tbody|tr|td|th|mark|sub|sup|ins|del|img)\b[^>]*>/i;
+
+function containsHtmlMarkup(s: string): boolean {
+  return HTML_TAG_RE.test(s);
+}
+
 // Normalize incoming content for contentEditable: pass HTML through untouched,
 // convert markdown to HTML, and fall back to plain text with line breaks.
 function normalizeForEditor(content: string): string {
   if (!content) return "";
-  if (content.includes("<")) return content;
+  if (containsHtmlMarkup(content)) return content;
   if (looksLikeMarkdown(content)) return markdownToHtml(content);
   return content.replace(/\n/g, "<br />");
 }
@@ -751,7 +802,7 @@ export function EditorArtifact({
   };
 
   const wordCount = (() => {
-    const text = (editorHtml || (content.includes("<") ? content : content.replace(/\n/g, "<br />")))
+    const text = (editorHtml || normalizeForEditor(content))
       .replace(/<[^>]+>/g, " ")
       .replace(/&nbsp;/g, " ")
       .replace(/\s+/g, " ")
@@ -760,7 +811,7 @@ export function EditorArtifact({
     return text.split(/\s+/).filter(Boolean).length;
   })();
 
-  const baselineHtml = versions[0]?.html || (content.includes("<") ? content : content.replace(/\n/g, "<br />"));
+  const baselineHtml = versions[0]?.html || normalizeForEditor(content);
   const baselineParagraphs = htmlToParagraphs(baselineHtml);
   const currentParagraphs = htmlToParagraphs(editorHtml || baselineHtml);
 

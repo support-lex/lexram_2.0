@@ -155,9 +155,27 @@ export async function getAccessToken(): Promise<string | null> {
   init();
   await readyPromise;
   // Prefer the freshest token; getSession() auto-refreshes if near expiry.
+  //
+  // BUT getSession() serialises behind Supabase's cross-tab navigator Web Lock
+  // (see lib/supabase/client.ts). With many tabs open, a background-throttled
+  // tab can hold that lock and the 2.5s steal timer can itself be throttled, so
+  // getSession() may HANG rather than throw. The old code only fell back to the
+  // cached token on a throw — a hang left this awaiting forever, and every
+  // authenticated request that awaits getAccessToken() (incl. the SSE query
+  // stream) was never issued: the chat sat on "Working…" with no network call.
+  // Race getSession() against a short timeout and fall back to the last good
+  // cached token, which is fresh enough to authenticate the request.
+  const GET_SESSION_TIMEOUT_MS = 2500;
   try {
-    const { data } = await supabase().auth.getSession();
-    return data.session?.access_token ?? snapshot.accessToken ?? null;
+    const data = await Promise.race([
+      supabase()
+        .auth.getSession()
+        .then((r) => r.data),
+      new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), GET_SESSION_TIMEOUT_MS),
+      ),
+    ]);
+    return data?.session?.access_token ?? snapshot.accessToken ?? null;
   } catch {
     return snapshot.accessToken ?? null;
   }

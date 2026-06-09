@@ -53,25 +53,69 @@ export async function streamLexramQuery(
   if (sessionId.startsWith("temp_")) throw new Error("Cannot stream query for an unsaved session — please sign in.");
   if (!query?.trim()) throw new Error("Empty query");
 
+  // The caller may have already pressed Stop while we were getting here (e.g.
+  // during a slow ensureSession round trip). Bail before doing any work.
+  if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
   const token = await getAuthToken();
+  // getAuthToken() awaits Supabase's cross-tab auth lock; Stop pressed during
+  // that window must still cancel the turn before we open the socket.
+  if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
   const headers: Record<string, string> = {
     "Content-Type": "application/json; charset=utf-8",
     Accept: "text/event-stream",
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(
-    `${LEXRAM_BASE}/sessions/${encodeURIComponent(sessionId)}/query/stream`,
-    {
-      method: "POST",
-      headers,
-      // ASCII-safe encoding — see jsonAsciiSafe doc for the backend bug we work around.
-      body: jsonAsciiSafe({ query, mode }),
-      signal: options.signal,
+  // Connect timeout. The idle watchdog below only starts AFTER we hold a reader,
+  // so it can't help if the POST is sent but the backend never returns response
+  // headers (cold start, proxy buffering, dropped socket) — fetch() would hang
+  // forever and the chat would sit on "Working…". Abort the fetch if headers
+  // don't arrive in time, surfacing a clean retryable error instead. We chain
+  // the caller's signal so the user's Stop still works.
+  const CONNECT_TIMEOUT_MS = 30000;
+  const connectController = new AbortController();
+  const onCallerAbort = () => connectController.abort();
+  if (options.signal) {
+    if (options.signal.aborted) connectController.abort();
+    else options.signal.addEventListener("abort", onCallerAbort, { once: true });
+  }
+  const connectTimer = setTimeout(() => connectController.abort(), CONNECT_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(
+      `${LEXRAM_BASE}/sessions/${encodeURIComponent(sessionId)}/query/stream`,
+      {
+        method: "POST",
+        headers,
+        // ASCII-safe encoding — see jsonAsciiSafe doc for the backend bug we work around.
+        body: jsonAsciiSafe({ query, mode }),
+        signal: connectController.signal,
+      }
+    );
+  } catch (err) {
+    // Connect failed/aborted — tear down the caller-abort wiring before bailing.
+    clearTimeout(connectTimer);
+    options.signal?.removeEventListener("abort", onCallerAbort);
+    // Distinguish a connect-timeout abort (retryable server problem) from a
+    // genuine user Stop (clean cancel) so the caller shows the right thing.
+    if (
+      (err as { name?: string })?.name === "AbortError" &&
+      !options.signal?.aborted
+    ) {
+      throw new Error("The server took too long to respond. Please try again.");
     }
-  );
+    throw err;
+  }
+  // Headers arrived — disarm the connect timer, but KEEP the caller-abort →
+  // connectController link wired: the response body below was opened with
+  // connectController.signal, so the user's Stop must still propagate to it.
+  // The wiring is torn down in the reader cleanup finally at the end.
+  clearTimeout(connectTimer);
 
   if (!res.ok) {
+    options.signal?.removeEventListener("abort", onCallerAbort);
     let detail = `HTTP ${res.status}`;
     try {
       const errBody = await res.json();
@@ -83,7 +127,10 @@ export async function streamLexramQuery(
     throw new Error(detail);
   }
 
-  if (!res.body) throw new Error("No response body for query stream");
+  if (!res.body) {
+    options.signal?.removeEventListener("abort", onCallerAbort);
+    throw new Error("No response body for query stream");
+  }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -175,6 +222,9 @@ export async function streamLexramQuery(
       }
     }
   } finally {
+    // Detach the caller-abort listener now the stream is over (success, idle
+    // timeout, or user Stop) so we don't leak it on the caller's signal.
+    options.signal?.removeEventListener("abort", onCallerAbort);
     // Close the connection explicitly. If the backend keeps the SSE stream
     // open after `done`, cancel() releases it so the fetch settles and the
     // caller's finally{} (which clears isSearching) actually runs.

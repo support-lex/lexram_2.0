@@ -30,7 +30,6 @@ import AuthoritiesPanel from "./components/AuthoritiesPanel";
 import ShortcutsModal from "./components/ShortcutsModal";
 import DocumentDialog from "./components/DocumentDialog";
 import SuggestionsPopup from "./components/SuggestionsPopup";
-import { parseNumberedQuestions } from "./components/InlineQuestionsForm";
 import demoConversation from "./demo-conversation.json";
 import type { Message } from "./types";
 import CaseSelector, { type Case as CaseItem } from "@/components/CaseSelector";
@@ -547,15 +546,9 @@ export default function Research2Page() {
   // The last AI message — used to decide whether to render the floating
   // suggestions popup above the chat input.
   const lastAiMessage = [...messages].reverse().find((m) => m.role === "ai");
-  // Suppress the floating popup when the same turn already renders the inline
-  // multi-question form (2+ numbered questions). The form is the comprehensive
-  // surface; the popup would only re-offer an answer to the first question.
-  const lastAiText =
-    lastAiMessage?.response?.streamText || lastAiMessage?.response?.shortAnswer || "";
   const showSuggestionsPopup =
     !!lastAiMessage?.response?.suggestedAnswers?.length &&
-    lastAiMessage.response.suggestedAnswersVariant === "popup" &&
-    parseNumberedQuestions(lastAiText).length < 2;
+    lastAiMessage.response.suggestedAnswersVariant === "popup";
 
   const chatInputProps = {
     query, setQuery, mode, setMode, queryMode, setQueryMode,

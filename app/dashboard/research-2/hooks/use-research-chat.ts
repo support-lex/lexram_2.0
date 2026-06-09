@@ -579,7 +579,11 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     setActiveRunMode(effectiveMode);
     setLiveEditorContent("");
 
-    abortRef.current = new AbortController();
+    // Capture the controller locally: stopGeneration only abort()s it now (it no
+    // longer nulls abortRef), but a *new* query could still reassign abortRef
+    // mid-flight, so we read the signal off this stable reference throughout.
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     // Make sure we have a LexRam session id before opening the SSE stream.
     let sessionId: string | null = null;
@@ -587,6 +591,13 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       sessionId = await ensureSessionRef.current(prompt);
     } catch (err: any) {
       setError(err?.message || "Could not create session.");
+      setIsSearching(false);
+      return;
+    }
+    // The Stop button is visible during the (sometimes slow) ensureSession round
+    // trip above. If the user hit Stop while we were creating the session, bail
+    // cleanly here instead of opening a stream they already cancelled.
+    if (controller.signal.aborted) {
       setIsSearching(false);
       return;
     }
@@ -633,7 +644,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
             setError(message);
           },
         },
-        { signal: abortRef.current.signal }
+        { signal: controller.signal }
       );
 
       // Build the final answer. Token order of preference:
@@ -1055,8 +1066,13 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
   };
 
   const stopGeneration = () => {
+    // Only abort — do NOT null abortRef. Nulling it caused startResearch to read
+    // `.signal` off null (TypeError) when Stop was pressed during the pre-stream
+    // ensureSession window, which surfaced as a crash instead of a clean stop.
+    // An already-aborted signal handed to fetch simply rejects with AbortError,
+    // which startResearch's catch treats as a clean cancel. The next query
+    // creates a fresh controller, so there's nothing to clear here.
     abortRef.current?.abort();
-    abortRef.current = null;
   };
 
   const handleSubmit = () => {

@@ -119,6 +119,17 @@ export function useResearchSessions(selectedMatterId: string) {
   const [pendingCaseId, setPendingCaseId] = useState<string | null>(null);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Number of messages last committed to the mirror for the active session.
+  // A growth in messages.length means a new turn finished (user msg or AI
+  // answer) — those are the important commit points and are persisted with
+  // NO debounce so a quick reload can't drop the just-finished turn (the
+  // "draft vanishes after reload" bug). In-place edits (e.g. inline editor
+  // typing that mutates an existing message) keep the 600ms debounce.
+  const lastSavedCountRef = useRef(0);
+  // Latest messages/session, mirrored into refs so the pagehide/visibility
+  // flush handlers (which run outside React's render closure) can persist the
+  // newest thread synchronously when the tab is being unloaded.
+  const latestMessagesRef = useRef<Message[]>([]);
   const sessionsRef = useRef<ResearchSession[]>([]);
   const titleGeneratedRef = useRef<Set<string>>(new Set());
   // A session the user selected before its real messages were loaded (the
@@ -165,8 +176,24 @@ export function useResearchSessions(selectedMatterId: string) {
       setSessionsReady(true);
       return true;
     }
-    setSessions(list);
-    sessionsRef.current = list;
+    // Per-session merge guard. refresh() runs on a poll (1.5s/3s/5s) after every
+    // stream completes, but the message mirror is written by a 600ms debounce —
+    // so a refresh can re-read Supabase BEFORE the just-finished turn has landed
+    // (read-after-write race). Blindly assigning `list` would then downgrade the
+    // richer in-memory thread (which still holds e.g. a freshly generated draft)
+    // to the stale/empty mirror copy; switching away and back would then show an
+    // empty session and fall through to the lossy /history reconstruction. Keep
+    // whichever copy has MORE messages — the debounced save reconciles the mirror
+    // moments later, and the next refresh picks up the authoritative version.
+    const prevById = new Map(sessionsRef.current.map((s) => [s.id, s]));
+    const merged = list.map((s) => {
+      const prev = prevById.get(s.id);
+      return prev && prev.messages.length > s.messages.length
+        ? { ...s, messages: prev.messages }
+        : s;
+    });
+    setSessions(merged);
+    sessionsRef.current = merged;
     setSessionsReady(true);
 
     // Fill a deferred selection: the user opened a session (sidebar/URL) before
@@ -175,7 +202,7 @@ export function useResearchSessions(selectedMatterId: string) {
     // typing/streaming there (functional guard: still empty), so we never
     // clobber an in-flight chat.
     if (pendingSelectRef.current) {
-      const sel = list.find((s) => s.id === pendingSelectRef.current);
+      const sel = merged.find((s) => s.id === pendingSelectRef.current);
       if (sel && sel.messages.length > 0) {
         setMessages((cur) => (cur.length === 0 ? sel.messages : cur));
         pendingSelectRef.current = null;
@@ -311,8 +338,70 @@ export function useResearchSessions(selectedMatterId: string) {
   // without any risk of an effect resetting `messages` and wiping the user's
   // just-typed first message or the in-flight AI stream.
 
-  // ── Debounced auto-save: persist messages to Supabase ──────────────────────
+  // ── Auto-save: persist messages to Supabase ────────────────────────────────
+  // The actual save body, holding the latest render closure. Stashed in a ref so
+  // the navigation flush handlers (pagehide / session switch) can invoke the
+  // newest version directly, not a stale one captured at mount.
+  const doSaveRef = useRef<() => Promise<void>>(async () => {});
+  doSaveRef.current = async () => {
+    if (messages.length === 0) return;
+
+    // Existing session → update messages
+    if (currentSessionId) {
+      lastSavedCountRef.current = messages.length;
+      await chatSessionRepository.updateMessages(currentSessionId, messages);
+      const updatedAt = new Date().toISOString();
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentSessionId ? { ...s, messages, updatedAt } : s
+        )
+      );
+      // Keep the ref in sync — the on-select effect now reads from it
+      // exclusively, so a stale ref would show old messages on re-selection.
+      sessionsRef.current = sessionsRef.current.map((s) =>
+        s.id === currentSessionId ? { ...s, messages, updatedAt } : s
+      );
+
+      // NOTE: AI title generation via Zhipu (/api/chat/title) is intentionally
+      // disabled. Chat answers come exclusively from the LexRam backend now,
+      // and we don't want a secondary AI provider in the path. The session
+      // keeps the truncated first-message as its title until the user
+      // renames it via the pencil icon (which calls PATCH /sessions/{id}).
+      return;
+    }
+
+    // No session yet → create one with a temporary title.
+    // Bail out if ensureSession() is already creating one for this thread —
+    // otherwise we'd insert a duplicate session row.
+    if (creatingSessionRef.current) return;
+    creatingSessionRef.current = true;
+    const created = await chatSessionRepository.create({
+      // MUST be literally "New Chat" — that's the trigger condition the
+      // backend checks before running Groq to auto-generate a 4–6 word
+      // title from the first query. Anything else (the old "first 60
+      // chars of the message" or "New Conversation") suppresses the
+      // auto-title entirely. Verified by direct API probe 2026-05-18.
+      title: "New Chat",
+      messages,
+      matter_id: selectedMatterId !== "all" ? selectedMatterId : null,
+      case_id: pendingCaseId,
+    });
+    creatingSessionRef.current = false;
+    if (!created) return;
+
+    lastSavedCountRef.current = messages.length;
+    setCurrentSessionId(created.id);
+    setSessions((prev) => [created, ...prev]);
+    sessionsRef.current = [created, ...sessionsRef.current];
+    // The pending case has been baked into the row — clear it so it isn't
+    // re-applied if the user later starts a fresh chat without picking again.
+    setPendingCaseId(null);
+  };
+
   useEffect(() => {
+    // Keep the unload-flush handlers pointed at the newest thread.
+    latestMessagesRef.current = messages;
+
     // Guest flow: mirror the active temp session to localStorage on every
     // messages change so the thread survives the /sign-in redirect and can
     // be migrated into a real backend session after the user authenticates.
@@ -328,63 +417,53 @@ export function useResearchSessions(selectedMatterId: string) {
     }
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    saveTimeoutRef.current = setTimeout(async () => {
-      if (messages.length === 0) return;
-
-      // Existing session → update messages
-      if (currentSessionId) {
-        await chatSessionRepository.updateMessages(currentSessionId, messages);
-        const updatedAt = new Date().toISOString();
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === currentSessionId ? { ...s, messages, updatedAt } : s
-          )
-        );
-        // Keep the ref in sync — the on-select effect now reads from it
-        // exclusively, so a stale ref would show old messages on re-selection.
-        sessionsRef.current = sessionsRef.current.map((s) =>
-          s.id === currentSessionId ? { ...s, messages, updatedAt } : s
-        );
-
-        // NOTE: AI title generation via Zhipu (/api/chat/title) is intentionally
-        // disabled. Chat answers come exclusively from the LexRam backend now,
-        // and we don't want a secondary AI provider in the path. The session
-        // keeps the truncated first-message as its title until the user
-        // renames it via the pencil icon (which calls PATCH /sessions/{id}).
-        return;
-      }
-
-      // No session yet → create one with a temporary title.
-      // Bail out if ensureSession() is already creating one for this thread —
-      // otherwise we'd insert a duplicate session row.
-      if (creatingSessionRef.current) return;
-      creatingSessionRef.current = true;
-      const created = await chatSessionRepository.create({
-        // MUST be literally "New Chat" — that's the trigger condition the
-        // backend checks before running Groq to auto-generate a 4–6 word
-        // title from the first query. Anything else (the old "first 60
-        // chars of the message" or "New Conversation") suppresses the
-        // auto-title entirely. Verified by direct API probe 2026-05-18.
-        title: "New Chat",
-        messages,
-        matter_id: selectedMatterId !== "all" ? selectedMatterId : null,
-        case_id: pendingCaseId,
-      });
-      creatingSessionRef.current = false;
-      if (!created) return;
-
-      setCurrentSessionId(created.id);
-      setSessions((prev) => [created, ...prev]);
-      sessionsRef.current = [created, ...sessionsRef.current];
-      // The pending case has been baked into the row — clear it so it isn't
-      // re-applied if the user later starts a fresh chat without picking again.
-      setPendingCaseId(null);
-    }, 600);
+    // A new turn (user message or AI answer) grew the array — persist it with
+    // NO debounce. New turns are the important, infrequent commit points; the
+    // old blanket 600ms debounce meant a reload within that window dropped the
+    // just-finished turn (the "draft vanishes after reload" report). In-place
+    // edits (length unchanged — e.g. inline editor mutating a message) keep the
+    // debounce so rapid keystrokes don't hammer the network.
+    const grew = messages.length > lastSavedCountRef.current;
+    const delay = grew ? 0 : 600;
+    saveTimeoutRef.current = setTimeout(() => { void doSaveRef.current(); }, delay);
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
   }, [messages, currentSessionId, selectedMatterId, isAuthed, pendingCaseId]);
+
+  // Flush any pending save synchronously-as-possible. Called before in-page
+  // navigation (session switch / new chat) and on tab unload so the last turn
+  // — typically a freshly generated draft — always reaches the mirror instead
+  // of dying with the cleared debounce timer.
+  const flushSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    void doSaveRef.current();
+  }, []);
+
+  // Persist on tab hide/close. `pagehide` + `visibilitychange:hidden` are the
+  // reliable signals on mobile + desktop (beforeunload is unreliable on mobile
+  // Safari). The Supabase write is async and may not finish if the tab is
+  // killed instantly, but flushing here closes the common reload/close window;
+  // Fix-A's in-memory merge guard covers same-session navigation regardless.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const flush = () => {
+      if (!isAuthed) return;
+      if (latestMessagesRef.current.length <= lastSavedCountRef.current) return;
+      flushSave();
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [flushSave, isAuthed]);
 
   // ── Ensure a session exists, creating one on demand if not ────────────────
   // Returns the session id. Authed users get a real LexRam + Supabase session;
@@ -457,6 +536,7 @@ export function useResearchSessions(selectedMatterId: string) {
       if (currentSessionId === id) {
         setCurrentSessionId(null);
         setMessages([]);
+        lastSavedCountRef.current = 0;
       }
     },
     [currentSessionId]
@@ -527,16 +607,25 @@ export function useResearchSessions(selectedMatterId: string) {
   );
 
   const handleNewSession = () => {
+    // Persist the outgoing thread before we wipe it from state — otherwise a
+    // pending debounced save for the session we're leaving is lost.
+    flushSave();
     pendingSelectRef.current = null;
     currentSessionIdRef.current = null;
     setCurrentSessionId(null);
     setMessages([]);
+    // Fresh thread — reset the per-session saved-count baseline so the first
+    // message of the new chat is treated as a new turn (immediate save).
+    lastSavedCountRef.current = 0;
     // Clear any case the user pre-selected for an earlier "New chat" attempt
     // they never followed through on, so the picker starts fresh.
     setPendingCaseId(null);
   };
 
   const handleSelectSession = (id: string) => {
+    // Persist the thread we're leaving before swapping in another one, so an
+    // in-flight debounced save (e.g. a just-generated draft) isn't dropped.
+    flushSave();
     // Load this session's messages from the authoritative in-memory list
     // (populated by refresh() from the Supabase mirror). Inlined here so
     // ensureSession() can also set currentSessionId without ever triggering
@@ -549,10 +638,17 @@ export function useResearchSessions(selectedMatterId: string) {
 
     if (loaded && loaded.messages.length > 0) {
       // Rich messages already in memory (from the Supabase mirror) — show them.
+      // Baseline the saved-count to the loaded length so we don't re-save an
+      // unchanged thread, but still detect the next appended turn as growth.
+      lastSavedCountRef.current = loaded.messages.length;
       setMessages(loaded.messages);
       pendingSelectRef.current = null;
       return;
     }
+
+    // Unknown/empty thread — baseline at 0 so a recovered or freshly typed
+    // message counts as a new turn for the immediate-save path.
+    lastSavedCountRef.current = 0;
 
     // No messages in memory: show empty now (the auto-save's length-0 guard
     // means this can never overwrite the server's real messages) and recover

@@ -33,7 +33,6 @@ import InlineBlock from "./inline/InlineBlock";
 import MermaidDiagram from "./inline/MermaidDiagram";
 import InlineAuthorities from "./inline/InlineAuthorities";
 import InlineDraftEditor from "./inline/InlineDraftEditor";
-import InlineQuestionsForm, { parseNumberedQuestions } from "./InlineQuestionsForm";
 import ProceduralTimeline from "./ProceduralTimeline";
 import { ExternalLink } from "lucide-react";
 import { feedbackRepository, type FeedbackRating } from "@/modules/chat/repository/feedback.repository";
@@ -390,15 +389,6 @@ export default function MessageBubble({
 
   const contentText = response.streamText || response.shortAnswer;
 
-  // Inline multi-question form (parsed from prose). When present (2+
-  // consecutive numbered questions), it's the comprehensive answer surface —
-  // it covers every question the assistant asked. The `suggestedAnswers`
-  // chips/list/buttons (and the floating popup) typically only address the
-  // FIRST question, so rendering both is redundant and confusing. We let the
-  // form win and suppress the chips whenever the form is active.
-  const inlineQuestions = onSuggestedAnswer ? parseNumberedQuestions(contentText) : [];
-  const hasInlineQuestionForm = inlineQuestions.length >= 2;
-
   const inlineAuthorities = (() => {
     const fromBlocks = response.uiBlocks?.find((b) => b.type === "authorities");
     if (fromBlocks && fromBlocks.type === "authorities") return fromBlocks.data;
@@ -700,20 +690,6 @@ export default function MessageBubble({
           )}
         </div>
 
-        {/* Inline questions form — rendered when the AI's prose contains a
-            consecutive numbered list of questions (drafting flow's "TRACK 1
-            — Essential Facts" pattern). Each question gets its own text
-            input; Proceed bundles the answers into "1. ans\n2. ans\n…"
-            and pushes them through onSuggestedAnswer just like a chip
-            click would. Parser returns [] when the pattern isn't there,
-            so this is a no-op for ordinary AI prose. */}
-        {hasInlineQuestionForm && (
-          <InlineQuestionsForm
-            questions={inlineQuestions}
-            onProceed={(formatted) => onSuggestedAnswer!(formatted)}
-          />
-        )}
-
         {/* Suggested answers — quick-reply chips shown when the assistant
             is asking the user a clarifying question. Clicking auto-submits
             the chip text as the user's next message. Visually distinct from
@@ -721,7 +697,7 @@ export default function MessageBubble({
             The `popup` variant is intentionally NOT rendered here — it's
             painted as a floating bar above the chat input by the page. */}
         {response.suggestedAnswers && response.suggestedAnswers.length > 0 &&
-          response.suggestedAnswersVariant !== "popup" && !hasInlineQuestionForm && (() => {
+          response.suggestedAnswersVariant !== "popup" && (() => {
           const variant = response.suggestedAnswersVariant ?? "inline";
           const heading = response.suggestedAnswersHeading ?? "Suggested answers";
           const splitOption = (a: string): { title: string; detail?: string } => {

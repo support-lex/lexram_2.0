@@ -57,8 +57,23 @@ function histLooksLikeDraft(text: string): boolean {
 }
 function histLooksLikePlan(text: string): boolean {
   if (!text) return false;
+  // Never classify as a plan when the text reads like a clarifying question.
+  // Clarifying questions often contain phrases such as "one critical question"
+  // or "could you please …" and can mention "proceed with drafting" /
+  // "proposed structure" in passing — the old broad regex misidentified them
+  // as plan responses, causing them to render with a "Proceed" button instead
+  // of as a chat message with suggested-answer chips.
+  const looksLikeQuestion =
+    /\bone critical question\b|\bneed(?:s)? to (?:clarify|ask|know)\b|\bcould you (?:please |kindly )?\b/i.test(text);
+  if (looksLikeQuestion) return false;
+  // Strong signal: text STARTS with an explicit "Drafting Plan" heading.
   if (/^[\s*#>-]*(?:Drafting Plan|Draft Plan)\b/im.test(text)) return true;
-  return /\bdrafting plan\b|\bproposed structure\b|\bproceed with drafting\b/i.test(text);
+  // "Here is the plan" style opening (common backend preamble).
+  if (/^[\s\S]{0,100}\bHere(?:'s| is) (?:the |a |my )?(?:drafting |draft )?plan\b/i.test(text)) return true;
+  // Weaker: "proposed structure" only when used as a section heading
+  // (colon or newline + list immediately after), not a bare prose mention.
+  if (/\bproposed structure\s*:/i.test(text)) return true;
+  return false;
 }
 export function mapHistoryToMessages(
   hist: { role: string; content: string }[]
@@ -86,7 +101,14 @@ export function mapHistoryToMessages(
     } else {
       response = { ...base, streamText: content };
     }
-    out.push({ id: histGenId(), role: 'ai', content: '', timestamp: ts, response });
+    // Mark as reconstructed from plain-text history. The session hook uses this
+    // flag to detect that these messages are lossy (no suggestedAnswers, no
+    // authoritative uiBlocks) and should be upgraded with richer Supabase data
+    // if it arrives later (e.g. when refresh() completes after the history
+    // fallback has already painted something on screen).
+    const msg = { id: histGenId(), role: 'ai' as const, content: '', timestamp: ts, response };
+    (msg as any)._reconstructed = true;
+    out.push(msg);
   }
   return out;
 }

@@ -202,9 +202,24 @@ export function useResearchSessions(selectedMatterId: string) {
     // typing/streaming there (functional guard: still empty), so we never
     // clobber an in-flight chat.
     if (pendingSelectRef.current) {
-      const sel = merged.find((s) => s.id === pendingSelectRef.current);
-      if (sel && sel.messages.length > 0) {
-        setMessages((cur) => (cur.length === 0 ? sel.messages : cur));
+      const pendingId = pendingSelectRef.current;
+      const sel = merged.find((s) => s.id === pendingId);
+      if (sel) {
+        if (sel.messages.length > 0 && currentSessionIdRef.current === pendingId) {
+          setMessages((cur) => {
+            if (cur.length === 0) return sel.messages;
+            // If the visible messages came from the lossy backend-history
+            // reconstruction (no suggestedAnswers, no authoritative uiBlocks),
+            // replace them now with the richer authoritative Supabase copy.
+            // This covers the race where getMessagesFromBackend() resolved
+            // before refresh() — the user was shown a degraded view, and we
+            // upgrade it silently as soon as Supabase data arrives.
+            const isLossyReconstruction = cur.some((m) => (m as any)._reconstructed);
+            return isLossyReconstruction ? sel.messages : cur;
+          });
+        }
+        // Session was found in the authoritative list — deferred selection resolved,
+        // whether or not it had messages (empty Supabase row stays as-is).
         pendingSelectRef.current = null;
       }
     }
@@ -338,6 +353,36 @@ export function useResearchSessions(selectedMatterId: string) {
   // without any risk of an effect resetting `messages` and wiping the user's
   // just-typed first message or the in-flight AI stream.
 
+  // ── Write-ahead backup helpers ────────────────────────────────────────────
+  // Before every Supabase write we persist the messages to localStorage so
+  // they survive a network failure or an unexpected page close. The backup is
+  // cleared immediately after Supabase confirms the write. On the next load of
+  // the same session we check for a stale backup and recover from it if it has
+  // more messages than what Supabase currently holds.
+  //
+  // Key collisions are impossible because we namespace by session id.
+  // Size concern: we keep at most ONE backup per session (overwritten each
+  // save), so at most a few hundred KB total even for long draft sessions.
+  const pendingBackupKey = (id: string) => `lexram_pending_msgs_${id}`;
+  const writeBackup = (id: string, msgs: Message[]) => {
+    if (typeof window === "undefined") return;
+    try { window.localStorage.setItem(pendingBackupKey(id), JSON.stringify(msgs)); }
+    catch { /* quota — skip backup; Supabase write still proceeds */ }
+  };
+  const clearBackup = (id: string) => {
+    if (typeof window === "undefined") return;
+    try { window.localStorage.removeItem(pendingBackupKey(id)); } catch { /* noop */ }
+  };
+  const readBackup = (id: string): Message[] | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(pendingBackupKey(id));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch { return null; }
+  };
+
   // ── Auto-save: persist messages to Supabase ────────────────────────────────
   // The actual save body, holding the latest render closure. Stashed in a ref so
   // the navigation flush handlers (pagehide / session switch) can invoke the
@@ -348,8 +393,14 @@ export function useResearchSessions(selectedMatterId: string) {
 
     // Existing session → update messages
     if (currentSessionId) {
+      // Write-ahead: persist to localStorage BEFORE the async Supabase call.
+      // If the Supabase write fails (network error) or the page is closed before
+      // it completes, the backup survives and is recovered on next session load.
+      writeBackup(currentSessionId, messages);
       lastSavedCountRef.current = messages.length;
       await chatSessionRepository.updateMessages(currentSessionId, messages);
+      // Supabase confirmed — backup is no longer needed.
+      clearBackup(currentSessionId);
       const updatedAt = new Date().toISOString();
       setSessions((prev) =>
         prev.map((s) =>
@@ -636,6 +687,31 @@ export function useResearchSessions(selectedMatterId: string) {
     // Selecting an existing session moots any pending case from the picker.
     setPendingCaseId(null);
 
+    // ── Write-ahead backup recovery ───────────────────────────────────────
+    // Check for messages that were in React state but whose Supabase write
+    // failed (network error) or never completed (page was closed mid-save).
+    // The backup is written BEFORE every Supabase call and cleared on
+    // confirmed success, so a stale backup means the last write didn't land.
+    const supabaseCount = loaded?.messages?.length ?? 0;
+    const backup = readBackup(id);
+    if (backup && backup.length > supabaseCount) {
+      // Backup has more messages than Supabase — recover the full thread.
+      lastSavedCountRef.current = backup.length;
+      setMessages(backup);
+      pendingSelectRef.current = null;
+      // Re-save to Supabase in the background, then clear the backup.
+      chatSessionRepository.updateMessages(id, backup)
+        .then(() => clearBackup(id))
+        .catch(() => { /* silent — backup stays, will retry on next open */ });
+      // Also update the in-memory ref so sidebar re-selection is instant.
+      sessionsRef.current = sessionsRef.current.map((s) =>
+        s.id === id ? { ...s, messages: backup } : s
+      );
+      return;
+    }
+    // Backup is stale (Supabase already has >= messages) — discard it.
+    if (backup) clearBackup(id);
+
     if (loaded && loaded.messages.length > 0) {
       // Rich messages already in memory (from the Supabase mirror) — show them.
       // Baseline the saved-count to the loaded length so we don't re-save an
@@ -669,7 +745,11 @@ export function useResearchSessions(selectedMatterId: string) {
       sessionsRef.current = sessionsRef.current.map((s) =>
         s.id === id ? { ...s, messages: recovered } : s
       );
-      pendingSelectRef.current = null;
+      // NOTE: intentionally NOT clearing pendingSelectRef here.
+      // These messages are lossy (plain-text reconstruction — no suggestedAnswers,
+      // no authoritative uiBlocks). If refresh() completes after this and has
+      // richer Supabase data, the pendingSelectRef guard above will upgrade them.
+      // pendingSelectRef is cleared there once the authoritative data lands.
     }).catch(() => { /* silent — refresh() pending-fill still applies */ });
   };
 

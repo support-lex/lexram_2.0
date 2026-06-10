@@ -458,15 +458,34 @@ export function EditorArtifact({
 
   useEffect(() => {
     if (!storageKey || typeof window === "undefined") return;
-    window.localStorage.setItem(
-      storageKey,
-      JSON.stringify({
-        editorHtml,
-        comments,
-        versions,
-        trackedChanges,
-      })
-    );
+    try {
+      window.localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          editorHtml,
+          comments,
+          versions,
+          trackedChanges,
+        })
+      );
+    } catch (e) {
+      // Storage quota exceeded — evict large caches (sessions list, draft import)
+      // and retry once so the user's in-progress edits survive where possible.
+      try {
+        const EVICTABLE = ["lexram_sessions_cache_v1", "lexram_draft_import"];
+        for (const key of EVICTABLE) {
+          try { window.localStorage.removeItem(key); } catch { /* noop */ }
+        }
+        window.localStorage.setItem(
+          storageKey,
+          JSON.stringify({ editorHtml, comments, versions, trackedChanges })
+        );
+      } catch {
+        // If it still fails after eviction, log and move on — never let an
+        // unhandled QuotaExceededError crash the component or block the chat.
+        console.warn("[EditorArtifact] localStorage quota exceeded; editor state not persisted.", e);
+      }
+    }
   }, [storageKey, editorHtml, comments, versions, trackedChanges]);
 
   useEffect(() => {

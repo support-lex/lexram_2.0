@@ -355,15 +355,31 @@ export function EditorArtifact({
 
   useEffect(() => {
     if (!storageKey || typeof window === "undefined") return;
-    window.localStorage.setItem(
-      storageKey,
-      JSON.stringify({
-        editorHtml,
-        comments,
-        versions,
-        trackedChanges,
-      })
-    );
+    try {
+      window.localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          editorHtml,
+          comments,
+          versions,
+          trackedChanges,
+        })
+      );
+    } catch (e) {
+      // Storage quota exceeded — evict large caches and retry once.
+      try {
+        const EVICTABLE = ["lexram_sessions_cache_v1", "lexram_draft_import"];
+        for (const key of EVICTABLE) {
+          try { window.localStorage.removeItem(key); } catch { /* noop */ }
+        }
+        window.localStorage.setItem(
+          storageKey,
+          JSON.stringify({ editorHtml, comments, versions, trackedChanges })
+        );
+      } catch {
+        console.warn("[EditorArtifact] localStorage quota exceeded; editor state not persisted.", e);
+      }
+    }
   }, [storageKey, editorHtml, comments, versions, trackedChanges]);
 
   useEffect(() => {

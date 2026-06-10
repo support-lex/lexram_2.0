@@ -955,59 +955,13 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         }
       }
 
-      // Draft-mode safety net (FALLBACK — only when the backend did NOT send a
-      // response_type): when the user explicitly picked the Draft pill
-      // AND the backend actually produced something that *looks* like a
-      // petition / memo / notice, promote it into a Draft UiBlock so
-      // InlineDraftEditor renders it. The earlier version of this block
-      // promoted *any* streamText, which masked a backend bug where mode=draft
-      // silently falls back to the research pipeline — users ended up with a
-      // research briefing (Summary / Statutory Provisions / Case Law …)
-      // dressed up as a "Draft", which is not the real deliverable.
-      //
-      // Heuristic: the backend's research output always leads with the
-      // "Summary"/"Statutory Provisions"/"Case Law" headings, whereas a real
-      // draft has court/petition markers. Match the latter, refuse the former.
-      const looksLikeRealDraft = (text: string): boolean => {
-        if (!text) return false;
-        // Only inspect the first 600 chars so a plan that *mentions* court terms
-        // in its proposed-structure section doesn't get misidentified as a draft.
-        const head = text.slice(0, 600);
-        return /\b(IN THE (HON(')?BLE )?(COURT|HIGH COURT|SESSIONS|TRIBUNAL|FORUM)|BEFORE THE (HON(')?BLE )?(COURT|JUDGE|MAGISTRATE|HIGH COURT)|RESPECTFULLY SHOWETH|MOST RESPECTFULLY SHOWETH)\b/i.test(head);
-      };
-      const looksLikePlan = (text: string): boolean => {
-        if (!text) return false;
-        // Explicit heading at the top
-        if (/^[\s*#]*(?:Drafting Plan|Draft Plan|Drafting plan)\b/i.test(text)) return true;
-        // Backend phrases that signal a planning response, not a finished document
-        if (/\b(following plan|formulated.*plan|plan.*formulated|one critical question|proceed with drafting\?|proposed structure|placeholders? for missing)\b/i.test(text)) return true;
-        return false;
-      };
-      if (!responseType && effectiveMode === "draft") {
-        const hasDraftBlock = answer.uiBlocks?.some((b) => b.type === "draft");
-        const hasPlanBlock  = answer.uiBlocks?.some((b) => b.type === "plan");
-        const explicitDraft = (answer.draftReady || "").trim();
-        const streamAsDraft = (answer.streamText || "").trim();
-
-        if (!hasDraftBlock && !hasPlanBlock) {
-          if (looksLikePlan(streamAsDraft)) {
-            const otherBlocks = (answer.uiBlocks ?? []).filter((b) => b.type !== "draft" && b.type !== "plan");
-            answer.uiBlocks = [...otherBlocks, { type: "plan", data: streamAsDraft }];
-            // Plan text lives in the plan block only — clear streamText so it doesn't also appear in the bubble
-            answer.streamText = "";
-          } else {
-            const promoteText = explicitDraft || (looksLikeRealDraft(streamAsDraft) ? streamAsDraft : "");
-            if (promoteText) {
-              answer.draftReady = promoteText;
-              const otherBlocks = (answer.uiBlocks ?? []).filter((b) => b.type !== "draft");
-              answer.uiBlocks = [...otherBlocks, { type: "draft", data: promoteText }];
-              // When streamText was promoted to the draft block, clear it so the document
-              // only renders inside the "View Draft" editor, not also in the chat bubble.
-              if (!explicitDraft) answer.streamText = "";
-            }
-          }
-        }
-      }
+      // NOTE: heuristic fallback (looksLikePlan / looksLikeRealDraft) removed.
+      // The backend now always sends LEXRAM_TYPE:question|plan|draft on the done
+      // event, which is read above as `responseType`. That is the authoritative
+      // signal — no text-matching guesswork needed for live responses.
+      // History-reconstruction heuristics (histLooksLikePlan / histLooksLikeDraft)
+      // are kept in chatSession.repository.ts for re-login fallback only, where
+      // response_type is unavailable.
 
       // Surface judgments + acts metadata as appended sections so users can
       // still see what the backend retrieved without losing the prose answer.

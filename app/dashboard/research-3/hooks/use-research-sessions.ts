@@ -28,6 +28,30 @@ export function useResearchSessions(selectedMatterId: string) {
   // up with duplicate sessions in the sidebar (the bug this guards against).
   const creatingSessionRef = useRef(false);
 
+  // ── Write-ahead localStorage backup ────────────────────────────────────────
+  // Written immediately before every Supabase updateMessages() call so that if
+  // the page is closed mid-save (or the network blips), the messages are
+  // recoverable on the next session open. Cleared on confirmed Supabase success.
+  const pendingBackupKey = (id: string) => `lexram_pending_msgs_${id}`;
+  const writeBackup = (id: string, msgs: Message[]) => {
+    if (typeof window === "undefined") return;
+    try { window.localStorage.setItem(pendingBackupKey(id), JSON.stringify(msgs)); }
+    catch { /* quota — skip backup; Supabase write still proceeds */ }
+  };
+  const clearBackup = (id: string) => {
+    if (typeof window === "undefined") return;
+    try { window.localStorage.removeItem(pendingBackupKey(id)); } catch { /* noop */ }
+  };
+  const readBackup = (id: string): Message[] | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(pendingBackupKey(id));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch { return null; }
+  };
+
   // ── Load all sessions for the current user from Supabase ───────────────────
   const refresh = useCallback(async () => {
     const list = await chatSessionRepository.list();
@@ -76,7 +100,9 @@ export function useResearchSessions(selectedMatterId: string) {
 
       // Existing session → update messages
       if (currentSessionId) {
+        writeBackup(currentSessionId, messages);
         await chatSessionRepository.updateMessages(currentSessionId, messages);
+        clearBackup(currentSessionId);
         const updatedAt = new Date().toISOString();
         setSessions((prev) =>
           prev.map((s) =>
@@ -247,6 +273,26 @@ export function useResearchSessions(selectedMatterId: string) {
     // ensureSession() can also set currentSessionId without ever triggering
     // a cache read that would clobber an in-flight chat.
     const cached = sessionsRef.current.find((s) => s.id === id);
+    const supabaseCount = cached?.messages?.length ?? 0;
+
+    // Recover from write-ahead backup if it has more messages than Supabase
+    // (page was closed mid-save, or network blipped during the last write).
+    const backup = readBackup(id);
+    if (backup && backup.length > supabaseCount) {
+      setMessages(backup);
+      setCurrentSessionId(id);
+      setPendingCaseId(null);
+      // Re-persist recovered messages to Supabase and clear the backup.
+      chatSessionRepository.updateMessages(id, backup)
+        .then(() => clearBackup(id))
+        .catch(() => { /* silent — backup stays, will retry on next open */ });
+      sessionsRef.current = sessionsRef.current.map((s) =>
+        s.id === id ? { ...s, messages: backup } : s
+      );
+      return;
+    }
+    if (backup) clearBackup(id); // stale backup — Supabase is already up-to-date
+
     setMessages(cached?.messages ?? []);
     setCurrentSessionId(id);
     // Selecting an existing session moots any pending case from the picker.

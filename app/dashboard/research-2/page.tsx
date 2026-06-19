@@ -235,7 +235,7 @@ export default function Research2Page() {
     selectedPromptPreset, setSelectedPromptPreset,
     liveEditorContent, activeRunMode, handleSubmit, stopGeneration,
     addFiles, attachCaseDocs, buildSessionDraft,
-  } = useResearchChat(messages, setMessages, { ensureSession, refreshSessions });
+  } = useResearchChat(messages, setMessages, { ensureSession, currentSessionId, refreshSessions });
 
   const lastAi = [...messages].reverse().find((m) => m.role === "ai");
   useEffect(() => { setSelectedSourceMessageId(null); }, [lastAi?.id]);
@@ -348,7 +348,7 @@ export default function Research2Page() {
         if (text) {
           deductForResponse(mode as BillingMode, text).then((result) => {
             if (result?.exhausted) setShowPaywall(true);
-          });
+          }).catch(() => { /* balance refresh failure — non-fatal */ });
         }
       }
     }

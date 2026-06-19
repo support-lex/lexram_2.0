@@ -671,6 +671,10 @@ export function useResearchSessions(selectedMatterId: string) {
     // Clear any case the user pre-selected for an earlier "New chat" attempt
     // they never followed through on, so the picker starts fresh.
     setPendingCaseId(null);
+    // Reset the session-creation guard so a new chat can create its session
+    // immediately. If a previous ensureSession() call threw, this ref could
+    // be stuck true — leaving it would prevent auto-save from ever firing.
+    creatingSessionRef.current = false;
   };
 
   const handleSelectSession = (id: string) => {

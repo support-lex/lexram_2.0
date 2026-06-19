@@ -182,7 +182,7 @@ export default function Research3Page() {
     addFiles,
     attachCaseDocs,
     buildSessionDraft,
-  } = useResearchChat(messages, setMessages, { ensureSession });
+  } = useResearchChat(messages, setMessages, { ensureSession, currentSessionId });
 
   const lastAi = [...messages].reverse().find((m) => m.role === "ai");
   // Reset the per-message override whenever a new AI message arrives so the

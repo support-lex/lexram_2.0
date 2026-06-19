@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useRef, useState, type DragEvent } from "react";
+import { useRef, useState, useEffect, type DragEvent } from "react";
 import { extractPdfText } from "@/lib/pdf-extract";
 import { generateId } from "@/lib/utils";
 import { setStoredData } from "@/lib/storage";
@@ -362,6 +362,8 @@ function normalizeAnswer(raw: any, rootQuery = "Query"): LegalAnswer {
 export interface UseResearchChatOptions {
   /** Ensure a LexRam session exists, creating one on demand. Returns the session id. */
   ensureSession: (titleHint: string) => Promise<string | null>;
+  /** Current session id — used to detect "New Chat" (null) and abort any in-flight stream. */
+  currentSessionId: string | null;
   /**
    * Optional: triggered ~1.5s after the first query finishes streaming so the
    * sidebar can pick up the LLM-auto-generated session title that the
@@ -403,6 +405,26 @@ export function useResearchChat(
 
   const ensureSessionRef = useRef(options.ensureSession);
   ensureSessionRef.current = options.ensureSession;
+
+  // ── Reset streaming state on new chat ──────────────────────────────────────
+  // When currentSessionId becomes null (user clicked "New Chat"), abort any
+  // in-flight SSE stream and clear the Working... state. Without this, a stale
+  // ensureSession closure can route the new request to the old session on the
+  // backend, which never sends a done event → isSearching stays true forever.
+  useEffect(() => {
+    if (options.currentSessionId === null) {
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+      setIsSearching(false);
+      setStreamingText("");
+      setStatusMessage("");
+      streamRef.current = "";
+      setActiveRunMode(null);
+    }
+  }, [options.currentSessionId]);
+
   const refreshSessionsRef = useRef(options.refreshSessions);
   refreshSessionsRef.current = options.refreshSessions;
 

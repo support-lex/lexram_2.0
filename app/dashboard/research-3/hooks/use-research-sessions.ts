@@ -21,6 +21,14 @@ export function useResearchSessions(selectedMatterId: string) {
   const [pendingCaseId, setPendingCaseId] = useState<string | null>(null);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Number of messages last committed to the Supabase mirror for the active
+  // session. When the count grows (a new user or AI turn was appended) we fire
+  // the save with 0ms delay so a quick reload can't drop the just-finished
+  // turn. In-place edits (length unchanged) keep the 600ms debounce.
+  const lastSavedCountRef = useRef(0);
+  // Latest messages mirrored into a ref so the save body (doSaveRef) always
+  // reads the newest array even when called from a stale closure.
+  const latestMessagesRef = useRef<Message[]>([]);
   const sessionsRef = useRef<ResearchSession[]>([]);
   const titleGeneratedRef = useRef<Set<string>>(new Set());
   // True while ensureSession() is mid-flight creating a session. The debounced
@@ -88,63 +96,82 @@ export function useResearchSessions(selectedMatterId: string) {
   // without any risk of an effect resetting `messages` and wiping the user's
   // just-typed first message or the in-flight AI stream.
 
-  // ── Debounced auto-save: persist messages to Supabase ──────────────────────
-  // (depends on `pendingCaseId` so the deps lint is satisfied — the value
-  // is read inside the timeout callback below.)
+  // ── Auto-save: persist messages to Supabase ───────────────────────────────
+  // The actual save body, stashed in a ref so it always holds the latest
+  // render closure. This means the save reads the freshest `messages` and
+  // `currentSessionId` even when invoked from a 0ms setTimeout — avoiding
+  // the stale-closure bug where a 600ms debounce would sometimes fire with
+  // the pre-AI-message snapshot and overwrite Supabase with just [userMsg].
+  const doSaveRef = useRef<() => Promise<void>>(async () => {});
+  doSaveRef.current = async () => {
+    if (messages.length === 0) return;
+
+    // Existing session → update messages
+    if (currentSessionId) {
+      writeBackup(currentSessionId, messages);
+      lastSavedCountRef.current = messages.length;
+      await chatSessionRepository.updateMessages(currentSessionId, messages);
+      clearBackup(currentSessionId);
+      const updatedAt = new Date().toISOString();
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === currentSessionId ? { ...s, messages, updatedAt } : s
+        )
+      );
+      // Keep the ref in sync — the on-select effect reads from it exclusively,
+      // so a stale ref would show old messages on re-selection.
+      sessionsRef.current = sessionsRef.current.map((s) =>
+        s.id === currentSessionId ? { ...s, messages, updatedAt } : s
+      );
+
+      // NOTE: AI title generation via Zhipu (/api/chat/title) is intentionally
+      // disabled. Chat answers come exclusively from the LexRam backend now,
+      // and we don't want a secondary AI provider in the path. The session
+      // keeps the truncated first-message as its title until the user
+      // renames it via the pencil icon (which calls PATCH /sessions/{id}).
+      return;
+    }
+
+    // No session yet → create one with a temporary title.
+    // Bail out if ensureSession() is already creating one for this thread —
+    // otherwise we'd insert a duplicate session row.
+    if (creatingSessionRef.current) return;
+    const firstUser = messages.find((m) => m.role === "user")?.content ?? "";
+    creatingSessionRef.current = true;
+    const created = await chatSessionRepository.create({
+      title: firstUser.slice(0, 60) || "New Conversation",
+      messages,
+      matter_id: selectedMatterId !== "all" ? selectedMatterId : null,
+      case_id: pendingCaseId,
+    });
+    creatingSessionRef.current = false;
+    if (!created) return;
+
+    lastSavedCountRef.current = messages.length;
+    setCurrentSessionId(created.id);
+    setSessions((prev) => [created, ...prev]);
+    sessionsRef.current = [created, ...sessionsRef.current];
+    // The pending case has been baked into the row — clear it so it isn't
+    // re-applied if the user later starts a fresh chat without picking again.
+    setPendingCaseId(null);
+  };
+
   useEffect(() => {
+    // Keep the latest messages in a ref for flush handlers.
+    latestMessagesRef.current = messages;
+
     if (!isAuthed) return; // guests can't save
+
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    saveTimeoutRef.current = setTimeout(async () => {
-      if (messages.length === 0) return;
-
-      // Existing session → update messages
-      if (currentSessionId) {
-        writeBackup(currentSessionId, messages);
-        await chatSessionRepository.updateMessages(currentSessionId, messages);
-        clearBackup(currentSessionId);
-        const updatedAt = new Date().toISOString();
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === currentSessionId ? { ...s, messages, updatedAt } : s
-          )
-        );
-        // Keep the ref in sync — the on-select effect now reads from it
-        // exclusively, so a stale ref would show old messages on re-selection.
-        sessionsRef.current = sessionsRef.current.map((s) =>
-          s.id === currentSessionId ? { ...s, messages, updatedAt } : s
-        );
-
-        // NOTE: AI title generation via Zhipu (/api/chat/title) is intentionally
-        // disabled. Chat answers come exclusively from the LexRam backend now,
-        // and we don't want a secondary AI provider in the path. The session
-        // keeps the truncated first-message as its title until the user
-        // renames it via the pencil icon (which calls PATCH /sessions/{id}).
-        return;
-      }
-
-      // No session yet → create one with a temporary title.
-      // Bail out if ensureSession() is already creating one for this thread —
-      // otherwise we'd insert a duplicate session row.
-      if (creatingSessionRef.current) return;
-      const firstUser = messages.find((m) => m.role === "user")?.content ?? "";
-      creatingSessionRef.current = true;
-      const created = await chatSessionRepository.create({
-        title: firstUser.slice(0, 60) || "New Conversation",
-        messages,
-        matter_id: selectedMatterId !== "all" ? selectedMatterId : null,
-        case_id: pendingCaseId,
-      });
-      creatingSessionRef.current = false;
-      if (!created) return;
-
-      setCurrentSessionId(created.id);
-      setSessions((prev) => [created, ...prev]);
-      sessionsRef.current = [created, ...sessionsRef.current];
-      // The pending case has been baked into the row — clear it so it isn't
-      // re-applied if the user later starts a fresh chat without picking again.
-      setPendingCaseId(null);
-    }, 600);
+    // A new turn (user message or AI answer) grew the array — persist it with
+    // NO debounce (0ms delay). This ensures the AI response is saved the
+    // moment it lands in state, not 600ms later when a premature save with
+    // only [userMsg] might have already overwritten the Supabase row.
+    // In-place edits (length unchanged) keep the 600ms debounce.
+    const grew = messages.length > lastSavedCountRef.current;
+    const delay = grew ? 0 : 600;
+    saveTimeoutRef.current = setTimeout(() => { void doSaveRef.current(); }, delay);
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -269,6 +296,9 @@ export function useResearchSessions(selectedMatterId: string) {
     // immediately. If a previous ensureSession() call threw, this ref could
     // be stuck true — leaving it would prevent auto-save from ever firing.
     creatingSessionRef.current = false;
+    // Reset the save-count so the first message in the new chat is treated as
+    // a "new turn" (grew = true) and saved with 0ms delay instead of 600ms.
+    lastSavedCountRef.current = 0;
   };
 
   const handleSelectSession = (id: string) => {
@@ -283,6 +313,7 @@ export function useResearchSessions(selectedMatterId: string) {
     // (page was closed mid-save, or network blipped during the last write).
     const backup = readBackup(id);
     if (backup && backup.length > supabaseCount) {
+      lastSavedCountRef.current = backup.length;
       setMessages(backup);
       setCurrentSessionId(id);
       setPendingCaseId(null);
@@ -297,7 +328,9 @@ export function useResearchSessions(selectedMatterId: string) {
     }
     if (backup) clearBackup(id); // stale backup — Supabase is already up-to-date
 
-    setMessages(cached?.messages ?? []);
+    const loaded = cached?.messages ?? [];
+    lastSavedCountRef.current = loaded.length;
+    setMessages(loaded);
     setCurrentSessionId(id);
     // Selecting an existing session moots any pending case from the picker.
     setPendingCaseId(null);

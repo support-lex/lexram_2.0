@@ -32,6 +32,11 @@ function buildHTML(payment: Payment, userEmail: string, userName: string): strin
   const num       = invNum(payment);
   const amount    = payment.amount_inr ?? payment.amount ?? 0;
   const credits   = payment.credits ?? 0;
+  // Amount charged is GST-inclusive (that's what Cashfree actually collected),
+  // so the taxable value is backed out of it rather than added on top.
+  const taxableValue = amount / 1.18;
+  const cgst = taxableValue * 0.09;
+  const sgst = taxableValue * 0.09;
   const date      = fmtDate(payment.paid_at ?? payment.created_at);
   const statusTxt = (() => {
     const s = (payment.status ?? '').toUpperCase();
@@ -206,8 +211,9 @@ function buildHTML(payment: Payment, userEmail: string, userName: string): strin
     <!-- Totals -->
     <div class="totals">
       <div class="totals-box">
-        <div class="totals-row"><span>Subtotal</span><span>${fmtINR(amount)}</span></div>
-        <div class="totals-row"><span>GST (0%)</span><span>₹0</span></div>
+        <div class="totals-row"><span>Taxable Value</span><span>${fmtINR(taxableValue)}</span></div>
+        <div class="totals-row"><span>CGST @9%</span><span>${fmtINR(cgst)}</span></div>
+        <div class="totals-row"><span>SGST @9%</span><span>${fmtINR(sgst)}</span></div>
         <div class="totals-divider"></div>
         <div class="totals-total"><span>Total Paid</span><span>${fmtINR(amount)}</span></div>
       </div>

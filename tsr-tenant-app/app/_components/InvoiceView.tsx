@@ -36,6 +36,12 @@ export default function InvoiceView({
   const dt = new Date(when);
   const dateStr = Number.isNaN(dt.getTime()) ? "—" : dt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
+  // Amount charged is GST-inclusive (that's what Cashfree actually collected),
+  // so the taxable value is backed out of it rather than added on top.
+  const taxableValue = payment.amount_inr / 1.18;
+  const cgst = taxableValue * 0.09;
+  const sgst = taxableValue * 0.09;
+
   return (
     <AnimatePresence>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -61,6 +67,9 @@ export default function InvoiceView({
             </div>
 
             <div className="rounded-2xl border border-maroon/12 bg-cream-soft p-5 space-y-2.5 text-sm">
+              <Row label="Taxable Value" value={<span className="inline-flex items-center text-ink/85"><IndianRupee className="w-3 h-3" />{taxableValue.toFixed(2)}</span>} />
+              <Row label="CGST @9%" value={<span className="inline-flex items-center text-ink/85"><IndianRupee className="w-3 h-3" />{cgst.toFixed(2)}</span>} />
+              <Row label="SGST @9%" value={<span className="inline-flex items-center text-ink/85"><IndianRupee className="w-3 h-3" />{sgst.toFixed(2)}</span>} />
               <Row label="Amount" value={<span className="inline-flex items-center font-semibold text-maroon"><IndianRupee className="w-3.5 h-3.5" />{payment.amount_inr}</span>} />
               <Row label="Status" value={<span className="text-emerald-700 font-semibold capitalize">{payment.status}</span>} />
               <Row label="Date" value={dateStr} />

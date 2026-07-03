@@ -80,6 +80,11 @@ function StatusBadge({ status }: { status?: string }) {
 export default function InvoiceView({ payment, userEmail, userName, onClose }: InvoiceViewProps) {
   const amountINR = payment?.amount_inr ?? payment?.amount ?? 0;
   const credits = payment?.credits ?? 0;
+  // Amount charged is GST-inclusive (that's what Cashfree actually collected),
+  // so the taxable value is backed out of it rather than added on top.
+  const taxableValue = amountINR / 1.18;
+  const cgst = taxableValue * 0.09;
+  const sgst = taxableValue * 0.09;
 
   const handleDownload = useCallback(() => {
     if (!payment) return;
@@ -236,12 +241,16 @@ export default function InvoiceView({ payment, userEmail, userName, onClose }: I
                   <div className="flex justify-end mb-8">
                     <div className="w-56 space-y-2">
                       <div className="flex justify-between text-xs text-neutral-500">
-                        <span>Subtotal</span>
-                        <span className="tabular-nums">{fmtINR(amountINR)}</span>
+                        <span>Taxable Value</span>
+                        <span className="tabular-nums">{fmtINR(taxableValue)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-neutral-500">
-                        <span>GST (0%)</span>
-                        <span>₹0</span>
+                        <span>CGST @9%</span>
+                        <span className="tabular-nums">{fmtINR(cgst)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-neutral-500">
+                        <span>SGST @9%</span>
+                        <span className="tabular-nums">{fmtINR(sgst)}</span>
                       </div>
                       <div className="h-px bg-neutral-200 my-1" />
                       <div className="flex justify-between text-sm font-bold text-neutral-900">

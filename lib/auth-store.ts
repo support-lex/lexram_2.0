@@ -104,6 +104,16 @@ function init() {
       applySession(null, null, true);
     });
 
+  // After laptop sleep / tab wake, Supabase's background refresh timer was
+  // paused and TOKEN_REFRESHED never fires. Re-run getSession() when the page
+  // becomes visible — it silently refreshes an expired token, then
+  // onAuthStateChange fires TOKEN_REFRESHED and updates the snapshot for free.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      sb.auth.getSession().catch(() => {});
+    }
+  });
+
   // Keep the snapshot live for the rest of the session. INITIAL_SESSION fires
   // on mount, TOKEN_REFRESHED hourly, SIGNED_IN/SIGNED_OUT on auth changes.
   sb.auth.onAuthStateChange((event, session) => {

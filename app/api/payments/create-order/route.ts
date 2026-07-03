@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
         ...(auth ? { Authorization: auth } : {}),
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000),
     });
     const data = await res.json().catch(() => ({ detail: 'Invalid response from payments API' }));
     return NextResponse.json(data, { status: res.status });

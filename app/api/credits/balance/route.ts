@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`${CREDITS_API}/credits/balance`, {
       headers: auth ? { Authorization: auth } : {},
+      signal: AbortSignal.timeout(10000),
     });
     const data = await res.json().catch(() => ({ detail: 'Invalid response from credits API' }));
     return NextResponse.json(data, { status: res.status });

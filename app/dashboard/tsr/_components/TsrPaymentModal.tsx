@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Loader2, IndianRupee, ShieldCheck, FileText, AlertCircle, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { withTimeout } from "@/lib/with-timeout";
 
 export interface TsrPaymentRecord {
   id: string;
@@ -139,16 +140,24 @@ export default function TsrPaymentModal({ open, caseId, caseName, onSuccess, onC
 
       // Production path: open Cashfree checkout with the minted session.
       const { load } = await import("@cashfreepayments/cashfree-js");
-      const cashfree = await load({ mode: "production" });
-      const result = await (cashfree as unknown as {
-        checkout: (opts: { paymentSessionId: string; redirectTarget: string }) => Promise<{
-          paymentDetails?: { paymentMessage?: string; cf_payment_id?: string | number };
-          error?: { message?: string };
-        }>;
-      }).checkout({
-        paymentSessionId: order.payment_session_id,
-        redirectTarget: "_modal",
-      });
+      const cashfree = await withTimeout(
+        load({ mode: "production" }),
+        20_000,
+        "Could not load the payment gateway. Please disable any ad blocker and try again.",
+      );
+      const result = await withTimeout(
+        (cashfree as unknown as {
+          checkout: (opts: { paymentSessionId: string; redirectTarget: string }) => Promise<{
+            paymentDetails?: { paymentMessage?: string; cf_payment_id?: string | number };
+            error?: { message?: string };
+          }>;
+        }).checkout({
+          paymentSessionId: order.payment_session_id,
+          redirectTarget: "_modal",
+        }),
+        120_000,
+        "Payment is taking too long. Please try again.",
+      );
 
       if (result?.error) {
         throw new Error(result.error.message ?? "Payment cancelled.");

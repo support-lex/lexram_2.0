@@ -6,6 +6,7 @@ import { X, Zap, Loader2, Sparkles, ChevronRight } from 'lucide-react';
 import { useCredits } from '@/hooks/use-credits';
 import { creditsApi } from '@/services/credits';
 import { supabase } from '@/lib/supabase/client';
+import { withTimeout } from '@/lib/with-timeout';
 
 interface PaywallModalProps {
   open: boolean;
@@ -78,18 +79,31 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
       );
 
       const { load } = await import('@cashfreepayments/cashfree-js');
-      const cashfree = await load({ mode: 'production' });
+      const cashfree = await withTimeout(
+        load({ mode: 'production' }),
+        20_000,
+        'Could not load the payment gateway. Please disable any ad blocker and try again.',
+      );
 
-      const result = await (cashfree as any).checkout({
-        paymentSessionId: order.payment_session_id,
-        redirectTarget: '_modal',
-      });
+      const result = await withTimeout<{ paymentDetails?: unknown; error?: { message?: string } }>(
+        (cashfree as any).checkout({
+          paymentSessionId: order.payment_session_id,
+          redirectTarget: '_modal',
+        }),
+        120_000,
+        'Payment is taking too long. Please try again.',
+      );
 
-      if (result?.paymentDetails) {
-        refresh();
-        // Redirect to success page — shows invoice automatically
-        window.location.href = `/payment/success?order_id=${encodeURIComponent(order.order_id)}&credits=${order.credits}&amount=${order.amount}`;
+      if (result?.error) {
+        throw new Error(result.error.message ?? 'Payment cancelled.');
       }
+      if (!result?.paymentDetails) {
+        throw new Error('Payment was not completed. Please try again.');
+      }
+
+      refresh();
+      // Redirect to success page — shows invoice automatically
+      window.location.href = `/payment/success?order_id=${encodeURIComponent(order.order_id)}&credits=${order.credits}&amount=${order.amount}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment failed. Please try again.');
     } finally {

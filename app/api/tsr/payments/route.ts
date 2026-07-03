@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(auth ? { Authorization: auth } : {}) },
       body: JSON.stringify({ amount_inr, user_email: ctx.email ?? "", user_phone: phone }),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => `HTTP ${res.status}`);
@@ -124,7 +125,11 @@ export async function POST(req: NextRequest) {
     }
     order = await res.json();
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Gateway unreachable" }, { status: 502 });
+    const timedOut = err instanceof Error && err.name === "TimeoutError";
+    return NextResponse.json(
+      { error: timedOut ? "Payment gateway timed out. Please try again." : err instanceof Error ? err.message : "Gateway unreachable" },
+      { status: 502 }
+    );
   }
 
   // Persist a pending tsr_payments row tied to this case.

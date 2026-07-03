@@ -22,12 +22,14 @@ export async function POST(req: NextRequest) {
         ...(auth ? { Authorization: auth } : {}),
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15_000),
     });
     const data = await res.json().catch(() => ({ detail: 'Invalid response from payments API' }));
     return NextResponse.json(data, { status: res.status });
   } catch (err) {
+    const timedOut = err instanceof Error && err.name === 'TimeoutError';
     return NextResponse.json(
-      { detail: err instanceof Error ? err.message : 'Payments API unreachable' },
+      { detail: timedOut ? 'Payments API timed out. Please try again.' : err instanceof Error ? err.message : 'Payments API unreachable' },
       { status: 502 }
     );
   }

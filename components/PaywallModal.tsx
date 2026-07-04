@@ -71,11 +71,26 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
     setError(null);
 
     try {
-      const { data: { user } } = await supabase().auth.getUser();
-      const order = await creditsApi.createOrder(
-        confirmedAmount,
-        user?.email ?? '',
-        phone,
+      // Always call getSession() (not getUser()) so an expired token is
+      // refreshed before we hit the payment API. Race against 10 s in case
+      // the network is still waking up — surface a clear error instead of
+      // hanging on "Processing…" indefinitely.
+      const session = await Promise.race([
+        supabase().auth.getSession().then(r => r.data.session),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 10_000)),
+      ]);
+      if (!session) {
+        throw new Error('Session expired or timed out. Please refresh the page and try again.');
+      }
+
+      const order = await withTimeout(
+        creditsApi.createOrder(
+          confirmedAmount,
+          session.user.email ?? '',
+          phone,
+        ),
+        20_000,
+        'Request timed out. Please check your connection and try again.',
       );
 
       const { load } = await import('@cashfreepayments/cashfree-js');

@@ -102,6 +102,15 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
       }
 
       refresh();
+
+      // Best-effort admin notification — must never block the user from
+      // reaching the success page over a mail hiccup.
+      fetch('/api/payments/notify-recharge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: order.order_id, amount_inr: order.amount, credits: order.credits }),
+      }).catch(() => {});
+
       // Redirect to success page — shows invoice automatically
       window.location.href = `/payment/success?order_id=${encodeURIComponent(order.order_id)}&credits=${order.credits}&amount=${order.amount}`;
     } catch (err) {

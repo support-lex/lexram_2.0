@@ -262,6 +262,7 @@ function useLandingTypewriter(lines: string[], active = true) {
    ============================================================ */
 function Nav() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -270,32 +271,35 @@ function Nav() {
     return () => window.removeEventListener("hashchange", onHash);
   }, [open]);
 
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const navLinks = [
-    { href: "/research", label: "Research" },
-    { href: "/drafting", label: "Drafting" },
-    { href: "/sign-in",   label: "TSR" },
-    { href: "/blog",      label: "Blog" },
-    { href: "#faq",       label: "FAQ" },
-    { href: "#contact",   label: "Contact" },
+    { href: "/research",      label: "Research" },
+    { href: "/drafting",      label: "Drafting" },
+    { href: "/sign-in", label: "TSR" },
+    { href: "/blog",          label: "Blog" },
+    { href: "/pricing",        label: "Pricing" },
+    { href: "#faq",            label: "FAQ" },
+    { href: "#contact",        label: "Contact" },
   ];
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 bg-[#d8cdb8] border-b border-[#6b1e2d]/15">
+    <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled ? "bg-[#d8cdb8]/95 backdrop-blur-md border-b border-[#6b1e2d]/10 shadow-[0_4px_24px_rgba(107, 30, 45,0.08)]" : "bg-transparent border-b border-transparent"}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-3">
         {/* Brand */}
         <a href="#" aria-label="Lexram" className="flex items-center shrink-0">
-          <span
-            className="font-serif text-[#6b1e2d] text-3xl sm:text-4xl leading-none tracking-tight"
-            style={{ fontFamily: 'var(--font-serif, "Libre Baskerville"), Georgia, serif' }}
-          >
-            LexRam
-          </span>
+          <img src="/lexram-logo.png" alt="Lexram" width={140} height={48} loading="eager" decoding="async" fetchPriority="high" className={`h-11 sm:h-12 w-auto transition-all duration-300 ${scrolled ? "" : "brightness-0 invert"}`} />
         </a>
 
         {/* Desktop nav */}
-        <nav className="hidden lg:flex items-center gap-7 text-base text-[#6b1e2d]">
+        <nav className={`hidden lg:flex items-center gap-7 text-base transition-colors duration-300 ${scrolled ? "text-[#6b1e2d]/93" : "text-white/90"}`}>
           {navLinks.map((l) => (
-            <a key={l.href} href={l.href} className="font-medium hover:text-[#CC5500] transition">
+            <a key={l.href} href={l.href} className={`font-medium transition ${scrolled ? "hover:text-[#6b1e2d]" : "hover:text-white"}`}>
               {l.label}
             </a>
           ))}
@@ -305,15 +309,16 @@ function Nav() {
         <div className="hidden sm:flex items-center gap-3">
           <button
             onClick={() => { track("cta_login_click", { location: "nav" }); go(LOGIN); }}
-            className="inline-flex items-center gap-2 border border-[#6b1e2d]/30 text-[#6b1e2d] px-4 lg:px-5 py-2.5 rounded-md text-base font-medium hover:border-[#6b1e2d] transition"
+            className={`inline-flex items-center gap-2 border px-4 lg:px-5 py-2.5 rounded-md text-base font-medium transition ${scrolled ? "border-[#6b1e2d]/25 text-[#6b1e2d] hover:border-[#6b1e2d] hover:text-[#6b1e2d]" : "border-white/40 text-white hover:border-white hover:text-white"}`}
           >
             Login
           </button>
           <button
             onClick={() => { track("cta_start_trial_click", { location: "nav" }); go(SIGNUP); }}
-            className="inline-flex items-center gap-2 bg-[#CC5500] text-[#d8cdb8] px-4 lg:px-5 py-2.5 rounded-md text-base font-medium hover:bg-[#b84900] transition shadow-soft"
+            className="inline-flex items-center gap-2 bg-[#CC5500] text-[#d8cdb8] px-4 lg:px-5 py-2.5 rounded-md text-base font-medium hover:bg-[#CC5500] transition shadow-soft"
           >
-            <span>Free Trial</span>
+            <span className="hidden md:inline">Free Trial</span>
+            <span className="md:hidden">Trial</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -331,7 +336,7 @@ function Nav() {
       </div>
 
       {/* Mobile drawer */}
-      <div className={`lg:hidden overflow-hidden border-t border-[#6b1e2d]/10 bg-[#d8cdb8] transition-[max-height,opacity] duration-300 ease-out ${
+      <div className={`lg:hidden overflow-hidden border-t border-[#6b1e2d]/10 bg-[#d8cdb8]/95 backdrop-blur-md transition-[max-height,opacity] duration-300 ease-out ${
         open ? "max-h-[700px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
       }`}>
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col">

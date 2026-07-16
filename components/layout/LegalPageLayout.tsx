@@ -55,9 +55,12 @@ function LegalNav() {
   }, [open]);
 
   const links = [
-{ href: "/#research", label: "Research" },
+{ href: "/", label: "Homepage" },
+    { href: "/#research", label: "Research" },
     { href: "/#drafting", label: "Drafting" },
+    { href: "/dashboard/tsr", label: "TSR" },
     { href: "/#faq", label: "FAQ" },
+    { href: "/blog", label: "Blog" },
     { href: "/pricing", label: "Pricing" },
     { href: "/#contact", label: "Contact" },
   ];

@@ -445,6 +445,7 @@ function Hero() {
           <h1
             className="font-serif font-bold text-[#d8cdb8] leading-[0.90] tracking-tight text-[1rem] sm:text-[1.3rem] md:text-[1.7rem] lg:text-[2.2rem] xl:text-[2.7rem]"
             style={{ textShadow: '0 4px 40px rgba(0,0,0,0.5)' }}
+            suppressHydrationWarning
           >
             &ldquo;From statute to submission<br />
             <em className="italic text-[#e8c8a8]">without leaving LexRam&rdquo;</em>

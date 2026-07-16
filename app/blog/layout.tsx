@@ -34,7 +34,6 @@ function BlogNav() {
   }, []);
 
 const links = [
-    { href: "/", label: "Home" },
     { href: "/#research", label: "Research" },
     { href: "/#drafting", label: "Drafting" },
     { href: "/#faq", label: "FAQ" },

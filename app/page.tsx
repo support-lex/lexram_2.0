@@ -279,7 +279,6 @@ function Nav() {
   }, []);
 
   const navLinks = [
-    { href: "/",              label: "Home" },
     { href: "/research",      label: "Research" },
     { href: "/drafting",      label: "Drafting" },
     { href: "#faq",            label: "FAQ" },

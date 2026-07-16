@@ -44,7 +44,7 @@ export default function PricingSection({ showHeader = true }: { showHeader?: boo
   const onFreeTrial = plan !== null;
 
   return (
-    <section id="pricing" className="bg-[#d8cdb8] text-[#1a1a1a] px-4 sm:px-6 lg:px-8 py-20 md:py-24">
+    <section id="pricing" className="bg-[#d8cdb8] text-[#1a1a1a] px-4 sm:px-6 lg:px-8 py-20 md:py-24 scroll-mt-24">
       <div className="max-w-5xl mx-auto">
 
         {/* ── Header ── */}

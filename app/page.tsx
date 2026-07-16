@@ -428,12 +428,12 @@ function Hero() {
   );
 
   return (
-    <section className="relative h-screen overflow-hidden flex flex-col justify-center">
+    <section className="relative h-screen overflow-hidden flex flex-col justify-center" suppressHydrationWarning>
       {BG}
-      <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 py-20 sm:py-24 flex flex-col justify-center h-full">
+      <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 py-20 sm:py-24 flex flex-col justify-center h-full" suppressHydrationWarning>
 
         {/* ── Kicker ─────────────────────────────────────────────────── */}
-        <div className="reveal-up mb-5" style={{ transitionDelay: "40ms" }}>
+        <div className="reveal-up mb-5" style={{ transitionDelay: "40ms" }} suppressHydrationWarning>
           <span className="inline-block text-[11px] tracking-[0.35em] uppercase font-bold text-[#CC5500]"
             style={{ textShadow: '0 0 18px rgba(204,85,0,0.7), 0 0 40px rgba(204,85,0,0.4)' }}>
             Indian AI Law Assistant
@@ -441,7 +441,7 @@ function Hero() {
         </div>
 
         {/* ── Editorial headline ─────────────────────────────────────── */}
-        <div className="reveal-up" style={{ transitionDelay: "80ms" }}>
+        <div className="reveal-up" style={{ transitionDelay: "80ms" }} suppressHydrationWarning>
           <h1
             className="font-serif font-bold text-[#d8cdb8] leading-[0.90] tracking-tight text-[1rem] sm:text-[1.3rem] md:text-[1.7rem] lg:text-[2.2rem] xl:text-[2.7rem]"
             style={{ textShadow: '0 4px 40px rgba(0,0,0,0.5)' }}
@@ -453,10 +453,11 @@ function Hero() {
         </div>
 
         {/* ── Description ────────────────────────────────────────────── */}
-        <div className="reveal-up mt-8 max-w-2xl" style={{ transitionDelay: "180ms" }}>
+        <div className="reveal-up mt-8 max-w-2xl" style={{ transitionDelay: "180ms" }} suppressHydrationWarning>
           <p
             className="font-serif text-lg sm:text-xl md:text-2xl text-[#d8cdb8]/90 leading-relaxed"
             style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}
+            suppressHydrationWarning
           >
             Research legal questions, draft pleadings, manage matters, trace titles, and grow your network — one platform, built on India&apos;s courts{" "}
             <span className="italic text-[#e8c8a8] font-semibold">alone.</span>
@@ -464,7 +465,7 @@ function Hero() {
         </div>
 
         {/* ── Typewriter practice-area hint ─────────────────────────── */}
-        <div className="reveal-up mt-6 flex items-center gap-2.5" style={{ transitionDelay: "240ms" }}>
+        <div className="reveal-up mt-6 flex items-center gap-2.5" style={{ transitionDelay: "240ms" }} suppressHydrationWarning>
           <span
             className="text-[12px] font-medium uppercase tracking-[0.18em]"
             style={{ color: "rgba(216,205,184,0.5)" }}
@@ -484,7 +485,7 @@ function Hero() {
         </div>
 
         {/* ── CTAs ───────────────────────────────────────────────────── */}
-        <div className="reveal-blur mt-8 flex flex-col sm:flex-row gap-4" style={{ transitionDelay: "280ms" }}>
+        <div className="reveal-blur mt-8 flex flex-col sm:flex-row gap-4" style={{ transitionDelay: "280ms" }} suppressHydrationWarning>
           <button
             type="button"
             onClick={() => {

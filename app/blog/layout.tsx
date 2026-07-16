@@ -33,12 +33,12 @@ function BlogNav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const links = [
+const links = [
+    { href: "/", label: "Home" },
     { href: "/#research", label: "Research" },
     { href: "/#drafting", label: "Drafting" },
-    { href: "/blog", label: "Blog" },
     { href: "/#faq", label: "FAQ" },
-    { href: "/#pricing", label: "Pricing" },
+    { href: "/pricing", label: "Pricing" },
     { href: "/#contact", label: "Contact" },
   ];
 

@@ -28,13 +28,12 @@ export function LandingNav() {
     return () => window.removeEventListener("hashchange", onHash);
   }, [open]);
 
-  const navLinks = [
+const navLinks = [
+    { href: "/",              label: "Home" },
     { href: "/research",      label: "Research" },
     { href: "/drafting",      label: "Drafting" },
-    { href: "/dashboard/tsr", label: "TSR" },
-    { href: "/blog",         label: "Blog" },
     { href: "/#faq",          label: "FAQ" },
-    { href: "/#pricing",      label: "Pricing" },
+    { href: "/pricing",       label: "Pricing" },
     { href: "/#contact",      label: "Contact" },
   ];
 

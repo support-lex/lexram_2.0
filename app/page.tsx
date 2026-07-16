@@ -279,11 +279,11 @@ function Nav() {
   }, []);
 
   const navLinks = [
+    { href: "/",              label: "Home" },
     { href: "/research",      label: "Research" },
     { href: "/drafting",      label: "Drafting" },
-    { href: "/sign-in", label: "TSR" },
-    { href: "/blog",          label: "Blog" },
     { href: "#faq",            label: "FAQ" },
+    { href: "/pricing",       label: "Pricing" },
     { href: "#contact",        label: "Contact" },
   ];
 
@@ -808,7 +808,7 @@ function SectionCTA({
       </a>
       {!hidePricing && (
         <a
-          href="#pricing"
+          href="/pricing"
           onClick={() => track("cta_see_pricing_click", { location })}
           className={`lex-btn lex-btn--pricing ${dark ? "lex-btn--dark" : ""}`}
         >

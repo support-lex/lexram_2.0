@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Libre_Baskerville, Geist, Geist_Mono, Playfair_Display, DM_Sans } from 'next/font/google';
+import { Libre_Baskerville, Geist, Geist_Mono } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import './globals.css';
 import { cn } from "@/lib/utils";
@@ -21,28 +21,14 @@ const libreBaskerville = Libre_Baskerville({
   display: 'swap',
 });
 
-// Playfair Display — display serif for the new cinematic landing page.
-// Only the weights actually used on the landing page are loaded.
-const playfair = Playfair_Display({
-  weight: ['400', '700'],
-  style: ['normal', 'italic'],
-  subsets: ['latin'],
-  variable: '--font-landing-display',
-  display: 'swap',
-});
-
-// DM Sans — body sans for the landing page.
-const dmSans = DM_Sans({
-  weight: ['400', '500', '700'],
-  subsets: ['latin'],
-  variable: '--font-landing-sans',
-  display: 'swap',
-});
-
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#d8cdb8' },
+    { media: '(prefers-color-scheme: dark)', color: '#060914' },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -141,11 +127,15 @@ export const metadata: Metadata = {
     // Add your Google Search Console verification code here
     // google: 'your-google-verification-code',
   },
+  icons: {
+    icon: [{ url: '/lexram-logo.png', type: 'image/png' }],
+    apple: [{ url: '/lexram-logo.png' }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-IN" className={cn("scroll-smooth", "h-full", geist.variable, geistMono.variable, libreBaskerville.variable, playfair.variable, dmSans.variable, "font-sans")} suppressHydrationWarning>
+    <html lang="en-IN" className={cn("scroll-smooth", "h-full", geist.variable, geistMono.variable, libreBaskerville.variable, "font-sans")} suppressHydrationWarning>
       <head>
         {/* Preconnect to the LexRam Legal Research API so the TLS handshake
             (~400–800 ms cold) overlaps with the page's initial paint instead

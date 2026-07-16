@@ -58,7 +58,7 @@ function LegalNav() {
     { href: "/#research", label: "Research" },
     { href: "/#drafting", label: "Drafting" },
     { href: "/blog", label: "Blog" },
-    { href: "/pricing", label: "Pricing" },
+    { href: "/#pricing", label: "Pricing" },
     { href: "/#faq", label: "FAQ" },
     { href: "/#contact", label: "Contact" },
   ];

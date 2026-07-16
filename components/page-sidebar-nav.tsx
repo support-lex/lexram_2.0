@@ -38,8 +38,12 @@ const ICONS: Record<string, LucideIcon> = {
 
 export type SidebarItem = {
   id: string;
-  /** Key into {@link ICONS} — e.g. "products", "research". */
-  icon: string;
+  /**
+   * Either a key into {@link ICONS} (e.g. "products", "research") for Server
+   * Component usage, or a LucideIcon component reference for Client
+   * Component usage. Backward compatible with both formats.
+   */
+  icon: string | LucideIcon;
   label: string;
   /** When set, the item renders as a link to this route instead of an in-page scroll target. */
   href?: string;
@@ -105,7 +109,9 @@ export function PageSidebarNav({ items }: { items: SidebarItem[] }) {
         }}
       >
         {items.map(({ id, icon: iconKey, label, href }, idx) => {
-          const Icon = ICONS[iconKey];
+          /* Resolve icon — accept either a string key or a LucideIcon ref. */
+          const Icon =
+            typeof iconKey === "string" ? ICONS[iconKey] : iconKey;
           const isActive = !href && activeId === id;
           const inner = (
             <>

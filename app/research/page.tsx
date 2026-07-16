@@ -5,7 +5,7 @@ import {
   ArrowRight, ChevronDown, Gavel, Scale,
   Layers, Search, PenTool, Bookmark, Mic,
   BookOpen, Shield, TrendingUp, CheckCircle2,
-  GitCompare, MessageSquare, HelpCircle, CreditCard, Mail,
+  GitCompare, MessageSquare, HelpCircle,
 } from "lucide-react";
 import { LandingNav, LandingFooter } from "@/components/LandingShell";
 import { track } from "@/lib/landing-analytics";
@@ -84,19 +84,19 @@ function SectionCTA({ label, primaryHref = SIGNUP, location }: { label: string; 
       <a
         href={primaryHref}
         onClick={() => track("cta_start_research_click", { location })}
-        className="inline-flex items-center gap-2 bg-gradient-to-r from-[#CC5500] to-[#CC5500] text-[#d8cdb8] px-6 py-3.5 rounded-xl font-semibold hover:opacity-90 transition shadow-[0_4px_22px_rgba(204,85,0,0.45)]"
+        className="inline-flex items-center gap-2 bg-gradient-to-r from-[#CC5500] to-[#CC5500] text-[#d8cdb8] px-6 py-3.5 rounded-full font-semibold hover:opacity-90 transition shadow-[0_4px_22px_rgba(204,85,0,0.45)]"
       >
         {label} <ArrowRight className="w-4 h-4" />
       </a>
       <a
         href="/#contact"
-        className="inline-flex items-center gap-2 bg-gradient-to-r from-[#CC5500] to-[#CC5500] text-[#d8cdb8] px-6 py-3.5 rounded-xl font-semibold hover:opacity-90 transition shadow-[0_4px_22px_rgba(204,85,0,0.45)]"
+        className="inline-flex items-center gap-2 bg-gradient-to-r from-[#CC5500] to-[#CC5500] text-[#d8cdb8] px-6 py-3.5 rounded-full font-semibold hover:opacity-90 transition shadow-[0_4px_22px_rgba(204,85,0,0.45)]"
       >
         Book a demo
       </a>
       <a
-        href="/pricing"
-        className="inline-flex items-center gap-2 bg-gradient-to-r from-[#CC5500] to-[#CC5500] text-[#d8cdb8] px-6 py-3.5 rounded-xl font-semibold hover:opacity-90 transition shadow-[0_4px_22px_rgba(204,85,0,0.45)]"
+        href="/#pricing"
+        className="inline-flex items-center gap-2 bg-gradient-to-r from-[#CC5500] to-[#CC5500] text-[#d8cdb8] px-6 py-3.5 rounded-full font-semibold hover:opacity-90 transition shadow-[0_4px_22px_rgba(204,85,0,0.45)]"
       >
         See Pricing
       </a>
@@ -630,13 +630,11 @@ export default function ResearchPage() {
   return (
     <div data-landing-v2 className="min-h-screen bg-[#d8cdb8]">
       <PageSidebarNav items={[
-        { id: "research",              icon: "research",     label: "Overview"  },
-        { id: "research-features",     icon: "layers",       label: "Features"  },
-        { id: "research-edge",         icon: "compare",      label: "Edge"      },
-        { id: "research-testimonials", icon: "testimonials", label: "Reviews"   },
-        { id: "research-faq",          icon: "faq",          label: "FAQ"       },
-        { id: "research-pricing",      icon: "credit-card",  label: "Pricing", href: "/pricing" },
-        { id: "research-contact",      icon: "contact",      label: "Contact", href: "/contact" },
+        { id: "research",              icon: Search,        label: "Overview"     },
+        { id: "research-features",     icon: Layers,        label: "Features"     },
+        { id: "research-edge",         icon: GitCompare,    label: "Edge"         },
+        { id: "research-testimonials", icon: MessageSquare, label: "Reviews"      },
+        { id: "research-faq",          icon: HelpCircle,    label: "FAQ"          },
       ]} />
       <LandingNav />
       <main className="pt-20">

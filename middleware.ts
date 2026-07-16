@@ -65,9 +65,10 @@ function isPublicPath(pathname: string) {
 
 export const config = {
   matcher: [
-    // Skip static assets, image optimisation, AND public auth/payment routes.
-    // Auth pages handle their own Supabase calls — running the middleware
-    // there just adds a cold network round-trip to the first paint.
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Only run auth checks on dashboard routes — Supabase round-trip would
+    // otherwise add ~50-200 ms to every public marketing/blog/research page.
+    // Public auth/payment routes are excluded entirely (they don't need
+    // session refresh); static assets are excluded by Next.js defaults.
+    '/dashboard/:path*',
   ],
 };

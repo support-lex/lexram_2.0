@@ -31,7 +31,7 @@ export default function Navbar() {
             <Link href="/blog" className="font-sans text-sm font-normal tracking-wide text-[var(--text-on-sidebar)]/80 hover:text-[var(--text-on-sidebar)] transition-colors">Blog</Link>
             <Link href="/dashboard/network" className="font-sans text-sm font-normal tracking-wide text-[var(--text-on-sidebar)]/80 hover:text-[var(--text-on-sidebar)] transition-colors">Network</Link>
             <a href="#practice-areas" className="font-sans text-sm font-normal tracking-wide text-[var(--text-on-sidebar)]/80 hover:text-[var(--text-on-sidebar)] transition-colors">Practice Areas</a>
-            <Link href="/pricing" className="font-sans text-sm font-normal tracking-wide text-[var(--text-on-sidebar)]/80 hover:text-[var(--text-on-sidebar)] transition-colors">Pricing</Link>
+            <Link href="/#pricing" className="font-sans text-sm font-normal tracking-wide text-[var(--text-on-sidebar)]/80 hover:text-[var(--text-on-sidebar)] transition-colors">Pricing</Link>
           </div>
 
           <div className="hidden md:flex items-center space-x-6">
@@ -58,7 +58,7 @@ export default function Navbar() {
           <Link href="/blog" className="block px-4 py-3 font-sans text-base font-normal text-[var(--text-on-sidebar)]/80 hover:bg-[var(--bg-sidebar-hover)] rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>Blog</Link>
           <Link href="/dashboard/network" className="block px-4 py-3 font-sans text-base font-normal text-[var(--text-on-sidebar)]/80 hover:bg-[var(--bg-sidebar-hover)] rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>Network</Link>
           <a href="#practice-areas" className="block px-4 py-3 font-sans text-base font-normal text-[var(--text-on-sidebar)]/80 hover:bg-[var(--bg-sidebar-hover)] rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>Practice Areas</a>
-          <Link href="/pricing" className="block px-4 py-3 font-sans text-base font-normal text-[var(--text-on-sidebar)]/80 hover:bg-[var(--bg-sidebar-hover)] rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>Pricing</Link>
+          <Link href="/#pricing" className="block px-4 py-3 font-sans text-base font-normal text-[var(--text-on-sidebar)]/80 hover:bg-[var(--bg-sidebar-hover)] rounded-xl" onClick={() => setIsMobileMenuOpen(false)}>Pricing</Link>
           <div className="pt-4 flex flex-col gap-3 px-2">
             <Link href="/sign-in" className="w-full text-center px-4 py-3 font-sans text-base font-normal text-white border border-white/20 rounded-xl">Sign In</Link>
             <Link href="/sign-in" className="w-full text-center px-4 py-3 text-base font-medium text-black bg-white rounded-xl">Get Started</Link>

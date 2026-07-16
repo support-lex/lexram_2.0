@@ -4,12 +4,14 @@ import { useState, useEffect } from "react";
 import { ArrowRight, Facebook, Instagram, Linkedin, Mail, MapPin, Menu, Phone, X, Youtube } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import BlogFAQ from "@/components/blog/BlogFAQ";
 
 export default function BlogLayout({ children }: { children: React.ReactNode }) {
   return (
     <div data-landing-v2 className="min-h-screen bg-[#fff0df]">
       <BlogNav />
       <main className="pt-16">{children}</main>
+      <BlogFAQ />
       <BlogFooter />
     </div>
   );
@@ -36,8 +38,10 @@ function BlogNav() {
   const links = [
     { href: "/#research", label: "Research" },
     { href: "/#drafting", label: "Drafting" },
+    { href: "/dashboard/tsr", label: "TSR" },
     { href: "/blog", label: "Blog" },
-    { href: "/pricing", label: "Pricing" },
+    { href: "/#pricing", label: "Pricing" },
+    { href: "#blog-faq", label: "FAQ" },
     { href: "/contact", label: "Contact" },
   ];
 

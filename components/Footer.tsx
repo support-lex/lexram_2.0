@@ -21,7 +21,7 @@ export default function Footer() {
             <li><a href="#research" className="hover:text-[var(--text-primary)] transition-colors">Deep Research</a></li>
             <li><a href="#drafting" className="hover:text-white transition-colors">Drafting Suite</a></li>
             <li><a href="#practice-areas" className="hover:text-white transition-colors">Practice Areas</a></li>
-            <li><Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link></li>
+            <li><Link href="/#pricing" className="hover:text-white transition-colors">Pricing</Link></li>
           </ul>
         </div>
         <div>

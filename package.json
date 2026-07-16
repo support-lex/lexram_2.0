@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--use-system-ca next dev",
-    "build": "next build",
-    "vercel-build": "next build",
+    "build": "node scripts/compress-assets.mjs && next build",
+    "vercel-build": "node scripts/compress-assets.mjs && next build",
     "start": "next start",
     "lint": "eslint .",
     "clean": "next clean"

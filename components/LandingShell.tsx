@@ -29,7 +29,8 @@ export function LandingNav() {
     { href: "/drafting",      label: "Drafting" },
     { href: "/dashboard/tsr", label: "TSR" },
     { href: "/blog",         label: "Blog" },
-    { href: "/pricing",      label: "Pricing" },
+    { href: "/#pricing",     label: "Pricing" },
+    { href: faqHref,         label: "FAQ" },
     { href: "/contact",      label: "Contact" },
   ];
 

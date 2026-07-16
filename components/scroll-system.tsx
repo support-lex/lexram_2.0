@@ -43,6 +43,15 @@ export function ScrollSystem() {
     let ctx: any = null;
     let lenis: { raf(t: number): void; on(e: string, cb: unknown): void; destroy(): void } | null = null;
 
+    /* Probe: only load gsap + lenis if this page actually uses them.
+       Saves ~80 KB+ on pages like /blog, /pricing, /research that don't
+       use data-animate / data-stagger / data-parallax. The active landing
+       variant uses its own useReveal() hook (data-reveal-section /
+       .fade-up classes), not gsap ScrollTrigger. */
+    const hasGsapTargets =
+      document.querySelector("[data-animate], [data-stagger], [data-parallax]") !== null;
+    if (!hasGsapTargets) return;
+
     /* CSS failsafe — if GSAP hasn't fired within 2.5 s, show everything */
     const failsafeId = window.setTimeout(() => {
       document.querySelectorAll("[data-animate], [data-stagger] > *").forEach((el) => {

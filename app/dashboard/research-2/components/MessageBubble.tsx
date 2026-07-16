@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -30,13 +31,17 @@ import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Message } from "../types";
 import InlineBlock from "./inline/InlineBlock";
-import MermaidDiagram from "./inline/MermaidDiagram";
 import InlineAuthorities from "./inline/InlineAuthorities";
 import InlineDraftEditor from "./inline/InlineDraftEditor";
 import ProceduralTimeline from "./ProceduralTimeline";
 import { ExternalLink } from "lucide-react";
 import { feedbackRepository, type FeedbackRating } from "@/modules/chat/repository/feedback.repository";
 import { useNetworkAvatar } from "@/hooks/use-network-avatar";
+
+const MermaidDiagram = dynamic(() => import("./inline/MermaidDiagram"), {
+  ssr: false,
+  loading: () => <div className="h-32 rounded-lg bg-muted/30 animate-pulse" />,
+});
 
 type MessageBubbleProps = {
   message: Message;

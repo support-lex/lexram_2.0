@@ -253,7 +253,7 @@ function HeroCarousel({ posts }: { posts: BlogPost[] }) {
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.cover_image_url ?? ""} alt="" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.02]" />
+          <img src={post.cover_image_url ?? ""} alt="" loading="lazy" decoding="async" width={1280} height={720} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.02]" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/15" aria-hidden />
           <div className="relative h-full flex flex-col justify-end p-5 sm:p-8 md:p-10">
             <div className="flex items-center gap-2 flex-wrap">
@@ -350,7 +350,7 @@ function TodayCard({ post }: { post: BlogPost }) {
         {post.cover_image_url ? (
           <div className="aspect-[16/9] overflow-hidden relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.cover_image_url} alt="" className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+            <img src={post.cover_image_url} alt="" loading="lazy" decoding="async" width={1280} height={720} className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/15" aria-hidden />
           </div>
         ) : (
@@ -422,7 +422,7 @@ function PostCard({ post, highlight }: { post: BlogPost; highlight?: boolean }) 
         {post.cover_image_url ? (
           <div className="aspect-[16/9] overflow-hidden relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.cover_image_url} alt="" className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+            <img src={post.cover_image_url} alt="" loading="lazy" decoding="async" width={1280} height={720} className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/15" aria-hidden />
           </div>
         ) : (

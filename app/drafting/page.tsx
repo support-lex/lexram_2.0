@@ -96,7 +96,7 @@ function SectionCTA({ label, primaryHref = SIGNUP, location }: { label: string; 
         Book a demo
       </a>
       <a
-        href="/pricing"
+        href="/#pricing"
         className="inline-flex items-center gap-2 bg-gradient-to-r from-[#CC5500] to-[#CC5500] text-[#d8cdb8] px-6 py-3.5 rounded-xl font-semibold hover:opacity-90 transition shadow-[0_4px_22px_rgba(204,85,0,0.45)]"
       >
         See Pricing
@@ -874,7 +874,7 @@ export default function DraftingPage() {
         { id: "drafting-edge",         icon: "compare",      label: "Edge"      },
         { id: "drafting-testimonials", icon: "testimonials", label: "Reviews"   },
         { id: "drafting-faq",          icon: "faq",          label: "FAQ"       },
-        { id: "drafting-pricing",      icon: "credit-card",  label: "Pricing", href: "/pricing" },
+        { id: "drafting-pricing",      icon: "credit-card",  label: "Pricing", href: "/#pricing" },
         { id: "drafting-contact",      icon: "contact",      label: "Contact", href: "/contact" },
       ]} />
       <LandingNav />

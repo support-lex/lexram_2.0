@@ -79,35 +79,6 @@ function useReveal() {
   }, []);
 }
 
-function useLenis() {
-  useEffect(() => {
-    let raf = 0;
-    let lenis: { raf: (t: number) => void; destroy: () => void } | null = null;
-    let mounted = true;
-    (async () => {
-      const Lenis = (await import("lenis")).default;
-      if (!mounted) return;
-      lenis = new Lenis({
-        duration: 1.15,
-        easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-        smoothWheel: true,
-        wheelMultiplier: 1,
-        touchMultiplier: 1.4,
-      });
-      const loop = (time: number) => {
-        lenis?.raf(time);
-        raf = requestAnimationFrame(loop);
-      };
-      raf = requestAnimationFrame(loop);
-    })();
-    return () => {
-      mounted = false;
-      cancelAnimationFrame(raf);
-      lenis?.destroy();
-    };
-  }, []);
-}
-
 /* Page-wide scroll progress (0 → 1). Used by ScrollProgress and any
    parallax-driven element. Throttled via rAF to avoid layout thrash. */
 function useScrollProgress() {
@@ -834,7 +805,7 @@ function SectionCTA({
       </a>
       {!hidePricing && (
         <a
-          href="/pricing"
+          href="/#pricing"
           onClick={() => track("cta_see_pricing_click", { location })}
           className={`lex-btn lex-btn--pricing ${dark ? "lex-btn--dark" : ""}`}
         >
@@ -901,6 +872,9 @@ function Research() {
               src={researchImg}
               alt="Legal research platform"
               loading="lazy"
+              decoding="async"
+              width={1280}
+              height={896}
               className="absolute inset-0 w-full h-full object-cover"
             />
           </div>
@@ -970,6 +944,9 @@ function Drafting() {
               src={draftingImg}
               alt="AI legal drafting platform"
               loading="lazy"
+              decoding="async"
+              width={1280}
+              height={896}
               className="absolute inset-0 w-full h-full object-cover"
             />
           </div>
@@ -1793,7 +1770,6 @@ function Footer() {
    ============================================================ */
 export default function LandingPage() {
   useReveal();
-  useLenis();
   return (
     <div>
       <Nav />

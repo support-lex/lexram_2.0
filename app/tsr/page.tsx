@@ -93,7 +93,7 @@ export default function TSRPage() {
                 Start a Title Report <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
-                href="/pricing"
+                href="/#pricing"
                 className="inline-flex items-center gap-2 border border-[#6b1e2d]/30 text-[#6b1e2d] px-7 py-3.5 rounded-xl font-medium hover:border-[#6b1e2d] hover:bg-[#6b1e2d]/5 transition"
               >
                 See Pricing

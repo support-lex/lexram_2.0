@@ -12,6 +12,7 @@ import { uploadAvatar } from '@/lib/network/profile';
 import { logoutUsecase } from '@/modules/auth/usecase/auth.usecase';
 import { supabase } from '@/lib/supabase/client';
 import { isPaywallEnabled } from '@/lib/billing';
+import Link from 'next/link';
 
 const themes = [
   { id: 'light', name: 'Classic', desc: 'Warm white with gold accents', sidebar: '#0F172A', bg: '#FAFAF9', accent: '#B8860B', surface: '#FFFFFF' },
@@ -405,7 +406,7 @@ export default function SettingsPage() {
                 <p className="text-4xl font-sans font-bold">500 Credits</p>
                 <p className="text-sm text-[var(--text-muted)] mt-1">Free trial credits</p>
               </div>
-              <a href="#pricing" className="block w-full text-center bg-[var(--accent)] text-[var(--accent-text)] py-3 rounded-xl font-bold hover:bg-[var(--accent-hover)] transition-colors">Buy More Credits</a>
+              <Link href="/pricing" className="block w-full text-center bg-[var(--accent)] text-[var(--accent-text)] py-3 rounded-xl font-bold hover:bg-[var(--accent-hover)] transition-colors">Buy More Credits</Link>
             </div>
           )}
         </div>

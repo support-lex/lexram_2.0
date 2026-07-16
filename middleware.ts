@@ -3,6 +3,14 @@ import { createServerClient } from '@supabase/ssr';
 import { isPublicDashboardPath } from '@/lib/public-dashboard-paths';
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Skip Supabase + auth checks entirely on public auth/payment routes —
+  // they don't need session refresh and the round-trip blocks first paint.
+  if (isPublicPath(pathname)) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -27,7 +35,6 @@ export async function middleware(request: NextRequest) {
   // Refreshes the session cookie if needed.
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
   const isDashboard = pathname.startsWith('/dashboard');
 
   // Guests can browse the resources hub, every legislation/compliance/analytics
@@ -43,9 +50,24 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
+const PUBLIC_PATHS = [
+  '/sign-in',
+  '/reset-password',
+  '/payment',
+  '/payment/success',
+];
+
+function isPublicPath(pathname: string) {
+  if (pathname.startsWith('/_next')) return true;
+  if (pathname === '/' || pathname.startsWith('/api')) return false;
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
+}
+
 export const config = {
   matcher: [
-    // Run on all paths except static assets and image optimisation.
+    // Skip static assets, image optimisation, AND public auth/payment routes.
+    // Auth pages handle their own Supabase calls — running the middleware
+    // there just adds a cold network round-trip to the first paint.
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

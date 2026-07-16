@@ -1,12 +1,48 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { LucideIcon } from "lucide-react";
+import Link from "next/link";
+import {
+  LayoutGrid,
+  Search,
+  FileText,
+  IndianRupee,
+  Scale,
+  MessageSquare,
+  HelpCircle,
+  Mail,
+  Layers,
+  GitCompare,
+  CreditCard,
+  type LucideIcon,
+} from "lucide-react";
+
+/**
+ * Icons resolvable by name. Pass `icon="products"` from a Server Component
+ * instead of passing a Lucide component reference — components/functions
+ * can't be serialized across the RSC boundary.
+ */
+const ICONS: Record<string, LucideIcon> = {
+  products: LayoutGrid,
+  research: Search,
+  drafting: FileText,
+  pricing: IndianRupee,
+  compare: Scale,
+  testimonials: MessageSquare,
+  faq: HelpCircle,
+  contact: Mail,
+  layers: Layers,
+  "credit-card": CreditCard,
+  "git-compare": GitCompare,
+};
 
 export type SidebarItem = {
   id: string;
-  icon: LucideIcon;
+  /** Key into {@link ICONS} — e.g. "products", "research". */
+  icon: string;
   label: string;
+  /** When set, the item renders as a link to this route instead of an in-page scroll target. */
+  href?: string;
 };
 
 export function PageSidebarNav({ items }: { items: SidebarItem[] }) {
@@ -21,10 +57,11 @@ export function PageSidebarNav({ items }: { items: SidebarItem[] }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  /* active section tracking */
+  /* active section tracking — only for items without an external href */
   useEffect(() => {
     const observers: IntersectionObserver[] = [];
-    items.forEach(({ id }) => {
+    items.forEach(({ id, href }) => {
+      if (href) return;
       const el = document.getElementById(id);
       if (!el) return;
       const obs = new IntersectionObserver(
@@ -67,23 +104,11 @@ export function PageSidebarNav({ items }: { items: SidebarItem[] }) {
           width: 80,
         }}
       >
-        {items.map(({ id, icon: Icon, label }, idx) => {
-          const isActive = activeId === id;
-          return (
-            <button
-              key={id}
-              onClick={() => scrollTo(id)}
-              className="w-full flex flex-col items-center justify-center gap-[6px] cursor-pointer border-0 transition-all duration-200"
-              style={{
-                height: "72px",
-                background: isActive ? "rgba(255,255,255,0.18)" : "transparent",
-                borderBottom:
-                  idx < items.length - 1
-                    ? "1px solid rgba(255,255,255,0.12)"
-                    : "none",
-                boxShadow: isActive ? "inset 3px 0 0 #CC5500" : "none",
-              }}
-            >
+        {items.map(({ id, icon: iconKey, label, href }, idx) => {
+          const Icon = ICONS[iconKey];
+          const isActive = !href && activeId === id;
+          const inner = (
+            <>
               <Icon
                 style={{
                   width: 19,
@@ -108,6 +133,38 @@ export function PageSidebarNav({ items }: { items: SidebarItem[] }) {
               >
                 {label}
               </span>
+            </>
+          );
+          const baseStyle = {
+            height: "72px",
+            background: isActive ? "rgba(255,255,255,0.18)" : "transparent",
+            borderBottom:
+              idx < items.length - 1
+                ? "1px solid rgba(255,255,255,0.12)"
+                : "none",
+            boxShadow: isActive ? "inset 3px 0 0 #CC5500" : "none",
+          } as const;
+          const className =
+            "w-full flex flex-col items-center justify-center gap-[6px] cursor-pointer border-0 transition-all duration-200";
+          return href ? (
+            <Link
+              key={id}
+              href={href}
+              className={className}
+              style={baseStyle}
+              aria-label={label}
+            >
+              {inner}
+            </Link>
+          ) : (
+            <button
+              key={id}
+              onClick={() => scrollTo(id)}
+              className={className}
+              style={baseStyle}
+              aria-label={label}
+            >
+              {inner}
             </button>
           );
         })}

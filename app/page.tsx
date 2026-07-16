@@ -6,10 +6,10 @@ import {
   CheckCircle2, ArrowRight, Quote, Plus, Minus,
   Mail, Phone, MapPin, Menu, X,
   Scale, Gavel, BookOpen,
-  LayoutGrid, Search, FileText, MessageSquare, HelpCircle,
 } from "lucide-react";
 import { track } from "@/lib/landing-analytics";
 import { PageSidebarNav } from "@/components/page-sidebar-nav";
+import PricingSection from "@/components/PricingSection";
 
 /* Asset paths — copied into /public/landing/ */
 const researchImg   = "/landing/research-img.jpg";
@@ -283,6 +283,7 @@ function Nav() {
     { href: "/drafting",      label: "Drafting" },
     { href: "/sign-in", label: "TSR" },
     { href: "/blog",          label: "Blog" },
+    { href: "/pricing",        label: "Pricing" },
     { href: "#faq",            label: "FAQ" },
     { href: "#contact",        label: "Contact" },
   ];
@@ -292,7 +293,7 @@ function Nav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-3">
         {/* Brand */}
         <a href="#" aria-label="Lexram" className="flex items-center shrink-0">
-          <img src="/lexram-logo.png" alt="Lexram" width={140} height={48} className={`h-11 sm:h-12 w-auto transition-all duration-300 ${scrolled ? "" : "brightness-0 invert"}`} />
+          <img src="/lexram-logo.png" alt="Lexram" width={140} height={48} loading="eager" decoding="async" fetchPriority="high" className={`h-11 sm:h-12 w-auto transition-all duration-300 ${scrolled ? "" : "brightness-0 invert"}`} />
         </a>
 
         {/* Desktop nav */}
@@ -386,13 +387,36 @@ function Hero() {
 
   const BG = (
     <>
-      {/* Video background */}
-      <video
+      {/* Poster image — paints immediately so LCP doesn't wait on a 4.5 MB video.
+          The video starts only after mount + intersection visible so users on
+          slow connections never pay for it. */}
+      <div
         aria-hidden
-        autoPlay
+        className="absolute inset-0 w-full h-full bg-cover bg-center"
+        style={{
+          backgroundImage: "url(/landing/hero-courtroom.jpg)",
+          transform: `translate3d(0, ${y * 0.08}px, 0) scale(1.04)`,
+        }}
+      />
+      <video
+        ref={(el) => {
+          if (!el || el.dataset.started === "1") return;
+          el.dataset.started = "1";
+          const play = () => el.play().catch(() => {});
+          if ("IntersectionObserver" in window) {
+            const obs = new IntersectionObserver(([e]) => {
+              if (e.isIntersecting) { play(); obs.disconnect(); }
+            }, { rootMargin: "200px" });
+            obs.observe(el);
+          } else {
+            setTimeout(play, 1500);
+          }
+        }}
+        aria-hidden
         muted
         loop
         playsInline
+        preload="none"
         className="absolute inset-0 w-full h-full object-cover"
         style={{ transform: `translate3d(0, ${y * 0.08}px, 0) scale(1.04)` }}
       >
@@ -808,7 +832,7 @@ function SectionCTA({
       </a>
       {!hidePricing && (
         <a
-          href="#pricing"
+          href="/pricing"
           onClick={() => track("cta_see_pricing_click", { location })}
           className={`lex-btn lex-btn--pricing ${dark ? "lex-btn--dark" : ""}`}
         >
@@ -844,6 +868,7 @@ function ParallaxHeroImage({
         src={src}
         alt={alt}
         loading="lazy"
+        decoding="async"
         width={1280}
         height={896}
         className="relative rounded-2xl shadow-elegant w-full aspect-[4/3] object-cover will-change-transform"
@@ -1767,25 +1792,21 @@ function Footer() {
 export default function LandingPage() {
   useReveal();
   useLenis();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
   return (
     <div>
       <Nav />
       <ScrollProgress />
       <PageSidebarNav items={[
-        { id: "products",     icon: LayoutGrid,    label: "Products"   },
-        { id: "research",     icon: Search,        label: "Research"   },
-        { id: "drafting",     icon: FileText,      label: "Drafting"   },
-        { id: "compare",      icon: Scale,         label: "Compare"    },
-        { id: "testimonials", icon: MessageSquare, label: "Reviews"    },
-        { id: "faq",          icon: HelpCircle,    label: "FAQ"        },
-        { id: "contact",      icon: Mail,          label: "Contact"    },
+        { id: "products",     icon: "products",     label: "Products"   },
+        { id: "research",     icon: "research",     label: "Research"   },
+        { id: "drafting",     icon: "drafting",     label: "Drafting"   },
+        { id: "compare",      icon: "compare",      label: "Compare"    },
+        { id: "testimonials", icon: "testimonials", label: "Reviews"    },
+        { id: "pricing",      icon: "pricing",      label: "Pricing"    },
+        { id: "faq",          icon: "faq",          label: "FAQ"        },
+        { id: "contact",      icon: "contact",      label: "Contact"    },
       ]} />
-      <main data-landing-v2 className={`bg-[#d8cdb8] overflow-x-hidden ${mounted ? "lex-page-enter" : "opacity-0"}`}>
+      <main data-landing-v2 className="bg-[#d8cdb8] overflow-x-hidden lex-page-enter">
         <Hero />
         <TrustStrip />
         <ProductCards />
@@ -1795,6 +1816,7 @@ export default function LandingPage() {
         <MarketComparison />
         <Stats />
         <Stories />
+        <PricingSection />
         <FAQ />
         <GetInTouch />
         {/* <CTA /> — removed; final closing message lives in the maroon GetInTouch section */}

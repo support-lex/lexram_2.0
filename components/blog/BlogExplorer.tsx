@@ -348,9 +348,10 @@ function TodayCard({ post }: { post: BlogPost }) {
     >
       <div className="relative">
         {post.cover_image_url ? (
-          <div className="aspect-[16/9] overflow-hidden">
+          <div className="aspect-[16/9] overflow-hidden relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.cover_image_url} alt="" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+            <img src={post.cover_image_url} alt="" className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/15" aria-hidden />
           </div>
         ) : (
           <div className="aspect-[16/9] bg-gradient-to-br from-[#b94826]/10 to-[#680318]/5 grid place-items-center">
@@ -419,9 +420,10 @@ function PostCard({ post, highlight }: { post: BlogPost; highlight?: boolean }) 
     >
       <div className="relative">
         {post.cover_image_url ? (
-          <div className="aspect-[16/9] overflow-hidden">
+          <div className="aspect-[16/9] overflow-hidden relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.cover_image_url} alt="" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+            <img src={post.cover_image_url} alt="" className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/15" aria-hidden />
           </div>
         ) : (
           <div className="aspect-[16/9] bg-gradient-to-br from-[#b94826]/10 to-[#680318]/5 grid place-items-center">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ArrowRight, Menu, X, Mail, Phone, MapPin } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────────
@@ -13,6 +14,24 @@ import { ArrowRight, Menu, X, Mail, Phone, MapPin } from "lucide-react";
 export function LandingNav() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const pathname = usePathname() || "/";
+
+  // Map the in-page FAQ section per route so the header link scrolls
+  // smoothly to the FAQ already on the page instead of routing to /faq.
+  const faqHref =
+    pathname.startsWith("/drafting") ? "#drafting-faq"
+    : pathname.startsWith("/research") ? "#research-faq"
+    : pathname === "/" ? "#faq"
+    : "/faq";
+
+  const navLinks = [
+    { href: "/research",      label: "Research" },
+    { href: "/drafting",      label: "Drafting" },
+    { href: "/dashboard/tsr", label: "TSR" },
+    { href: "/blog",         label: "Blog" },
+    { href: "/pricing",      label: "Pricing" },
+    { href: "/contact",      label: "Contact" },
+  ];
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -28,23 +47,9 @@ export function LandingNav() {
     return () => window.removeEventListener("hashchange", onHash);
   }, [open]);
 
-  const navLinks = [
-    { href: "/research",      label: "Research" },
-    { href: "/drafting",      label: "Drafting" },
-    { href: "/dashboard/tsr", label: "TSR" },
-    { href: "/blog",         label: "Blog" },
-    { href: "/#pricing",      label: "Pricing" },
-    { href: "/#faq",          label: "FAQ" },
-    { href: "/#contact",      label: "Contact" },
-  ];
-
   return (
     <header
-      className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 backdrop-blur-md border-b border-[#6b1e2d]/10 ${
-        scrolled
-          ? "bg-[#d8cdb8] shadow-[0_4px_24px_rgba(107,30,45,0.08)]"
-          : "bg-[#d8cdb8]/80"
-      }`}
+      className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 bg-[#d8cdb8]/95 backdrop-blur-md border-b border-[#6b1e2d]/10 shadow-[0_4px_24px_rgba(107,30,45,0.08)]`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-3">
 
@@ -55,7 +60,7 @@ export function LandingNav() {
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden lg:flex items-center gap-7 text-base text-[#6b1e2d]/80">
+        <nav className="hidden lg:flex items-center gap-7 text-base text-[#6b1e2d]/93">
           {navLinks.map((l) => (
             <Link key={l.href} href={l.href} className="font-medium hover:text-[#6b1e2d] transition-colors">
               {l.label}
@@ -65,10 +70,16 @@ export function LandingNav() {
 
         {/* Desktop CTAs */}
         <div className="hidden sm:flex items-center gap-3">
-          <Link href="/sign-in" className="inline-flex items-center gap-2 border border-[#6b1e2d]/25 text-[#6b1e2d] px-4 lg:px-5 py-2.5 rounded-md text-base font-medium hover:border-[#6b1e2d] hover:text-[#6b1e2d] transition">
+          <Link
+            href="/sign-in"
+            className="inline-flex items-center gap-2 border border-[#6b1e2d]/25 text-[#6b1e2d] px-4 lg:px-5 py-2.5 rounded-md text-base font-medium hover:border-[#6b1e2d] hover:text-[#6b1e2d] transition"
+          >
             Login
           </Link>
-          <Link href="/#contact" className="inline-flex items-center gap-2 bg-[#CC5500] text-[#d8cdb8] px-4 lg:px-5 py-2.5 rounded-md text-base font-semibold hover:bg-[#AA4400] transition shadow-[0_4px_16px_rgba(204,85,0,0.35)]">
+          <Link
+            href="/sign-in?intent=signup"
+            className="inline-flex items-center gap-2 bg-[#CC5500] text-[#d8cdb8] px-4 lg:px-5 py-2.5 rounded-md text-base font-medium hover:bg-[#CC5500] transition shadow-soft"
+          >
             <span className="hidden md:inline">Free Trial</span>
             <span className="md:hidden">Trial</span>
             <ArrowRight className="w-4 h-4" />
@@ -103,7 +114,7 @@ export function LandingNav() {
             >
               Login
             </Link>
-            <Link href="/#contact" onClick={() => setOpen(false)}
+            <Link href="/sign-in?intent=signup" onClick={() => setOpen(false)}
               className="inline-flex items-center justify-center gap-2 bg-[#CC5500] text-[#d8cdb8] px-4 py-2.5 rounded-md text-sm font-semibold"
             >
               Free Trial <ArrowRight className="w-4 h-4" />
@@ -159,7 +170,12 @@ export function LandingFooter() {
 
           {/* Col 1: Brand + contact + social */}
           <div className="flex flex-col gap-4">
-            <span className="font-serif text-3xl sm:text-4xl font-bold text-[#d8cdb8] tracking-tight" style={{ textShadow: "0 2px 24px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.55)" }}>LexRam</span>
+            <span
+              className="font-serif text-3xl sm:text-4xl font-bold text-[#d8cdb8] tracking-tight"
+              style={{ textShadow: "0 2px 24px rgba(107, 30, 45,0.65), 0 1px 8px rgba(0,0,0,0.55)" }}
+            >
+              LexRam
+            </span>
             <p className="text-sm leading-relaxed text-[#d8cdb8]/90 max-w-xs">
               &ldquo;You argue the case. We&apos;ll find the law.&rdquo;<br />
               Built exclusively on India&apos;s courts — statute to submission.
@@ -182,7 +198,7 @@ export function LandingFooter() {
                 </address>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 pt-1">
+            <div className="flex items-center gap-2.5 pt-1 stagger-children">
               {socials.map(({ href, svgPath, label }) => (
                 <a
                   key={label}
@@ -225,7 +241,6 @@ export function LandingFooter() {
             <ul className="space-y-3 text-sm">
               <li><Link href="/privacy"       className="text-[#d8cdb8]/90 hover:text-[#d8cdb8] transition-colors">Privacy</Link></li>
               <li><Link href="/terms"         className="text-[#d8cdb8]/90 hover:text-[#d8cdb8] transition-colors">Terms</Link></li>
-              <li><Link href="/refund-policy" className="text-[#d8cdb8]/90 hover:text-[#d8cdb8] transition-colors">Refund</Link></li>
             </ul>
           </div>
         </div>

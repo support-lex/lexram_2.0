@@ -8,6 +8,10 @@ import type { BlogPost } from "@/types/blog";
 import BlogActions from "./BlogActions";
 import CommentsSection from "@/components/blog/CommentsSection";
 import { LeftSidebar, RightSidebar } from "@/components/blog/PostSidebars";
+import { SITE_URL, DEFAULT_OG } from "@/lib/seo/site";
+import { blogPostingJsonLd, breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { Breadcrumbs } from "@/components/seo/Breadcrumbs";
 
 
 
@@ -26,16 +30,25 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params;
   const post = await fetchPost(slug);
   if (!post) return { title: "Blog post not found" };
+  const url = `${SITE_URL}/blog/${slug}`;
   return {
     title: post.meta_title || `${post.title} | LexRam`,
     description: post.meta_description || post.subtitle || undefined,
+    alternates: { canonical: url },
     openGraph: {
       title: post.title,
       description: post.meta_description || post.subtitle || undefined,
-      images: post.cover_image_url ? [post.cover_image_url] : undefined,
+      url,
+      images: post.cover_image_url ? [post.cover_image_url] : [DEFAULT_OG],
       type: "article",
       publishedTime: post.published_at ?? undefined,
       authors: post.author_name ? [post.author_name] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: post.meta_description || post.subtitle || undefined,
+      images: post.cover_image_url ? [post.cover_image_url] : [DEFAULT_OG],
     },
   };
 }
@@ -55,6 +68,27 @@ export default async function BlogPostPage({ params }: PageProps) {
 
   return (
     <article className="bg-[#fff0df] pb-24">
+      <JsonLd
+        id="ld-blogposting"
+        data={blogPostingJsonLd({
+          title: post.title,
+          description: post.meta_description || post.subtitle || post.title,
+          slug,
+          image: post.cover_image_url ?? undefined,
+          authorName: post.author_name || "LexRam Editorial",
+          datePublished: publishDate.toISOString(),
+          dateModified: post.updated_at
+            ? new Date(post.updated_at).toISOString()
+            : undefined,
+        })}
+      />
+      <Breadcrumbs
+        items={[
+          { name: "Home", href: "/" },
+          { name: "Blog", href: "/blog" },
+          { name: post.title, href: `/blog/${slug}` },
+        ]}
+      />
       {/* Hero cover card — same design language as the blog carousel */}
       <div className="px-4 sm:px-6 lg:px-10 py-4 max-w-[1400px] mx-auto">
         <div

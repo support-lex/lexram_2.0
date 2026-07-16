@@ -2,14 +2,35 @@
 
 import { motion, AnimatePresence } from 'motion/react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import OtpInput from '@/components/auth/OtpInput';
-import PhoneInput from 'react-phone-input-2';
-import 'react-phone-input-2/lib/style.css';
 import { supabase } from '@/lib/supabase/client';
+
+// react-phone-input-2 + its CSS is ~150 KB and only needed on phone fields.
+// Lazy-load the JS chunk via next/dynamic so it doesn't block first paint.
+// The CSS is injected on demand inside PhoneField (also via a link tag) so
+// it doesn't ship in the initial CSS bundle either.
+const PhoneInput = dynamic(() => import('react-phone-input-2' /* webpackChunkName: "phone-input" */), { ssr: false });
+const PHONE_CSS_HREF = 'https://cdn.jsdelivr.net/npm/react-phone-input-2@2.15.1/lib/style.css';
+function PhoneField(props: React.ComponentProps<typeof PhoneInput>) {
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (document.querySelector(`link[data-phone-input-css]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = PHONE_CSS_HREF;
+    link.setAttribute('data-phone-input-css', '');
+    document.head.appendChild(link);
+    return () => {
+      link.remove();
+    };
+  }, []);
+  return <PhoneInput {...props} />;
+}
 import {
   signupUsecase,
   loginUsecase,
@@ -44,33 +65,20 @@ export default function SignInForm() {
   // is just clicking "Sign in" out of habit. Bounce them straight to the
   // dashboard. Renders a small spinner while the check is in flight so we
   // don't flash the form.
-  const [sessionChecked, setSessionChecked] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(true);
   useEffect(() => {
     let cancelled = false;
-    const showForm = () => { if (!cancelled) setSessionChecked(true); };
-    // Failsafe: NEVER trap the user on the loading spinner if the auth probe
-    // stalls. Supabase's auth client serialises getSession()/getUser() behind a
-    // navigator Web Lock; with several lexram tabs open (or a stale lock held by
-    // a suspended tab) that acquire can hang indefinitely BEFORE any network
-    // request, leaving this gate unresolved and the sign-in form never rendered
-    // — observed in production as a permanent spinner with no API calls. After
-    // 2.5s we render the form regardless so the user can always sign in.
-    const failsafe = setTimeout(showForm, 2500);
-    // getSession() (cache-first) instead of getUser() (server round-trip): the
-    // middleware is the authoritative auth gate, so a cached session is enough
-    // to decide whether to bounce an already-signed-in user to the dashboard.
-    supabase().auth.getSession()
-      .then(({ data }) => {
+    // Quick, cache-only session probe — only redirect if a valid, phone-verified
+    // session is ALREADY cached locally. No network call, no spinner.
+    try {
+      const cached = supabase().auth.getSession();
+      cached.then(({ data }) => {
         if (cancelled) return;
         const u = data.session?.user;
-        if (u && u.phone_confirmed_at) {
-          router.replace(redirectPath);
-          return;
-        }
-        showForm();
-      })
-      .catch(showForm);
-    return () => { cancelled = true; clearTimeout(failsafe); };
+        if (u && u.phone_confirmed_at) router.replace(redirectPath);
+      }).catch(() => { /* noop — render form */ });
+    } catch { /* noop */ }
+    return () => { cancelled = true; };
   }, [router, redirectPath]);
 
   // Sign-in
@@ -304,15 +312,8 @@ export default function SignInForm() {
     forgot: { title: 'Forgot password', sub: 'Enter your email or phone to receive a verification code.' },
   }[mode];
 
-  // While the session probe is in flight, render a small spinner so we don't
-  // flash the form for users who are already logged in.
-  if (!sessionChecked) {
-    return (
-      <div className="w-full max-w-sm mx-auto flex items-center justify-center py-24">
-        <Loader2 className="w-6 h-6 animate-spin text-[var(--text-muted)]" />
-      </div>
-    );
-  }
+  // Form renders immediately — the cached-session probe above will redirect
+  // already-signed-in users without ever showing the form.
 
   return (
     <motion.div
@@ -382,7 +383,7 @@ export default function SignInForm() {
                 <label className="block text-sm font-medium text-[var(--text-secondary)]">
                   Phone number
                 </label>
-                <PhoneInput
+                <PhoneField
                   country={'in'}
                   value={signinPhone}
                   onChange={(value) => setSigninPhone(value)}
@@ -462,7 +463,7 @@ export default function SignInForm() {
           >
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-[var(--text-secondary)]">Mobile number</label>
-              <PhoneInput
+              <PhoneField
                 country={'in'}
                 value={signupPhone}
                 onChange={(value) => setSignupPhone(value)}

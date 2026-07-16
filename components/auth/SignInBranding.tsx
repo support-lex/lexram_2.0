@@ -71,12 +71,26 @@ export default function SignInBranding() {
         >
           <div className="relative" style={{ paddingTop: "52%" }}>
             <video
+              ref={(el) => {
+                if (!el || el.dataset.started === "1") return;
+                el.dataset.started = "1";
+                const play = () => el.play().catch(() => {});
+                if ("IntersectionObserver" in window) {
+                  const obs = new IntersectionObserver(([e]) => {
+                    if (e.isIntersecting) { play(); obs.disconnect(); }
+                  }, { rootMargin: "200px" });
+                  obs.observe(el);
+                } else {
+                  setTimeout(play, 1500);
+                }
+              }}
               className="absolute inset-0 w-full h-full object-cover"
               src="/landing/hero-ambient.mp4"
-              autoPlay
               muted
               loop
               playsInline
+              preload="none"
+              poster="/landing/hero-courtroom.jpg"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#3a0d18]/80 via-[#3a0d18]/10 to-transparent pointer-events-none" />
 

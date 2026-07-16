@@ -129,7 +129,7 @@ export default function Hero() {
               </Link>
             </motion.div>
             <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
-              <a href="#pricing" className="px-7 py-3 bg-transparent text-white border border-white/20 rounded-full text-sm font-semibold tracking-wide hover:bg-white/5 hover:border-white/35 transition-all block">
+              <a href="/pricing" className="px-7 py-3 bg-transparent text-white border border-white/20 rounded-full text-sm font-semibold tracking-wide hover:bg-white/5 hover:border-white/35 transition-all block">
                 View Pricing
               </a>
             </motion.div>

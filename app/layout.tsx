@@ -1,45 +1,42 @@
 import type { Metadata, Viewport } from 'next';
-import { Libre_Baskerville, Geist, Geist_Mono, Cormorant_Garamond, Playfair_Display, DM_Sans } from 'next/font/google';
+import { Libre_Baskerville, Geist, Geist_Mono, Playfair_Display, DM_Sans } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import './globals.css';
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/lib/query-provider";
 import { ScrollSystem } from "@/components/scroll-system";
+import FontAwesomeLoader from "@/components/font-awesome-loader";
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
 
-const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-mono' });
+const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
 
 const libreBaskerville = Libre_Baskerville({
   weight: ['400', '700'],
   subsets: ['latin'],
   variable: '--font-serif',
+  display: 'swap',
 });
 
-// Cormorant Garamond — used by the prior editorial landing variant
-const cormorant = Cormorant_Garamond({
-  weight: ['300', '400', '500', '600', '700'],
-  style: ['normal', 'italic'],
-  subsets: ['latin'],
-  variable: '--font-editorial',
-});
-
-// Playfair Display — display serif for the new cinematic landing page
+// Playfair Display — display serif for the new cinematic landing page.
+// Only the weights actually used on the landing page are loaded.
 const playfair = Playfair_Display({
-  weight: ['400', '500', '600', '700', '800'],
+  weight: ['400', '700'],
   style: ['normal', 'italic'],
   subsets: ['latin'],
   variable: '--font-landing-display',
+  display: 'swap',
 });
 
-// DM Sans — body sans for the landing page
+// DM Sans — body sans for the landing page.
 const dmSans = DM_Sans({
-  weight: ['300', '400', '500', '600', '700'],
+  weight: ['400', '500', '700'],
   subsets: ['latin'],
   variable: '--font-landing-sans',
+  display: 'swap',
 });
 
 export const viewport: Viewport = {
@@ -148,20 +145,32 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-IN" className={cn("scroll-smooth", "h-full", geist.variable, geistMono.variable, libreBaskerville.variable, cormorant.variable, playfair.variable, dmSans.variable, "font-sans")} suppressHydrationWarning>
+    <html lang="en-IN" className={cn("scroll-smooth", "h-full", geist.variable, geistMono.variable, libreBaskerville.variable, playfair.variable, dmSans.variable, "font-sans")} suppressHydrationWarning>
       <head>
         {/* Preconnect to the LexRam Legal Research API so the TLS handshake
             (~400–800 ms cold) overlaps with the page's initial paint instead
             of blocking the first /sessions call on the research screen. */}
         <link rel="preconnect" href="https://api.lexram.ai" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://api.lexram.ai" />
-        {/* FontAwesome free CDN — required for mermaid fa: icon nodes */}
+        {/* FontAwesome free CDN — required for mermaid fa: icon nodes.
+            Preload hint starts the download early; FontAwesomeLoader
+            (client component) mounts the <link media="print"> and flips
+            media="all" once loaded. */}
         <link
-          rel="stylesheet"
+          rel="preload"
+          as="style"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
           crossOrigin="anonymous"
           referrerPolicy="no-referrer"
         />
+        <noscript>
+          <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
+          />
+        </noscript>
         {/* ── JSON-LD Structured Data ─────────────────────────────────── */}
         <script
           type="application/ld+json"
@@ -279,6 +288,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         }} />
       </head>
       <body className="font-sans antialiased h-full bg-[var(--bg-primary)] text-[var(--text-primary)] selection:bg-[var(--accent)]/30 transition-colors duration-300" suppressHydrationWarning>
+        <FontAwesomeLoader />
         <ScrollSystem />
         <QueryProvider>
           {children}

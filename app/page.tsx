@@ -283,7 +283,6 @@ function Nav() {
     { href: "/drafting",      label: "Drafting" },
     { href: "/sign-in", label: "TSR" },
     { href: "/blog",          label: "Blog" },
-    { href: "/pricing",        label: "Pricing" },
     { href: "#faq",            label: "FAQ" },
     { href: "#contact",        label: "Contact" },
   ];

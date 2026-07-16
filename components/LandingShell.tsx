@@ -29,7 +29,6 @@ export function LandingNav() {
   }, [open]);
 
 const navLinks = [
-    { href: "/",              label: "Homepage" },
     { href: "/research",      label: "Research" },
     { href: "/drafting",      label: "Drafting" },
     { href: "/dashboard/tsr", label: "TSR" },

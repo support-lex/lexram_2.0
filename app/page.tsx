@@ -443,7 +443,7 @@ function Hero() {
         {/* ── Editorial headline ─────────────────────────────────────── */}
         <div className="reveal-up" style={{ transitionDelay: "80ms" }}>
           <h1
-            className="font-serif font-bold text-[#d8cdb8] leading-[0.90] tracking-tight text-[2.8rem] sm:text-[4rem] md:text-[5.2rem] lg:text-[6.8rem] xl:text-[8.5rem]"
+            className="font-serif font-bold text-[#d8cdb8] leading-[0.90] tracking-tight text-[2rem] sm:text-[2.75rem] md:text-[3.5rem] lg:text-[4.5rem] xl:text-[5.5rem]"
             style={{ textShadow: '0 4px 40px rgba(0,0,0,0.5)' }}
           >
             &ldquo;From statute to submission<br />

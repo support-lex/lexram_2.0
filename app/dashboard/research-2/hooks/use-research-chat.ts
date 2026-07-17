@@ -409,10 +409,6 @@ export function useResearchChat(
   ensureSessionRef.current = options.ensureSession;
 
   // ── Reset streaming state on new chat ──────────────────────────────────────
-  // When currentSessionId becomes null (user clicked "New Chat"), abort any
-  // in-flight SSE stream and clear the Working... state. Without this, a stale
-  // ensureSession closure can route the new request to the old session on the
-  // backend, which never sends a done event → isSearching stays true forever.
   useEffect(() => {
     if (options.currentSessionId === null) {
       if (abortRef.current) {
@@ -424,8 +420,28 @@ export function useResearchChat(
       setStatusMessage("");
       streamRef.current = "";
       setActiveRunMode(null);
+      setStreamingSources([]);
     }
   }, [options.currentSessionId]);
+
+  // ── Hydrate sources from sessionStorage when switching sessions ─────────────
+  useEffect(() => {
+    const sid = options.currentSessionId;
+    if (!sid || sid.startsWith("temp_")) return;
+    try {
+      const stored = sessionStorage.getItem(`lexram-sources-${sid}`);
+      if (stored) setStreamingSources(JSON.parse(stored));
+    } catch { /* ignore parse errors */ }
+  }, [options.currentSessionId]);
+
+  // ── Persist sources to sessionStorage whenever they change ──────────────────
+  useEffect(() => {
+    const sid = options.currentSessionId;
+    if (!sid || sid.startsWith("temp_") || streamingSources.length === 0) return;
+    try {
+      sessionStorage.setItem(`lexram-sources-${sid}`, JSON.stringify(streamingSources));
+    } catch { /* quota exceeded — non-fatal */ }
+  }, [streamingSources, options.currentSessionId]);
 
   const refreshSessionsRef = useRef(options.refreshSessions);
   refreshSessionsRef.current = options.refreshSessions;

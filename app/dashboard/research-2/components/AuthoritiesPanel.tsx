@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   ArrowUpRight, Copy, Plus, Landmark, FileText,
   Eye, Download, X, ExternalLink, Scale, BookOpen, Gavel, FileCheck, ScrollText,
@@ -356,6 +356,29 @@ export default function AuthoritiesPanel({
   streamingSources = [],
 }: AuthoritiesPanelProps) {
   const hasSources = streamingSources.length > 0;
+  const [activeFilters, setActiveFilters] = useState<Set<ChunkSourceType>>(new Set());
+
+  // Reset filters when a new set of sources arrives (different query)
+  const prevSourcesLenRef = useRef(0);
+  if (streamingSources.length < prevSourcesLenRef.current) {
+    setActiveFilters(new Set());
+  }
+  prevSourcesLenRef.current = streamingSources.length;
+
+  const toggleFilter = (type: ChunkSourceType) => {
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type); else next.add(type);
+      return next;
+    });
+  };
+
+  const presentTypes = (["sc_judgment", "hc_judgment", "statute", "sc_order", "state_act"] as ChunkSourceType[])
+    .filter((t) => streamingSources.some((s) => s.type === t));
+
+  const displayedSources = activeFilters.size === 0
+    ? streamingSources
+    : streamingSources.filter((s) => activeFilters.has(s.type));
 
   const getHost = (url?: string): string => {
     if (!url) return "";
@@ -419,27 +442,52 @@ export default function AuthoritiesPanel({
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between mb-3 pb-3 border-b border-[var(--border-light)]">
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {streamingSources.length} retrieved
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    {(["sc_judgment", "hc_judgment", "statute", "sc_order"] as ChunkSourceType[])
-                      .filter((t) => streamingSources.some((s) => s.type === t))
-                      .map((t) => {
-                        const c = TYPE_CONFIG[t];
-                        return (
-                          <span key={t} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${c.badge}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-                            {c.label}
-                          </span>
-                        );
-                      })}
+                <div className="mb-3 pb-3 border-b border-[var(--border-light)]">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      {displayedSources.length === streamingSources.length
+                        ? `${streamingSources.length} retrieved`
+                        : `${displayedSources.length} of ${streamingSources.length}`}
+                    </p>
+                    {activeFilters.size > 0 && (
+                      <button
+                        onClick={() => setActiveFilters(new Set())}
+                        className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline transition-colors"
+                      >
+                        Clear filter
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {presentTypes.map((t) => {
+                      const c = TYPE_CONFIG[t];
+                      const active = activeFilters.has(t);
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => toggleFilter(t)}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-all ${
+                            active
+                              ? `${c.badge} ring-2 ring-offset-1 ring-current opacity-100`
+                              : `${c.badge} opacity-60 hover:opacity-100`
+                          }`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+                          {c.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-                {streamingSources.map((src, i) => (
-                  <SourceCard key={i} source={src} index={i} />
-                ))}
+                {displayedSources.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-[var(--text-muted)]">
+                    No sources match the selected filter
+                  </div>
+                ) : (
+                  displayedSources.map((src, i) => (
+                    <SourceCard key={i} source={src} index={i} />
+                  ))
+                )}
               </>
             )}
           </div>

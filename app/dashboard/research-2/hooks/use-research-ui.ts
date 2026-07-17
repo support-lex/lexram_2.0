@@ -74,19 +74,11 @@ export function useResearchUI({
     }
   }, [streamingSourcesCount]);
 
-  // Auto-open the right-side authorities rail when a new AI response arrives
-  // with parsed sources. Only switches tab if the user hasn't manually picked
-  // one during this query — avoids yanking them off Sources mid-read.
+  // Authorities are shown inline below the answer in the chat bubble —
+  // no auto-switch needed in the side panel.
   useEffect(() => {
     if (!lastAi?.id || !lastAi.response) return;
-    if (lastAi.id === lastAutoArtifactResponseIdRef.current) return;
-
-    const auths = lastAi.response.authorities ?? [];
-    if (auths.length > 0) {
-      lastAutoArtifactResponseIdRef.current = lastAi.id;
-      setShowArtifacts(true);
-      if (!userPickedTabRef.current) _setArtifactTab("authorities");
-    }
+    lastAutoArtifactResponseIdRef.current = lastAi.id;
   }, [lastAi]);
 
   // CustomEvent listeners from the global dashboard header

@@ -669,11 +669,28 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
             doneEventRef.current = event;
           },
           onChunks: (_tool, sources) => {
+            const dedup = (existing: ChunkSource[], incoming: ChunkSource[]): ChunkSource[] => {
+              const seen = new Set(existing.map((s) => (s.chunk_text ?? "").slice(0, 120)));
+              return incoming.filter((s) => {
+                const key = (s.chunk_text ?? "").slice(0, 120);
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+            };
             if (firstChunkOfQueryRef.current) {
               firstChunkOfQueryRef.current = false;
-              setStreamingSources(sources as ChunkSource[]);
+              const incoming = sources as ChunkSource[];
+              // Deduplicate within the first batch itself
+              const unique: ChunkSource[] = [];
+              const seen = new Set<string>();
+              for (const s of incoming) {
+                const key = (s.chunk_text ?? "").slice(0, 120);
+                if (!seen.has(key)) { seen.add(key); unique.push(s); }
+              }
+              setStreamingSources(unique);
             } else {
-              setStreamingSources((prev) => [...prev, ...(sources as ChunkSource[])]);
+              setStreamingSources((prev) => [...prev, ...dedup(prev, sources as ChunkSource[])]);
             }
           },
           onError: (message) => {

@@ -355,8 +355,7 @@ export default function AuthoritiesPanel({
   width = 50,
   streamingSources = [],
 }: AuthoritiesPanelProps) {
-  const hasWorkflow = (lastResponse?.workflowSteps || []).length > 0;
-  const hasSources  = streamingSources.length > 0;
+  const hasSources = streamingSources.length > 0;
 
   const getHost = (url?: string): string => {
     if (!url) return "";
@@ -370,7 +369,7 @@ export default function AuthoritiesPanel({
   const editorContent = liveEditorContent || lastResponse?.draftReady || "";
   const hasEditor = Boolean(editorContent.trim());
 
-  if (!showArtifacts || (!hasWorkflow && !hasEditor && !hasSources)) return null;
+  if (!showArtifacts || (!hasEditor && !hasSources)) return null;
 
   const tabBtn = (tab: ArtifactTab, label: string) => (
     <button
@@ -393,9 +392,8 @@ export default function AuthoritiesPanel({
       {/* Tab bar */}
       <div className="px-4 py-3 border-b border-[var(--border-default)] flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-1 rounded-xl bg-[var(--surface-hover)] p-1 border border-[var(--border-default)]">
-          {hasSources  && tabBtn("sources",  `Sources (${streamingSources.length})`)}
-          {hasWorkflow && tabBtn("workflow", `Mind map${workflowCount > 0 ? ` (${workflowCount})` : ""}`)}
-          {hasEditor   && tabBtn("editor",   "Editor")}
+          {hasSources && tabBtn("sources", `Sources (${streamingSources.length})`)}
+          {hasEditor  && tabBtn("editor",  "Editor")}
         </div>
         <div className="flex items-center gap-2">
           {hasEditor && artifactTab !== "editor" && (

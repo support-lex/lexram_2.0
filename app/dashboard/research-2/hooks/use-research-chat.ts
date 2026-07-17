@@ -427,11 +427,16 @@ export function useResearchChat(
   // ── Hydrate sources from sessionStorage when switching sessions ─────────────
   useEffect(() => {
     const sid = options.currentSessionId;
-    if (!sid || sid.startsWith("temp_")) return;
+    if (!sid || sid.startsWith("temp_")) {
+      setStreamingSources([]);
+      return;
+    }
     try {
       const stored = sessionStorage.getItem(`lexram-sources-${sid}`);
-      if (stored) setStreamingSources(JSON.parse(stored));
-    } catch { /* ignore parse errors */ }
+      setStreamingSources(stored ? JSON.parse(stored) : []);
+    } catch {
+      setStreamingSources([]);
+    }
   }, [options.currentSessionId]);
 
   // ── Persist sources to sessionStorage whenever they change ──────────────────

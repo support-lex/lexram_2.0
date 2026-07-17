@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowUpRight, Copy, Plus, Landmark, FileText,
   Eye, Download, X, ExternalLink, Scale, BookOpen, Gavel, FileCheck, ScrollText,
@@ -151,25 +152,35 @@ function SourceChunkModal({
 // ── PDF iframe overlay (HC judgments only) ───────────────────────────────────
 
 function PdfOverlay({ src, title, onClose }: { src: string; title: string; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm">
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const overlay = (
+    <div className="fixed inset-0 z-[9999] flex flex-col" style={{ background: "rgba(0,0,0,0.92)" }}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[var(--bg-sidebar)] text-white flex-shrink-0">
-        <span className="text-sm font-semibold truncate max-w-[70%]">{title}</span>
+      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ background: "#1a1a2e" }}>
+        <span className="text-sm font-semibold text-white truncate max-w-[60%]">{title}</span>
         <div className="flex items-center gap-2">
           <a
             href={src}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-colors"
+            style={{ background: "rgba(255,255,255,0.12)" }}
           >
             <ExternalLink className="w-3.5 h-3.5" /> Open in tab
           </a>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+            aria-label="Close PDF"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors"
+            style={{ background: "rgba(239,68,68,0.8)" }}
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" /> Close
           </button>
         </div>
       </div>
@@ -177,11 +188,15 @@ function PdfOverlay({ src, title, onClose }: { src: string; title: string; onClo
       <iframe
         src={src}
         title={title}
-        className="flex-1 w-full border-0"
+        className="flex-1 w-full border-0 bg-white"
         allow="fullscreen"
       />
     </div>
   );
+
+  // Portal to document.body so backdrop-filter stacking context can't trap it
+  if (typeof document === "undefined") return null;
+  return createPortal(overlay, document.body);
 }
 
 // ── Chunk source card ────────────────────────────────────────────────────────

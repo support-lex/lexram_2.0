@@ -389,7 +389,7 @@ export default function AuthoritiesPanel({
   return (
     <aside
       className={`w-full h-full border-t lg:border-t-0 lg:border-l border-[var(--border-default)] bg-[var(--surface-glass)] backdrop-blur-2xl flex-col ${mobilePane === "chat" ? "hidden lg:flex" : "flex"}`}
-      style={{ flexBasis: `${width}%`, minWidth: "350px" }}
+      style={{ flexBasis: `${width}%`, minWidth: "280px" }}
     >
       {/* Tab bar */}
       <div className="px-4 py-3 border-b border-[var(--border-default)] flex items-center justify-between flex-shrink-0">

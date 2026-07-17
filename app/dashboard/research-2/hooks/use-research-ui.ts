@@ -42,7 +42,7 @@ export function useResearchUI({
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [mobilePane, setMobilePane] = useState<"chat" | "authorities">("chat");
   const [selectedAuthorityIndex, setSelectedAuthorityIndex] = useState<number | null>(null);
-  const [artifactsWidth, setArtifactsWidth] = useState(50);
+  const [artifactsWidth, setArtifactsWidth] = useState(35);
   const [isDragging, setIsDragging] = useState(false);
   const [expandedWorking, setExpandedWorking] = useState<Record<string, boolean>>({});
   const [expandedThinkingTokens, setExpandedThinkingTokens] = useState<Record<string, boolean>>({});

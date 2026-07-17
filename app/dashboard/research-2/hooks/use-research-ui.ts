@@ -65,7 +65,12 @@ export function useResearchUI({
     if (streamingSourcesCount > 0 && !sourcesOpenedRef.current) {
       sourcesOpenedRef.current = true;
       setShowArtifacts(true);
-      if (!userPickedTabRef.current) _setArtifactTab("sources");
+      if (!userPickedTabRef.current) {
+        _setArtifactTab("sources");
+        // Lock the tab so the authorities auto-switch (firing when onDone
+        // arrives) doesn't yank the user off the sources they're reading.
+        userPickedTabRef.current = true;
+      }
     }
   }, [streamingSourcesCount]);
 

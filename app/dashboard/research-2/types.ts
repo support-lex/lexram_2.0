@@ -1,5 +1,27 @@
 export type CommandMode = "normal" | "counter" | "draft" | "timeline";
-export type ArtifactTab = "workflow" | "authorities" | "editor";
+export type ArtifactTab = "workflow" | "authorities" | "editor" | "sources";
+
+export type ChunkSourceType = "sc_judgment" | "hc_judgment" | "statute" | "sc_order" | "state_act";
+
+export type ChunkSource = {
+  type: ChunkSourceType;
+  title?: string;
+  /** For statutes: the parent act name */
+  act_name?: string;
+  citation?: string;
+  court?: string;
+  date?: string;
+  cnr?: string;
+  diary_no?: string;
+  section_number?: string;
+  section_title?: string;
+  chunk_text?: string;
+  /** PDF/document URL — source_url for SC judgments, pdf_url for HC/orders/statutes */
+  pdf_url?: string;
+  source_url?: string;
+  /** True only for HC judgments (S3) — embed in iframe overlay */
+  embed?: boolean;
+};
 
 export type Authority = {
   caseName: string;

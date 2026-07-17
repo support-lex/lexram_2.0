@@ -7,10 +7,12 @@ export function useResearchUI({
   lastAi,
   queryTextareaRef,
   handleSubmitRef,
+  streamingSourcesCount = 0,
 }: {
   lastAi?: Message;
   queryTextareaRef: React.RefObject<HTMLTextAreaElement | null>;
   handleSubmitRef: React.RefObject<() => void>;
+  streamingSourcesCount?: number;
 }) {
   const [showArtifacts, setShowArtifacts] = useState(false);
   const [artifactTab, setArtifactTab] = useState<ArtifactTab>("workflow");
@@ -33,6 +35,20 @@ export function useResearchUI({
   // manually with the history toggle (or `Cmd/Ctrl+H`). Keeps the chat card
   // at full width by default and avoids fighting for screen real estate on
   // smaller laptops.
+
+  // Auto-open the sources panel as soon as the first chunk arrives from tools
+  // (before the LLM finishes streaming). Stays on "sources" tab.
+  const sourcesOpenedRef = useRef(false);
+  useEffect(() => {
+    if (streamingSourcesCount > 0 && !sourcesOpenedRef.current) {
+      sourcesOpenedRef.current = true;
+      setShowArtifacts(true);
+      setArtifactTab("sources");
+    }
+    if (streamingSourcesCount === 0) {
+      sourcesOpenedRef.current = false;
+    }
+  }, [streamingSourcesCount]);
 
   // Auto-open the right-side authorities rail whenever a new AI response
   // arrives with parsed sources. The LexRam backend ships inline citations

@@ -36,6 +36,9 @@ export interface QueryStreamCallbacks {
   onToken?: (content: string) => void;
   onDone?: (event: QueryStreamDoneEvent) => void;
   onError?: (message: string) => void;
+  /** Called each time a tool completes with the retrieved chunk sources.
+   *  Arrives progressively during the stream, before `onDone`. */
+  onChunks?: (tool: string, sources: unknown[]) => void;
 }
 
 export interface QueryStreamOptions {
@@ -206,6 +209,11 @@ export async function streamLexRamQuery(
             case "done":
               callbacks.onDone?.(event as QueryStreamDoneEvent);
               streamDone = true;
+              break;
+            case "chunks":
+              if (Array.isArray(event.sources)) {
+                callbacks.onChunks?.(String(event.tool ?? ""), event.sources);
+              }
               break;
             case "error":
               callbacks.onError?.(String(event.message ?? "Unknown error"));

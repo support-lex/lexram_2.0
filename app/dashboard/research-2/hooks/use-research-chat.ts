@@ -11,6 +11,7 @@ import {
   type AnalysisDepth,
   type AttachedFile,
   type Authority,
+  type ChunkSource,
   type CommandMode,
   type LegalAnswer,
   type Message,
@@ -402,6 +403,7 @@ export function useResearchChat(
   const [writingStyle, setWritingStyle] = useState<WritingStyle>("neutral");
   const [liveEditorContent, setLiveEditorContent] = useState("");
   const [activeRunMode, setActiveRunMode] = useState<CommandMode | null>(null);
+  const [streamingSources, setStreamingSources] = useState<ChunkSource[]>([]);
 
   const ensureSessionRef = useRef(options.ensureSession);
   ensureSessionRef.current = options.ensureSession;
@@ -597,6 +599,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     setStreamingText("");
     setStatusMessage("");
     setStatusDetail([]);
+    setStreamingSources([]);
     streamRef.current = "";
     setActiveRunMode(effectiveMode);
     setLiveEditorContent("");
@@ -661,6 +664,9 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
           },
           onDone: (event) => {
             doneEventRef.current = event;
+          },
+          onChunks: (_tool, sources) => {
+            setStreamingSources((prev) => [...prev, ...(sources as ChunkSource[])]);
           },
           onError: (message) => {
             setError(message);
@@ -1236,6 +1242,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     setWritingStyle,
     liveEditorContent,
     activeRunMode,
+    streamingSources,
     handleSubmit,
     stopGeneration,
     addFiles,

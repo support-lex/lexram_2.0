@@ -233,7 +233,7 @@ export default function Research2Page() {
     webSearchEnabled, setWebSearchEnabled, outputFormat, setOutputFormat,
     analysisDepth, setAnalysisDepth, writingStyle, setWritingStyle,
     selectedPromptPreset, setSelectedPromptPreset,
-    liveEditorContent, activeRunMode, handleSubmit, stopGeneration,
+    liveEditorContent, activeRunMode, streamingSources, handleSubmit, stopGeneration,
     addFiles, attachCaseDocs, buildSessionDraft,
   } = useResearchChat(messages, setMessages, { ensureSession, currentSessionId, refreshSessions });
 
@@ -249,7 +249,7 @@ export default function Research2Page() {
     mobilePane, setMobilePane, selectedAuthorityIndex, setSelectedAuthorityIndex,
     artifactsWidth, isDragging, containerRef, handleDragStart,
     expandedWorking, expandedThinkingTokens, toggleWorking, toggleThinkingTokens,
-  } = useResearchUI({ lastAi, queryTextareaRef, handleSubmitRef });
+  } = useResearchUI({ lastAi, queryTextareaRef, handleSubmitRef, streamingSourcesCount: streamingSources.length });
 
   const shouldAutoSubmit = useRef(false);
   useEffect(() => {
@@ -830,6 +830,25 @@ export default function Research2Page() {
           </div>
 
         </div>
+
+        {/* ── Sources / Authorities panel ─── */}
+        <AuthoritiesPanel
+          showArtifacts={showArtifacts}
+          mobilePane={mobilePane}
+          artifactTab={artifactTab}
+          setArtifactTab={setArtifactTab}
+          lastResponse={sourceMessage?.response}
+          currentQuestion={sourceMessage?.content}
+          workflowCount={sourceMessage?.response?.uiBlocks?.filter(b => b.type === "mindmap").length ?? 0}
+          authorityCount={sourceMessage?.response?.authorities?.length ?? 0}
+          selectedAuthorityIndex={selectedAuthorityIndex}
+          onSelectAuthority={setSelectedAuthorityIndex}
+          liveEditorContent={liveEditorContent}
+          isDraftArtifactStreaming={isSearching && activeRunMode === "draft"}
+          sessionId={currentSessionId}
+          width={artifactsWidth}
+          streamingSources={streamingSources}
+        />
 
         {/* ── Case Hub — rightmost sibling of the chat area ─── */}
         <CasesPanel

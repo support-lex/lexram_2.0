@@ -249,7 +249,7 @@ export default function Research2Page() {
     mobilePane, setMobilePane, selectedAuthorityIndex, setSelectedAuthorityIndex,
     artifactsWidth, isDragging, containerRef, handleDragStart,
     expandedWorking, expandedThinkingTokens, toggleWorking, toggleThinkingTokens,
-  } = useResearchUI({ lastAi, queryTextareaRef, handleSubmitRef, streamingSourcesCount: streamingSources.length });
+  } = useResearchUI({ lastAi, queryTextareaRef, handleSubmitRef, streamingSourcesCount: streamingSources.length, isSearching });
 
   const shouldAutoSubmit = useRef(false);
   useEffect(() => {

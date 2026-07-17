@@ -432,6 +432,9 @@ export function useResearchChat(
 
   const streamRef = useRef("");
   const abortRef = useRef<AbortController | null>(null);
+  // True at the start of each query; the first onChunks call resets it after
+  // replacing (not appending) so old sources don't flash empty between queries.
+  const firstChunkOfQueryRef = useRef(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryTextareaRef = useRef<HTMLTextAreaElement>(null);
   const handleSubmitRef = useRef<() => void>(() => {});
@@ -599,7 +602,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     setStreamingText("");
     setStatusMessage("");
     setStatusDetail([]);
-    setStreamingSources([]);
+    firstChunkOfQueryRef.current = true; // next onChunks replaces instead of appending
     streamRef.current = "";
     setActiveRunMode(effectiveMode);
     setLiveEditorContent("");
@@ -666,7 +669,12 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
             doneEventRef.current = event;
           },
           onChunks: (_tool, sources) => {
-            setStreamingSources((prev) => [...prev, ...(sources as ChunkSource[])]);
+            if (firstChunkOfQueryRef.current) {
+              firstChunkOfQueryRef.current = false;
+              setStreamingSources(sources as ChunkSource[]);
+            } else {
+              setStreamingSources((prev) => [...prev, ...(sources as ChunkSource[])]);
+            }
           },
           onError: (message) => {
             setError(message);

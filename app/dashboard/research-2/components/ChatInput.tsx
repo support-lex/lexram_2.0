@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import {
   Send,
   Square,
@@ -130,6 +130,23 @@ export default function ChatInput({
   isAuthenticated = true,
   onSignUp,
 }: ChatInputProps) {
+  type InputTab = "ask" | "docChat" | "draft";
+  const [inputTab, setInputTab] = useState<InputTab>(
+    () => (queryMode === "draft" ? "draft" : "ask")
+  );
+
+  // Sync tab if queryMode is changed externally
+  useEffect(() => {
+    if (queryMode === "draft" && inputTab !== "draft") setInputTab("draft");
+    else if (queryMode !== "draft" && inputTab === "draft") setInputTab("ask");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryMode]);
+
+  const handleTabChange = (tab: InputTab) => {
+    setInputTab(tab);
+    setQueryMode(tab === "draft" ? "draft" : "deep");
+  };
+
   useEffect(() => {
     resizeTextarea(queryTextareaRef.current);
   }, [query, resizeTextarea, queryTextareaRef]);
@@ -222,9 +239,32 @@ export default function ChatInput({
         )}
 
 
-        {/* Main input bar — proper search-box height, Draft mode toggle
-            lives on the RIGHT corner next to the send button so the
-            left side stays clean (just the attach +). */}
+          {/* Mode tabs — Ask / DocChat / Draft */}
+        <div className="flex items-center gap-1 mb-2 px-1">
+          {(["ask", "docChat", "draft"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => handleTabChange(tab)}
+              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                inputTab === tab
+                  ? "bg-[var(--accent)] text-white shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+              }`}
+            >
+              {tab === "ask" ? "Ask" : tab === "docChat" ? "DocChat" : "Draft"}
+              {tab === "draft" && (
+                <span className={`text-[8px] font-bold tracking-wider px-1 py-0.5 rounded ${
+                  inputTab === "draft" ? "bg-white/25 text-white" : "bg-amber-100 text-amber-600"
+                }`}>
+                  BETA
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Main input bar */}
         <div className="flex items-center gap-2 sm:gap-3 rounded-full border border-[var(--oracle-outline-variant,#d0c5b6)]/30 bg-transparent px-3 sm:px-4 py-2.5 shadow-[var(--input-shadow)] focus-within:border-[var(--oracle-primary-container,#c6a76e)]/60 focus-within:shadow-[0_0_0_2px_rgba(198,167,110,0.15),var(--input-shadow)] transition-all duration-300">
           {/* + button */}
           <button
@@ -242,32 +282,21 @@ export default function ChatInput({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={hasThread ? "Inquire further..." : "Ask LexRam anything..."}
+            placeholder={
+              hasThread
+                ? "Inquire further..."
+                : inputTab === "docChat"
+                ? "Ask about a judgment, statute, or uploaded document…"
+                : inputTab === "draft"
+                ? "Describe the document you want to draft…"
+                : "Ask anything about Indian law…"
+            }
             rows={1}
             className="flex-1 resize-none bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/60 outline-none border-0 appearance-none focus:outline-none focus:ring-0 leading-6 max-h-[120px] overflow-y-auto custom-scrollbar py-1.5"
           />
 
-          {/* Right: Draft pill + mic + send */}
+          {/* Right: mic + send */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-
-            {/* Draft mode toggle — sits on the right corner of the input */}
-            <button
-              type="button"
-              onClick={() => setQueryMode(queryMode === "draft" ? "deep" : "draft")}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all flex-shrink-0 ${
-                queryMode === "draft"
-                  ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-default)]"
-              }`}
-              title="Draft a legal document"
-            >
-              Draft
-              <span className={`text-[8px] font-bold tracking-wider px-1 py-0.5 rounded ${
-                queryMode === "draft" ? "bg-white/25 text-white" : "bg-amber-100 text-amber-600"
-              }`}>
-                BETA
-              </span>
-            </button>
 
             {/* Voice typing */}
             {speechSupported && (

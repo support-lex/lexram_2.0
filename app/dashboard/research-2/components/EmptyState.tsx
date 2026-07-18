@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Scale, Paperclip, ArrowRight, Mic, MicOff } from "lucide-react";
 import { useVoiceTyping } from "@/hooks/use-voice-typing";
 
@@ -33,6 +33,24 @@ export default function EmptyState({
   isDraftMode = false,
   onToggleDraftMode,
 }: EmptyStateProps) {
+  // ── Mode tab state ─────────────────────────────────────────────────────
+  type InputTab = "ask" | "docChat" | "draft";
+  const [inputTab, setInputTab] = useState<InputTab>(
+    () => (isDraftMode ? "draft" : "ask")
+  );
+
+  useEffect(() => {
+    if (isDraftMode && inputTab !== "draft") setInputTab("draft");
+    else if (!isDraftMode && inputTab === "draft") setInputTab("ask");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDraftMode]);
+
+  const handleTabChange = (tab: InputTab) => {
+    setInputTab(tab);
+    const shouldBeDraft = tab === "draft";
+    if (shouldBeDraft !== isDraftMode) onToggleDraftMode?.();
+  };
+
   // ── Hero input behaviour ───────────────────────────────────────────────
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const resize = (el: HTMLTextAreaElement | null) => {
@@ -93,6 +111,31 @@ export default function EmptyState({
 
         {/* ── Hero input — rounded card with rust focus ring ────── */}
         <div data-tour="research-hero-input" className="w-full max-w-2xl lex-animate-scale-in">
+          {/* Mode tabs */}
+          <div className="flex items-center gap-1 mb-2 px-1">
+            {(["ask", "docChat", "draft"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => handleTabChange(tab)}
+                className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                  inputTab === tab
+                    ? "bg-[var(--lex-rust)] text-[var(--lex-cream)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--lex-maroon)] hover:bg-[var(--lex-cream-deep)]"
+                }`}
+              >
+                {tab === "ask" ? "Ask" : tab === "docChat" ? "DocChat" : "Draft"}
+                {tab === "draft" && (
+                  <span className={`text-[8px] font-bold tracking-wider px-1 py-0.5 rounded ${
+                    inputTab === "draft" ? "bg-white/25 text-white" : "bg-amber-100 text-amber-600"
+                  }`}>
+                    BETA
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
           <div
             data-no-focus-ring
             className="lexram-input-shell group/input relative rounded-2xl bg-white border border-[var(--border-default)] px-5 py-3 shadow-[var(--lex-shadow-elevated)] focus-within:border-[var(--lex-rust)] focus-within:shadow-[0_0_0_4px_rgba(185,72,38,0.15),var(--lex-shadow-elevated)] transition-all duration-300"
@@ -112,7 +155,13 @@ export default function EmptyState({
                 }
               }}
               rows={1}
-              placeholder="Ask anything about Indian law…"
+              placeholder={
+                inputTab === "docChat"
+                  ? "Ask about a judgment, statute, or uploaded document…"
+                  : inputTab === "draft"
+                  ? "Describe the document you want to draft…"
+                  : "Ask anything about Indian law…"
+              }
               className="w-full block bg-transparent border-0 outline-none resize-none appearance-none shadow-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-none text-[15px] text-[#1a1010] placeholder:text-[#aa9ea0] leading-[1.55] m-0 p-0"
               style={{
                 boxShadow: "none",
@@ -143,26 +192,6 @@ export default function EmptyState({
               </button>
 
               <div className="flex items-center gap-2">
-                {onToggleDraftMode && (
-                  <button
-                    type="button"
-                    onClick={onToggleDraftMode}
-                    title="Draft a legal document"
-                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all flex-shrink-0 ${
-                      isDraftMode
-                        ? "bg-[var(--lex-rust)] text-[var(--lex-cream)] shadow-sm"
-                        : "bg-[var(--lex-cream-deep)] text-[var(--lex-maroon)] hover:bg-[var(--lex-maroon)] hover:text-[var(--lex-cream)] border border-[var(--border-default)]"
-                    }`}
-                  >
-                    Draft
-                    <span className={`text-[8px] font-bold tracking-wider px-1 py-0.5 rounded ${
-                      isDraftMode ? "bg-white/25 text-white" : "bg-amber-100 text-amber-600"
-                    }`}>
-                      BETA
-                    </span>
-                  </button>
-                )}
-
                 {speechSupported && (
                   <button
                     type="button"

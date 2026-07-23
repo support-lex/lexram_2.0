@@ -152,12 +152,21 @@ function SourceChunkModal({
 // ── PDF iframe overlay (HC judgments only) ───────────────────────────────────
 
 function PdfOverlay({ src, title, onClose }: { src: string; title: string; onClose: () => void }) {
-  // Close on Escape
+  // Push a history entry so the browser back button closes the overlay
+  // instead of navigating away from the research page.
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.history.pushState({ pdfOverlay: true }, "");
+    const onPopState = () => onClose();
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [onClose]);
+
+  // Escape — go back through history so the pushed state is consumed
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") window.history.back(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, []);
 
   const overlay = (
     <div className="fixed inset-0 z-[9999] flex flex-col" style={{ background: "rgba(0,0,0,0.92)" }}>
@@ -175,7 +184,7 @@ function PdfOverlay({ src, title, onClose }: { src: string; title: string; onClo
             <ExternalLink className="w-3.5 h-3.5" /> Open in tab
           </a>
           <button
-            onClick={onClose}
+            onClick={() => window.history.back()}
             aria-label="Close PDF"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors"
             style={{ background: "rgba(239,68,68,0.8)" }}

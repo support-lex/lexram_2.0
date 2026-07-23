@@ -140,7 +140,7 @@ function init() {
         .catch(() => {
           // Refresh failed (e.g. refresh token also expired) — fall back to
           // getSession() so onAuthStateChange can redirect to sign-in if needed.
-          return sb.auth.getSession().catch(() => {});
+          sb.auth.getSession().catch(() => {}); // fire-and-forget, keep return type void
         })
         .finally(() => {
           wakeRefreshPromise = null;

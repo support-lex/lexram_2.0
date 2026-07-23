@@ -160,6 +160,25 @@ export const authStore = {
  * reads a fresh token via getSession() (which transparently refreshes an
  * expiring token). Returns null on the server or when signed out.
  */
+/**
+ * Explicitly exchange the refresh token for a new access token.
+ * Call this after a 401 to silently recover the session before retrying.
+ */
+export async function refreshAuthToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const { data, error } = await supabase().auth.refreshSession();
+    if (error || !data.session) return null;
+    // applySession fires via onAuthStateChange (TOKEN_REFRESHED), but also
+    // update the snapshot immediately so the next getAccessToken() call reads
+    // the new token without waiting for the event loop.
+    applySession(data.session.user, data.session.access_token, true);
+    return data.session.access_token;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAccessToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
   init();

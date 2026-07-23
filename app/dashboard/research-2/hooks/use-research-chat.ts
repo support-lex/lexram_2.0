@@ -362,15 +362,16 @@ function normalizeAnswer(raw: any, rootQuery = "Query"): LegalAnswer {
 
 function classifyError(raw: string): { message: string; kind: "auth" | "retryable" } {
   const s = (raw ?? "").toLowerCase();
-  if (s.includes("token expired") || s.includes("unauthorized") || s.includes("not authenticated") || s.includes("http 401") || s.includes("sign in to start"))
+  // Status-code patterns (encoded as [NNN] by the API layer) take priority over string matching
+  if (s.includes("[401]") || s.includes("token expired") || s.includes("unauthorized") || s.includes("not authenticated") || s.includes("could not validate credentials") || s.includes("sign in to start"))
     return { message: "Your session has expired. Please sign in again.", kind: "auth" };
-  if (s.includes("429") || s.includes("rate limit") || s.includes("too many requests"))
+  if (s.includes("[429]") || s.includes("rate limit") || s.includes("too many requests"))
     return { message: "Too many requests. Please wait a moment and try again.", kind: "retryable" };
-  if (s.includes("402") || s.includes("credits") || s.includes("quota") || s.includes("billing") || s.includes("payment required"))
+  if (s.includes("[402]") || s.includes("credits") || s.includes("quota") || s.includes("billing") || s.includes("payment required"))
     return { message: "We're experiencing high demand. Please try again in a few minutes.", kind: "retryable" };
   if (s.includes("failed to fetch") || s.includes("networkerror") || s.includes("load failed") || s.includes("network request failed"))
     return { message: "Check your internet connection and try again.", kind: "retryable" };
-  if (s.includes("500") || s.includes("502") || s.includes("503") || s.includes("internal server error"))
+  if (s.includes("[500]") || s.includes("[502]") || s.includes("[503]") || s.includes("internal server error"))
     return { message: "Something went wrong on our end. Please try again.", kind: "retryable" };
   if (s.includes("took too long") || s.includes("stopped responding") || s.includes("timed out"))
     return { message: raw, kind: "retryable" };
@@ -474,6 +475,7 @@ export function useResearchChat(
   refreshSessionsRef.current = options.refreshSessions;
 
   const streamRef = useRef("");
+  const lastSubmittedQueryRef = useRef("");
   const abortRef = useRef<AbortController | null>(null);
   // True at the start of each query; the first onChunks call resets it after
   // replacing (not appending) so old sources don't flash empty between queries.
@@ -638,6 +640,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       mode: effectiveMode,
     };
 
+    lastSubmittedQueryRef.current = prompt;
     setMessages((prev) => [...prev, userMessage]);
     setQuery("");
     setError(null);
@@ -745,6 +748,14 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         },
         { signal: controller.signal }
       );
+
+      // Silent drop guard: if the stream closed cleanly (no error thrown) but
+      // delivered zero content and no done event, the backend silently dropped
+      // the connection. Surface a retryable error instead of leaving the chat idle.
+      if (!streamRef.current.trim() && !doneEventRef.current) {
+        setError("The response was empty. Please try again."); setErrorKind("retryable");
+        return;
+      }
 
       // Build the final answer. Token order of preference:
       //   1. concatenated streaming tokens (the normal happy path)
@@ -1129,6 +1140,13 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     abortRef.current?.abort();
   };
 
+  const retryLastQuery = () => {
+    const last = lastSubmittedQueryRef.current;
+    if (!last) return;
+    setQuery(last);
+    setTimeout(() => handleSubmitRef.current?.(), 50);
+  };
+
   const handleSubmit = () => {
     const trimmed = query.trim();
     if (!trimmed) return;
@@ -1317,6 +1335,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     activeRunMode,
     streamingSources,
     handleSubmit,
+    retryLastQuery,
     stopGeneration,
     addFiles,
     attachCaseDocs,

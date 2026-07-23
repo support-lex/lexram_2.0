@@ -233,7 +233,7 @@ export default function Research2Page() {
     webSearchEnabled, setWebSearchEnabled, outputFormat, setOutputFormat,
     analysisDepth, setAnalysisDepth, writingStyle, setWritingStyle,
     selectedPromptPreset, setSelectedPromptPreset,
-    liveEditorContent, activeRunMode, streamingSources, handleSubmit, stopGeneration,
+    liveEditorContent, activeRunMode, streamingSources, handleSubmit, retryLastQuery, stopGeneration,
     addFiles, attachCaseDocs, buildSessionDraft,
   } = useResearchChat(messages, setMessages, { ensureSession, currentSessionId, refreshSessions });
 
@@ -760,7 +760,7 @@ export default function Research2Page() {
                 <ChatThread
                   messages={messages} isSearching={isSearching || demoTyping} streamingText={streamingText}
                   statusMessage={statusMessage} statusDetail={statusDetail} error={error} errorKind={errorKind} userInitials={userInitials}
-                  onRetry={() => handleSubmitRef.current?.()}
+                  onRetry={retryLastQuery}
                   onSignIn={() => { window.location.href = "/sign-in"; }}
                   expandedWorking={expandedWorking} expandedThinkingTokens={expandedThinkingTokens}
                   toggleWorking={toggleWorking} toggleThinkingTokens={toggleThinkingTokens}

@@ -109,6 +109,11 @@ export async function streamLexRamQuery(
     ) {
       throw new Error("The server took too long to respond. Please try again.");
     }
+    // "Failed to fetch" = no network / CORS / DNS — surface a readable message
+    const msg = (err as { message?: string })?.message ?? "";
+    if (msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("load failed")) {
+      throw new Error("Check your internet connection and try again.");
+    }
     throw err;
   }
   // Headers arrived — disarm the connect timer, but KEEP the caller-abort →
@@ -217,6 +222,7 @@ export async function streamLexRamQuery(
               break;
             case "error":
               callbacks.onError?.(String(event.message ?? "Unknown error"));
+              streamDone = true;
               break;
             default:
               // ignore unknown event types

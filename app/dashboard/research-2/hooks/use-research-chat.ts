@@ -360,6 +360,27 @@ function normalizeAnswer(raw: any, rootQuery = "Query"): LegalAnswer {
   };
 }
 
+function classifyError(raw: string): { message: string; kind: "auth" | "retryable" } {
+  const s = (raw ?? "").toLowerCase();
+  if (s.includes("token expired") || s.includes("unauthorized") || s.includes("not authenticated") || s.includes("http 401") || s.includes("sign in to start"))
+    return { message: "Your session has expired. Please sign in again.", kind: "auth" };
+  if (s.includes("429") || s.includes("rate limit") || s.includes("too many requests"))
+    return { message: "Too many requests. Please wait a moment and try again.", kind: "retryable" };
+  if (s.includes("402") || s.includes("credits") || s.includes("quota") || s.includes("billing") || s.includes("payment required"))
+    return { message: "We're experiencing high demand. Please try again in a few minutes.", kind: "retryable" };
+  if (s.includes("failed to fetch") || s.includes("networkerror") || s.includes("load failed") || s.includes("network request failed"))
+    return { message: "Check your internet connection and try again.", kind: "retryable" };
+  if (s.includes("500") || s.includes("502") || s.includes("503") || s.includes("internal server error"))
+    return { message: "Something went wrong on our end. Please try again.", kind: "retryable" };
+  if (s.includes("took too long") || s.includes("stopped responding") || s.includes("timed out"))
+    return { message: raw, kind: "retryable" };
+  if (s.includes("could not create") || s.includes("could not start") || s.includes("chat session"))
+    return { message: "Could not start a research session. Please refresh and try again.", kind: "retryable" };
+  if (s.includes("knowledge base") || s.includes("weaviate") || s.includes("neo4j"))
+    return { message: "Could not reach the knowledge base. Please try again.", kind: "retryable" };
+  return { message: "Something went wrong. Please try again.", kind: "retryable" };
+}
+
 export interface UseResearchChatOptions {
   /** Ensure a LexRam session exists, creating one on demand. Returns the session id. */
   ensureSession: (titleHint: string) => Promise<string | null>;
@@ -385,6 +406,7 @@ export function useResearchChat(
   const [queryMode, setQueryMode] = useState<QueryMode>("deep");
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<"auth" | "retryable" | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   // Optional sub-lines that the backend now ships alongside the status
@@ -619,6 +641,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     setMessages((prev) => [...prev, userMessage]);
     setQuery("");
     setError(null);
+    setErrorKind(null);
     setIsSearching(true);
     setStreamingText("");
     setStatusMessage("");
@@ -639,7 +662,8 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     try {
       sessionId = await ensureSessionRef.current(prompt);
     } catch (err: any) {
-      setError(err?.message || "Could not create session.");
+      const { message, kind } = classifyError(err?.message || "Could not create session.");
+      setError(message); setErrorKind(kind);
       setIsSearching(false);
       return;
     }
@@ -651,12 +675,12 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       return;
     }
     if (!sessionId) {
-      setError("Could not create a chat session.");
+      setError("Could not start a research session. Please refresh and try again."); setErrorKind("retryable");
       setIsSearching(false);
       return;
     }
     if (sessionId.startsWith("temp_")) {
-      setError("Please sign in to start a research session.");
+      setError("Please sign in to start a research session."); setErrorKind("auth");
       setIsSearching(false);
       return;
     }
@@ -715,7 +739,8 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
             }
           },
           onError: (message) => {
-            setError(message);
+            const { message: friendly, kind } = classifyError(message);
+            setError(friendly); setErrorKind(kind);
           },
         },
         { signal: controller.signal }
@@ -1071,7 +1096,8 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         setMessages((prev) => [...prev, fallback]);
       }
       if (err?.name !== "AbortError") {
-        setError(err?.message || "Research failed.");
+        const { message, kind } = classifyError(err?.message || "Research failed.");
+        setError(message); setErrorKind(kind);
       }
     } finally {
       setIsSearching(false);
@@ -1268,6 +1294,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     statusDetail,
     isSearching,
     error,
+    errorKind,
     streamingText,
     attachedFiles,
     removeFile,

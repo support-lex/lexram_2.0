@@ -227,7 +227,7 @@ export default function Research2Page() {
 
   const {
     query, setQuery, mode, setMode, queryMode, setQueryMode,
-    statusMessage, statusDetail, isSearching, error, streamingText,
+    statusMessage, statusDetail, isSearching, error, errorKind, streamingText,
     attachedFiles, removeFile, isDragActive, dropHandlers,
     fileInputRef, queryTextareaRef, handleSubmitRef, resizeTextarea,
     webSearchEnabled, setWebSearchEnabled, outputFormat, setOutputFormat,
@@ -759,7 +759,9 @@ export default function Research2Page() {
               {hasThread ? (
                 <ChatThread
                   messages={messages} isSearching={isSearching || demoTyping} streamingText={streamingText}
-                  statusMessage={statusMessage} statusDetail={statusDetail} error={error} userInitials={userInitials}
+                  statusMessage={statusMessage} statusDetail={statusDetail} error={error} errorKind={errorKind} userInitials={userInitials}
+                  onRetry={() => handleSubmitRef.current?.()}
+                  onSignIn={() => { window.location.href = "/sign-in"; }}
                   expandedWorking={expandedWorking} expandedThinkingTokens={expandedThinkingTokens}
                   toggleWorking={toggleWorking} toggleThinkingTokens={toggleThinkingTokens}
                   onOpenAuthorities={handleOpenAuthorities} onOpenEditor={handleOpenEditor}

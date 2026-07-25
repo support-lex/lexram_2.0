@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, Scale, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
-import { updatePasswordUsecase } from '@/modules/auth/usecase/auth.usecase';
+import {
+  readResetTicket,
+  resetPasswordWithTicketUsecase,
+  updatePasswordUsecase,
+} from '@/modules/auth/usecase/auth.usecase';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -21,7 +25,12 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const result = await updatePasswordUsecase(newPassword, confirmPassword);
+    // Two ways to land here:
+    //   • SMS OTP   → no session, but a single-use ticket in sessionStorage
+    //   • email OTP → signed in already, Supabase does the update
+    const result = readResetTicket()
+      ? await resetPasswordWithTicketUsecase(newPassword, confirmPassword)
+      : await updatePasswordUsecase(newPassword, confirmPassword);
     setLoading(false);
 
     if (!result.success) {

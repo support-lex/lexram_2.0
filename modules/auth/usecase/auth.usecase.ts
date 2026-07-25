@@ -1,8 +1,17 @@
-// Auth use-cases backed by Supabase.
+// Auth use-cases. Sessions are Supabase; SMS OTP is ours.
+//
+// Phone OTP does NOT go through Supabase Auth (which would send via its
+// configured SMS provider). We mint, send and verify codes ourselves through
+// app/api/auth/* → Arihant Global. Supabase only stores the user and issues the
+// session once the phone is confirmed.
+//
 // Flows:
-//   • Signup → email/password + profile metadata, then EMAIL OTP gating before login
-//   • Login  → email or phone + password (no OTP)
-//   • Forgot → email-or-phone OTP, then update password while signed in via OTP
+//   • Signup → POST /api/auth/signup (creates unconfirmed user + sends SMS OTP)
+//              → verify OTP → phone confirmed → sign in with phone + password
+//   • Login  → email or phone + password. An unconfirmed phone bounces the user
+//              into the same SMS OTP screen.
+//   • Forgot → SMS OTP (phone) or Supabase email OTP (email), then a new
+//              password: by reset ticket for SMS, by OTP session for email.
 
 import { supabase } from '@/lib/supabase/client';
 import { userFromSupabase, type StoredUser } from '../storage/userStorage';
@@ -23,6 +32,7 @@ export function isValidPhone(raw: string): boolean {
 }
 
 export type OtpChannel = 'email' | 'sms';
+export type OtpIntent = 'signup' | 'reset';
 
 // ─── Result types ─────────────────────────────────────────────────────────────
 
@@ -36,22 +46,60 @@ export interface UsecaseResult {
   phone?: string;
 }
 
-export interface SignupResult extends UsecaseResult {
-  otpPhone?: string;
+export interface SendOtpResult extends UsecaseResult {
+  /** Partially hidden destination, safe to render (e.g. "+91••••••6508"). */
+  maskedPhone?: string;
+}
+
+export interface SignupResult extends SendOtpResult {
+  /** What to pass back to verify/resend — the phone in E.164. */
+  otpIdentifier?: string;
   /**
-   * True when the phone is already attached to an existing account. The
-   * caller is expected to flip the form into Sign in mode (with the phone
-   * prefilled) instead of showing the raw error string.
+   * True when the phone is already attached to a verified account. The caller
+   * is expected to flip the form into Sign in mode (with the phone prefilled)
+   * instead of showing the raw error string.
    */
   alreadyRegistered?: boolean;
 }
 
-export interface SendResetOtpResult extends UsecaseResult {
+export interface LoginResult extends UsecaseResult {
+  /**
+   * Credentials were correct but the phone was never confirmed — the caller
+   * should send an OTP and show the verification screen.
+   */
+  needsPhoneVerification?: boolean;
+}
+
+export interface SendResetOtpResult extends SendOtpResult {
   contact?: string;
   channel?: OtpChannel;
 }
 
-// ─── Signup: create account, then trigger email OTP gating ────────────────────
+// ─── API helper ──────────────────────────────────────────────────────────────
+
+interface ApiResponse {
+  success?: boolean;
+  error?: string;
+  [key: string]: unknown;
+}
+
+async function postJson(path: string, body: unknown): Promise<ApiResponse> {
+  try {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = (await res.json().catch(() => ({}))) as ApiResponse;
+    if (!res.ok) return { ...data, success: false, error: data.error ?? 'Something went wrong.' };
+    return { ...data, success: true };
+  } catch (err) {
+    console.error(`[auth] ${path} failed:`, err);
+    return { success: false, error: 'Network error. Please check your connection and try again.' };
+  }
+}
+
+// ─── Signup: create the account, then send our SMS OTP ────────────────────────
 
 export interface SignupInput {
   phone: string;        // the actual auth identifier
@@ -74,94 +122,58 @@ export async function signupUsecase(input: SignupInput): Promise<SignupResult> {
     return { success: false, error: 'Passwords do not match.' };
   }
 
-  const { data, error: signUpErr } = await supabase().auth.signUp({
-    phone,
-    password: input.password,
-    options: { data: {} },
-  });
-  if (signUpErr) {
-    console.error('[signup] supabase.auth.signUp error:', signUpErr);
-    // Distinguish "phone already registered" from generic errors so the
-    // form can auto-switch into Sign in mode instead of dead-ending the
-    // user with a red banner.
-    if (isAlreadyRegisteredError(signUpErr.message)) {
-      return {
-        success: false,
-        alreadyRegistered: true,
-        error: 'An account with this phone number already exists.',
-      };
-    }
-    return { success: false, error: friendlyError(signUpErr.message) };
-  }
-
-  // Detailed logging so we can diagnose silent SMS-delivery failures.
-  // Paste the full output of this group when reporting issues.
-  console.groupCollapsed('[signup] signUp response');
-  console.log('user_id:           ', data.user?.id);
-  console.log('phone_confirmed_at:', data.user?.phone_confirmed_at);
-  console.log('confirmed_at:      ', data.user?.confirmed_at);
-  console.log('identities:        ', data.user?.identities);
-  console.log('session:           ', !!data.session);
-  console.log('full data.user:    ', data.user);
-  console.groupEnd();
-
-  // Supabase's anti-enumeration protection: when a phone is already attached
-  // to a confirmed account, signUp() returns NO error but `data.user.identities`
-  // comes back as an empty array (and `phone_confirmed_at` is set on the
-  // existing user). Without this branch the form happily marches the user
-  // off to an OTP screen for a code that will never arrive, because no new
-  // signup actually happened. Detect both signals and bounce the caller
-  // back so the form can auto-switch into Sign in mode.
-  const identities = data.user?.identities;
-  const looksAlreadyRegistered =
-    (Array.isArray(identities) && identities.length === 0) ||
-    !!data.user?.phone_confirmed_at;
-  if (looksAlreadyRegistered) {
-    // Tear down any transient session signUp may have created so the user
-    // isn't accidentally logged in with empty metadata.
-    if (data.session) await supabase().auth.signOut();
+  const data = await postJson('/api/auth/signup', { phone, password: input.password });
+  if (!data.success) {
     return {
       success: false,
-      alreadyRegistered: true,
-      error: 'An account with this phone number already exists.',
+      error: data.error,
+      alreadyRegistered: data.alreadyRegistered === true,
     };
   }
 
-  // If phone confirmations are disabled in the Supabase project, signUp()
-  // returns an active session — sign it out so the OTP screen still gates entry.
-  if (data.session) {
-    await supabase().auth.signOut();
-  }
-
-  return { success: true, otpPhone: phone };
+  return {
+    success: true,
+    otpIdentifier: phone,
+    maskedPhone: typeof data.maskedPhone === 'string' ? data.maskedPhone : undefined,
+  };
 }
 
-// ─── Verify the signup OTP (logs the user in) ─────────────────────────────────
+// ─── Verify the signup OTP, then sign in ──────────────────────────────────────
+// Confirming the phone happens server-side; the session comes from a normal
+// password sign-in right after, which is why the password is needed here.
 
 export async function verifySignupOtpUsecase(
-  phone: string,
-  token: string
+  identifier: string,
+  token: string,
+  password: string
 ): Promise<UsecaseResult> {
-  const normalized = normalizePhone(phone);
-  if (!isValidPhone(normalized)) return { success: false, error: 'Invalid phone number.' };
   if (!/^\d{6}$/.test(token)) return { success: false, error: 'OTP must be 6 digits.' };
 
-  const { data, error } = await supabase().auth.verifyOtp({
-    phone: normalized,
-    token,
-    type: 'sms',
+  const data = await postJson('/api/auth/otp/verify', {
+    identifier,
+    purpose: 'signup',
+    code: token,
   });
-  if (error) return { success: false, error: friendlyError(error.message) };
+  if (!data.success) return { success: false, error: data.error ?? 'Verification failed.' };
+
+  if (!password) {
+    // Phone is verified but we have no password in hand (e.g. the tab was
+    // reloaded mid-flow) — send them back to sign in rather than hanging.
+    return { success: false, error: 'Phone verified. Please sign in with your password.' };
+  }
+
+  const login = await loginUsecase(
+    typeof data.phone === 'string' ? data.phone : identifier,
+    password
+  );
+  if (!login.success) return login;
 
   // Belt-and-suspenders profile sync. The DB trigger `on_auth_user_change`
   // already mirrors auth.users → public.profiles, but we also upsert from the
   // client so the table is up-to-date even if the trigger isn't installed yet.
-  const stored = userFromSupabase(data.user);
-  if (stored) {
-    await profileRepository.upsertCurrent(stored);
-  }
+  if (login.user) await profileRepository.upsertCurrent(login.user);
 
-  return { success: true, user: stored ?? undefined };
+  return login;
 }
 
 // ─── Login (email OR phone + password) ────────────────────────────────────────
@@ -169,7 +181,7 @@ export async function verifySignupOtpUsecase(
 export async function loginUsecase(
   identifier: string,
   password: string
-): Promise<UsecaseResult> {
+): Promise<LoginResult> {
   const id = identifier.trim();
   if (!id) return { success: false, error: 'Email or phone is required.' };
   if (!password) return { success: false, error: 'Password is required.' };
@@ -189,7 +201,20 @@ export async function loginUsecase(
     ? await supabase().auth.signInWithPassword({ email: id, password })
     : await supabase().auth.signInWithPassword({ phone, password });
 
-  if (error) return { success: false, error: friendlyError(error.message) };
+  if (error) {
+    // Supabase validates the password BEFORE reporting "phone not confirmed",
+    // so this branch means the credentials were right — the user just never
+    // finished OTP verification. Route them to the OTP screen.
+    if (isPhoneUnconfirmedError(error.message)) {
+      return {
+        success: false,
+        needsPhoneVerification: true,
+        phone: isPhone ? phone : '',
+        error: 'Please verify your phone number to continue.',
+      };
+    }
+    return { success: false, error: friendlyError(error.message) };
+  }
 
   const phoneVerified = !!data.user?.phone_confirmed_at;
   const userPhone = data.user?.phone ? `+${data.user.phone}` : '';
@@ -202,23 +227,22 @@ export async function loginUsecase(
   };
 }
 
-// ─── Send a fresh signup-confirmation OTP to an existing unverified user ──────
-// Used when a user logs in but their phone isn't confirmed yet — we trigger a
-// new SMS so they can finish the verification on the OTP screen.
+// ─── Send a signup OTP to an existing unverified user ─────────────────────────
+// Used when a user logs in but their phone isn't confirmed yet. `identifier`
+// may be the email or the phone — the server resolves the number on file.
 
 export async function sendVerificationOtpUsecase(
-  rawPhone: string
-): Promise<UsecaseResult> {
-  const phone = normalizePhone(rawPhone);
-  if (!isValidPhone(phone)) {
-    return { success: false, error: 'Invalid phone number on this account.' };
-  }
-  const { error } = await supabase().auth.signInWithOtp({
-    phone,
-    options: { shouldCreateUser: false },
-  });
-  if (error) return { success: false, error: friendlyError(error.message) };
-  return { success: true };
+  identifier: string
+): Promise<SendOtpResult> {
+  const id = identifier.trim();
+  if (!id) return { success: false, error: 'Email or phone is required.' };
+
+  const data = await postJson('/api/auth/otp/send', { identifier: id, purpose: 'signup' });
+  if (!data.success) return { success: false, error: data.error ?? 'Could not send the code.' };
+  return {
+    success: true,
+    maskedPhone: typeof data.maskedPhone === 'string' ? data.maskedPhone : undefined,
+  };
 }
 
 // ─── Forgot password: send OTP via the matching channel ───────────────────────
@@ -229,6 +253,7 @@ export async function sendResetOtpUsecase(
   const id = identifier.trim();
   if (!id) return { success: false, error: 'Email or phone is required.' };
 
+  // Email resets keep using Supabase's email OTP — no SMS gateway involved.
   if (isValidEmail(id)) {
     const { error } = await supabase().auth.signInWithOtp({
       email: id,
@@ -240,18 +265,23 @@ export async function sendResetOtpUsecase(
 
   const phone = normalizePhone(id);
   if (isValidPhone(phone)) {
-    const { error } = await supabase().auth.signInWithOtp({
-      phone,
-      options: { shouldCreateUser: false },
-    });
-    if (error) return { success: false, error: friendlyError(error.message) };
-    return { success: true, contact: phone, channel: 'sms' };
+    const data = await postJson('/api/auth/otp/send', { identifier: phone, purpose: 'reset' });
+    if (!data.success) return { success: false, error: data.error ?? 'Could not send the code.' };
+    return {
+      success: true,
+      contact: phone,
+      channel: 'sms',
+      maskedPhone: typeof data.maskedPhone === 'string' ? data.maskedPhone : undefined,
+    };
   }
 
   return { success: false, error: 'Enter a valid email address or phone number.' };
 }
 
-// ─── Verify reset OTP — leaves the user signed in via OTP ─────────────────────
+// ─── Verify reset OTP ─────────────────────────────────────────────────────────
+// Email → the OTP itself creates a session, and /reset-password calls
+// updateUser(). SMS → no session; we stash a single-use ticket that
+// /reset-password exchanges for the password change.
 
 export async function verifyResetOtpUsecase(
   contact: string,
@@ -260,46 +290,95 @@ export async function verifyResetOtpUsecase(
 ): Promise<UsecaseResult> {
   if (!/^\d{6}$/.test(token)) return { success: false, error: 'OTP must be 6 digits.' };
 
-  const { data, error } =
-    channel === 'email'
-      ? await supabase().auth.verifyOtp({ email: contact, token, type: 'email' })
-      : await supabase().auth.verifyOtp({ phone: contact, token, type: 'sms' });
+  if (channel === 'email') {
+    const { data, error } = await supabase().auth.verifyOtp({
+      email: contact,
+      token,
+      type: 'email',
+    });
+    if (error) return { success: false, error: friendlyError(error.message) };
+    clearResetTicket();
+    return { success: true, user: userFromSupabase(data.user) ?? undefined };
+  }
 
-  if (error) return { success: false, error: friendlyError(error.message) };
-  return { success: true, user: userFromSupabase(data.user) ?? undefined };
+  const data = await postJson('/api/auth/otp/verify', {
+    identifier: contact,
+    purpose: 'reset',
+    code: token,
+  });
+  if (!data.success) return { success: false, error: data.error ?? 'Verification failed.' };
+
+  storeResetTicket(
+    typeof data.phone === 'string' ? data.phone : contact,
+    String(data.resetTicket ?? '')
+  );
+  return { success: true };
 }
 
-// ─── Update password (called from /reset-password while signed in via OTP) ────
+// ─── Update password ─────────────────────────────────────────────────────────
 
+/** Email/OTP-session path: the user is signed in, Supabase does the update. */
 export async function updatePasswordUsecase(
   newPassword: string,
   confirmPassword: string
 ): Promise<UsecaseResult> {
-  if (newPassword.length < 8) {
-    return { success: false, error: 'Password must be at least 8 characters.' };
-  }
-  if (newPassword !== confirmPassword) {
-    return { success: false, error: 'Passwords do not match.' };
-  }
+  const invalid = validateNewPassword(newPassword, confirmPassword);
+  if (invalid) return invalid;
 
   const { error } = await supabase().auth.updateUser({ password: newPassword });
   if (error) return { success: false, error: friendlyError(error.message) };
   return { success: true };
 }
 
+/**
+ * SMS path: no session yet. Spend the reset ticket from the verified OTP, then
+ * sign the user in with the password they just chose.
+ */
+export async function resetPasswordWithTicketUsecase(
+  newPassword: string,
+  confirmPassword: string
+): Promise<UsecaseResult> {
+  const invalid = validateNewPassword(newPassword, confirmPassword);
+  if (invalid) return invalid;
+
+  const ticket = readResetTicket();
+  if (!ticket) {
+    return { success: false, error: 'Verification expired. Please start again.' };
+  }
+
+  const data = await postJson('/api/auth/reset-password', {
+    phone: ticket.phone,
+    ticket: ticket.token,
+    password: newPassword,
+  });
+  if (!data.success) return { success: false, error: data.error ?? 'Could not update the password.' };
+
+  clearResetTicket();
+  return loginUsecase(ticket.phone, newPassword);
+}
+
 // ─── Resend OTP (used by both signup and reset OTP screens) ───────────────────
 
 export async function resendOtpUsecase(
   contact: string,
-  channel: OtpChannel
-): Promise<UsecaseResult> {
-  const { error } =
-    channel === 'email'
-      ? await supabase().auth.signInWithOtp({ email: contact, options: { shouldCreateUser: false } })
-      : await supabase().auth.signInWithOtp({ phone: contact, options: { shouldCreateUser: false } });
+  channel: OtpChannel,
+  intent: OtpIntent = 'reset'
+): Promise<SendOtpResult> {
+  if (channel === 'email') {
+    const { error } = await supabase().auth.signInWithOtp({
+      email: contact,
+      options: { shouldCreateUser: false },
+    });
+    if (error) return { success: false, error: friendlyError(error.message) };
+    return { success: true };
+  }
 
-  if (error) return { success: false, error: friendlyError(error.message) };
-  return { success: true };
+  const data = await postJson('/api/auth/otp/send', { identifier: contact, purpose: intent });
+  if (!data.success) return { success: false, error: data.error ?? 'Could not resend the code.' };
+  return {
+    success: true,
+    maskedPhone: typeof data.maskedPhone === 'string' ? data.maskedPhone : undefined,
+  };
 }
 
 // ─── Logout ──────────────────────────────────────────────────────────────────
@@ -308,7 +387,43 @@ export async function logoutUsecase(): Promise<void> {
   await supabase().auth.signOut();
 }
 
+// ─── Reset-ticket handoff (sign-in form → /reset-password) ────────────────────
+// sessionStorage, not the URL: the ticket authorises a password change, so it
+// must not end up in history, referrers or shared links. Cleared on use.
+
+const TICKET_KEY = 'lexram.reset.ticket';
+
+interface ResetTicket { phone: string; token: string }
+
+function storeResetTicket(phone: string, token: string): void {
+  if (typeof window === 'undefined' || !token) return;
+  sessionStorage.setItem(TICKET_KEY, JSON.stringify({ phone, token }));
+}
+
+export function readResetTicket(): ResetTicket | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(TICKET_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ResetTicket;
+    return parsed.phone && parsed.token ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearResetTicket(): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(TICKET_KEY);
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function validateNewPassword(pw: string, confirm: string): UsecaseResult | null {
+  if (pw.length < 8) return { success: false, error: 'Password must be at least 8 characters.' };
+  if (pw !== confirm) return { success: false, error: 'Passwords do not match.' };
+  return null;
+}
 
 function friendlyError(msg: string): string {
   const m = msg.toLowerCase();
@@ -316,8 +431,6 @@ function friendlyError(msg: string): string {
     return 'Too many requests. Please wait a few seconds before trying again.';
   if (m.includes('invalid login credentials')) return 'Incorrect email/phone or password.';
   if (m.includes('email not confirmed')) return 'Please confirm your email before signing in.';
-  if (isAlreadyRegisteredError(msg))
-    return 'An account with this phone number already exists.';
   if (m.includes('expired')) return 'OTP expired. Please request a new code.';
   if (m.includes('invalid') && (m.includes('otp') || m.includes('token')))
     return 'Invalid OTP. Please check and try again.';
@@ -325,18 +438,8 @@ function friendlyError(msg: string): string {
   return msg;
 }
 
-/**
- * Returns true for any of Supabase's "phone/user already registered" error
- * variants. Centralised so the signup form can auto-switch to Sign in
- * without each call site re-implementing the substring check.
- */
-function isAlreadyRegisteredError(msg: string): boolean {
+/** Supabase's "the password was right but the phone isn't confirmed" error. */
+function isPhoneUnconfirmedError(msg: string): boolean {
   const m = msg.toLowerCase();
-  return (
-    m.includes('user already registered') ||
-    m.includes('already registered') ||
-    m.includes('phone number already exists') ||
-    m.includes('phone_exists') ||
-    m.includes('user_already_exists')
-  );
+  return m.includes('phone not confirmed') || m.includes('phone_not_confirmed');
 }

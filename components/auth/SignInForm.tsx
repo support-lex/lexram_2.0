@@ -89,9 +89,15 @@ export default function SignInForm() {
 
   // OTP screen state
   const [otpDigits, setOtpDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
+  // What we send back to the API (email or phone the user identified with).
   const [otpContact, setOtpContact] = useState('');
+  // What we show on screen — a masked phone for SMS, the email otherwise.
+  const [otpDestination, setOtpDestination] = useState('');
   const [otpChannel, setOtpChannel] = useState<OtpChannel>('email');
   const [otpIntent, setOtpIntent] = useState<OtpIntent>('signup');
+  // Phone verification no longer mints a session by itself — we sign in with
+  // the password right after the code checks out, so hold on to it here.
+  const [otpPassword, setOtpPassword] = useState('');
   const [cooldown, setCooldown] = useState(0);
 
   // ── Cooldown timer ──────────────────────────────────────────────────────────
@@ -108,7 +114,26 @@ export default function SignInForm() {
 
   const goBackFromOtp = () => {
     setOtpDigits(Array(OTP_LENGTH).fill(''));
+    setOtpPassword('');
     switchMode(otpIntent === 'signup' ? 'signup' : 'forgot');
+  };
+
+  /** Drop the user on the OTP screen for a code we just sent. */
+  const openOtpScreen = (opts: {
+    contact: string;
+    destination: string;
+    channel: OtpChannel;
+    intent: OtpIntent;
+    password?: string;
+  }) => {
+    setOtpContact(opts.contact);
+    setOtpDestination(opts.destination);
+    setOtpChannel(opts.channel);
+    setOtpIntent(opts.intent);
+    setOtpPassword(opts.password ?? '');
+    setOtpDigits(Array(OTP_LENGTH).fill(''));
+    setCooldown(RESEND_COOLDOWN);
+    setMode('otp');
   };
 
   // ── Sign in ─────────────────────────────────────────────────────────────────
@@ -124,46 +149,42 @@ export default function SignInForm() {
         : identifier;
     const result = await loginUsecase(idForLogin, password);
 
-    if (!result.success) {
-      setLoading(false);
-      setError(result.error ?? 'Sign in failed.');
-      return;
-    }
-
     // ── Verification gate ────────────────────────────────────────────────────
-    // Phone OTP is the ONLY thing that counts as verified. If the user logged
-    // in with valid credentials but never confirmed their phone, we must NOT
-    // let them into the dashboard. Sign them out, fire a fresh OTP, and drop
-    // them on the OTP screen with their phone prefilled.
-    if (!result.phoneVerified) {
-      const phoneToVerify = result.phone || result.user?.phone || '';
-      if (!phoneToVerify) {
-        setLoading(false);
-        setError('Your account has no phone on file. Please contact support.');
-        await logoutUsecase();
-        return;
-      }
+    // Phone OTP is the ONLY thing that counts as verified. Supabase refuses to
+    // issue a session for an unconfirmed phone (it validates the password
+    // first, so we know the credentials were right) — send a fresh SMS code and
+    // drop the user on the OTP screen. `!result.phoneVerified` covers the
+    // legacy case where a session IS issued but the phone is still unconfirmed.
+    const needsVerification = result.needsPhoneVerification || (result.success && !result.phoneVerified);
 
-      // End the unverified session before they can navigate anywhere.
-      await logoutUsecase();
+    if (needsVerification) {
+      // End any unverified session before they can navigate anywhere.
+      if (result.success) await logoutUsecase();
 
-      // Trigger a fresh OTP so the user gets a new code.
-      const otpResult = await sendVerificationOtpUsecase(phoneToVerify);
+      const otpResult = await sendVerificationOtpUsecase(idForLogin);
       setLoading(false);
       if (!otpResult.success) {
         setError(otpResult.error ?? 'Could not send verification code.');
         return;
       }
 
-      setOtpContact(phoneToVerify);
-      setOtpChannel('sms');
-      setOtpIntent('signup'); // reuse signup OTP verification path
-      setOtpDigits(Array(OTP_LENGTH).fill(''));
-      setCooldown(RESEND_COOLDOWN);
-      setMode('otp');
-      toast.info('Verify your phone to continue', {
-        description: `Code sent via SMS to ${phoneToVerify}`,
+      const destination = otpResult.maskedPhone || result.phone || 'your phone';
+      openOtpScreen({
+        contact: idForLogin,
+        destination,
+        channel: 'sms',
+        intent: 'signup', // reuse the signup OTP verification path
+        password,
       });
+      toast.info('Verify your phone to continue', {
+        description: `Code sent via SMS to ${destination}`,
+      });
+      return;
+    }
+
+    if (!result.success) {
+      setLoading(false);
+      setError(result.error ?? 'Sign in failed.');
       return;
     }
 
@@ -211,13 +232,15 @@ export default function SignInForm() {
     if (!result.success) { setError(result.error ?? 'Signup failed.'); return; }
 
     // Move to OTP screen — code goes to the user's phone via SMS.
-    setOtpContact(result.otpPhone ?? e164Phone);
-    setOtpChannel('sms');
-    setOtpIntent('signup');
-    setOtpDigits(Array(OTP_LENGTH).fill(''));
-    setCooldown(RESEND_COOLDOWN);
-    setMode('otp');
-    toast.success('OTP sent', { description: `Code sent via SMS to ${result.otpPhone ?? e164Phone}` });
+    const destination = result.maskedPhone ?? e164Phone;
+    openOtpScreen({
+      contact: result.otpIdentifier ?? e164Phone,
+      destination,
+      channel: 'sms',
+      intent: 'signup',
+      password: signupPassword,
+    });
+    toast.success('OTP sent', { description: `Code sent via SMS to ${destination}` });
   };
 
   // ── Forgot password → trigger OTP ──────────────────────────────────────────
@@ -230,16 +253,18 @@ export default function SignInForm() {
     setLoading(false);
     if (!result.success) { setError(result.error ?? 'Could not send OTP.'); return; }
 
-    setOtpContact(result.contact ?? forgotIdentifier);
-    setOtpChannel(result.channel ?? 'email');
-    setOtpIntent('reset');
-    setOtpDigits(Array(OTP_LENGTH).fill(''));
-    setCooldown(RESEND_COOLDOWN);
-    setMode('otp');
+    const contact = result.contact ?? forgotIdentifier;
+    const destination = result.maskedPhone ?? contact;
+    openOtpScreen({
+      contact,
+      destination,
+      channel: result.channel ?? 'email',
+      intent: 'reset',
+    });
     toast.success('OTP sent', {
       description: result.channel === 'sms'
-        ? `Code sent via SMS to ${result.contact}`
-        : `Check ${result.contact} for the 6-digit code.`,
+        ? `Code sent via SMS to ${destination}`
+        : `Check ${contact} for the 6-digit code.`,
     });
   };
 
@@ -252,18 +277,20 @@ export default function SignInForm() {
     const token = otpDigits.join('');
     const result =
       otpIntent === 'signup'
-        ? await verifySignupOtpUsecase(otpContact, token)
+        ? await verifySignupOtpUsecase(otpContact, token, otpPassword)
         : await verifyResetOtpUsecase(otpContact, otpChannel, token);
     setLoading(false);
 
     if (!result.success) { setError(result.error ?? 'Verification failed.'); return; }
+    setOtpPassword('');
 
     if (otpIntent === 'signup') {
       toast.success(`Welcome${result.user?.first_name ? `, ${result.user.first_name}` : ''}!`);
       router.push(redirectPath);
       router.refresh();
     } else {
-      // User is now signed in via OTP — let them set a new password.
+      // Email OTP leaves the user signed in; SMS OTP hands /reset-password a
+      // single-use ticket instead. Either way the next stop is the same page.
       router.push('/reset-password');
       router.refresh();
     }
@@ -275,9 +302,10 @@ export default function SignInForm() {
     if (cooldown > 0 || loading) return;
     setError('');
     setLoading(true);
-    const result = await resendOtpUsecase(otpContact, otpChannel);
+    const result = await resendOtpUsecase(otpContact, otpChannel, otpIntent);
     setLoading(false);
     if (!result.success) { setError(result.error ?? 'Could not resend OTP.'); return; }
+    if (result.maskedPhone) setOtpDestination(result.maskedPhone);
     setCooldown(RESEND_COOLDOWN);
     toast.success('OTP resent');
   };
@@ -299,7 +327,7 @@ export default function SignInForm() {
     signup: { title: 'Create account', sub: 'Join LexRam for AI-powered legal research.' },
     otp: {
       title: otpTitle,
-      sub: `Enter the ${OTP_LENGTH}-digit code sent to ${otpContact || (otpChannel === 'sms' ? 'your phone' : 'your email')}.`,
+      sub: `Enter the ${OTP_LENGTH}-digit code sent to ${otpDestination || (otpChannel === 'sms' ? 'your phone' : 'your email')}.`,
     },
     forgot: { title: 'Forgot password', sub: 'Enter your email or phone to receive a verification code.' },
   }[mode];

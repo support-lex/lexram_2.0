@@ -14,6 +14,7 @@ import {
 import { useCurrentUser, getDisplayName } from "@/hooks/use-current-user"
 import { useNetworkAvatar } from "@/hooks/use-network-avatar"
 import { useIsSuperAdmin } from "@/hooks/use-is-super-admin"
+import { useAdminAccess } from "@/hooks/use-admin-access"
 import { logoutUsecase } from "@/modules/auth/usecase/auth.usecase"
 import {
   LayoutGrid,
@@ -30,6 +31,7 @@ import {
   LogOutIcon,
   Sparkles,
   ShieldCheck,
+  BarChart3,
 } from "lucide-react"
 import { useTour } from "@/components/tour/TourProvider"
 import { TOURS } from "@/lib/tour/tour-config"
@@ -103,6 +105,18 @@ const SUPER_ADMIN_NAV_ITEM: NavItem = {
   match: (p) => p.startsWith("/dashboard/super-admin"),
 }
 
+/**
+ * Platform operations overview. Gated on profiles.is_super_admin — a different
+ * list from the app_metadata.role that governs SUPER_ADMIN_NAV_ITEM, so it gets
+ * its own visibility check rather than riding along on that one.
+ */
+const ADMIN_STATS_NAV_ITEM: NavItem = {
+  title: "Admin",
+  url: "/dashboard/admin/stats",
+  icon: <BarChart3 className="size-4" strokeWidth={1.75} />,
+  match: (p) => p.startsWith("/dashboard/admin/stats"),
+}
+
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return "U"
@@ -114,6 +128,7 @@ export function AppTopBar() {
   const pathname = usePathname()
   const currentUser = useCurrentUser()
   const isSuperAdmin = useIsSuperAdmin()
+  const hasAdminStats = useAdminAccess()
   const { start: startTour } = useTour()
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const [hoveredIdx, setHoveredIdx] = React.useState<number | null>(null)
@@ -124,8 +139,12 @@ export function AppTopBar() {
   // Server-side access control still gates the dashboard via 403, so this is
   // purely about which links to show in the topbar.
   const navItems = React.useMemo<NavItem[]>(
-    () => (isSuperAdmin ? [...NAV_ITEMS, SUPER_ADMIN_NAV_ITEM] : NAV_ITEMS),
-    [isSuperAdmin],
+    () => [
+      ...NAV_ITEMS,
+      ...(isSuperAdmin ? [SUPER_ADMIN_NAV_ITEM] : []),
+      ...(hasAdminStats ? [ADMIN_STATS_NAV_ITEM] : []),
+    ],
+    [isSuperAdmin, hasAdminStats],
   )
   const [pillStyle, setPillStyle] = React.useState<{ left: number; width: number; opacity: number }>(
     { left: 0, width: 0, opacity: 0 }

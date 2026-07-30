@@ -1,8 +1,9 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Scale, Paperclip, ArrowRight, Mic, MicOff } from "lucide-react";
+import { Scale, Paperclip, ArrowRight, Mic, MicOff, LayoutTemplate } from "lucide-react";
 import { useVoiceTyping } from "@/hooks/use-voice-typing";
+import type { DraftTemplate } from "./TemplatesPanel";
 
 interface EmptyStateProps {
   onPickQuickStart: (query: string) => void;
@@ -19,6 +20,8 @@ interface EmptyStateProps {
   /** Draft mode toggle — same backend as ChatInput's queryMode === "draft". */
   isDraftMode?: boolean;
   onToggleDraftMode?: () => void;
+  selectedTemplate?: DraftTemplate | null;
+  onOpenTemplates?: () => void;
 }
 
 export default function EmptyState({
@@ -32,6 +35,8 @@ export default function EmptyState({
   onSignUp,
   isDraftMode = false,
   onToggleDraftMode,
+  selectedTemplate,
+  onOpenTemplates,
 }: EmptyStateProps) {
   // ── Mode tab state ─────────────────────────────────────────────────────
   type InputTab = "ask" | "docChat" | "draft";
@@ -135,6 +140,27 @@ export default function EmptyState({
               </button>
             ))}
           </div>
+
+          {/* Template chip — draft mode only */}
+          {inputTab === "draft" && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <button
+                type="button"
+                onClick={onOpenTemplates}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors border ${
+                  selectedTemplate
+                    ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                    : "border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]"
+                }`}
+              >
+                <LayoutTemplate className="w-3 h-3" />
+                {selectedTemplate ? selectedTemplate.name : "Use a template"}
+              </button>
+              {selectedTemplate && (
+                <span className="text-[10px] text-[var(--text-muted)] italic">format locked to template</span>
+              )}
+            </div>
+          )}
 
           <div
             data-no-focus-ring

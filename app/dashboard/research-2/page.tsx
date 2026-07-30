@@ -809,6 +809,8 @@ export default function Research2Page() {
                   onToggleDraftMode={() =>
                     setQueryMode(queryMode === "draft" ? "deep" : "draft")
                   }
+                  selectedTemplate={selectedTemplate}
+                  onOpenTemplates={() => setShowTemplatesPanel(true)}
                 />
               )}
 

@@ -3,6 +3,7 @@ import path from 'path';
 
 const nextConfig: NextConfig = {
   turbopack: {},
+  serverExternalPackages: ["mammoth"],
   outputFileTracingRoot: path.join(__dirname),
   reactStrictMode: true,
   eslint: {

@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { NextRequest, NextResponse } from "next/server";
 import mammoth from "mammoth";
 import { getSessionCtx } from "@/lib/auth-helpers";

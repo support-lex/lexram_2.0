@@ -43,6 +43,8 @@ export interface QueryStreamCallbacks {
 
 export interface QueryStreamOptions {
   signal?: AbortSignal;
+  /** Compact structure JSON from a saved draft template — injected into the draft prompt. */
+  templateStructure?: object | null;
 }
 
 export async function streamLexRamQuery(
@@ -93,7 +95,11 @@ export async function streamLexRamQuery(
         method: "POST",
         headers,
         // ASCII-safe encoding — see jsonAsciiSafe doc for the backend bug we work around.
-        body: jsonAsciiSafe({ query, mode }),
+        body: jsonAsciiSafe({
+          query,
+          mode,
+          ...(options.templateStructure ? { template_structure: JSON.stringify(options.templateStructure) } : {}),
+        }),
         signal: connectController.signal,
       }
     );
@@ -125,7 +131,7 @@ export async function streamLexRamQuery(
         headers.Authorization = `Bearer ${freshToken}`;
         const retryRes = await fetch(
           `${LEXRAM_BASE}/sessions/${encodeURIComponent(sessionId)}/query/stream`,
-          { method: "POST", headers, body: jsonAsciiSafe({ query, mode }), signal: connectController.signal }
+          { method: "POST", headers, body: jsonAsciiSafe({ query, mode, ...(options.templateStructure ? { template_structure: JSON.stringify(options.templateStructure) } : {}) }), signal: connectController.signal }
         );
         if (retryRes.ok) {
           // Swap in the successful retry response and continue

@@ -9,6 +9,7 @@ import {
   FileText,
   Mic,
   MicOff,
+  LayoutTemplate,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
@@ -16,6 +17,7 @@ import { useVoiceTyping } from "@/hooks/use-voice-typing";
 import type { AttachedFile, CommandMode, OutputFormat, AnalysisDepth, WritingStyle } from "../types";
 import { PROMPT_PRESETS } from "../types";
 import type { QueryMode } from "@/modules/legal/api/queryStream";
+import type { DraftTemplate } from "./TemplatesPanel";
 
 /** Grouped types — reduce the 26-flat-prop surface to logical clusters */
 
@@ -69,6 +71,8 @@ type ChatInputProps = ChatConfig &
     hasThread: boolean;
     isAuthenticated?: boolean;
     onSignUp?: () => void;
+    selectedTemplate?: DraftTemplate | null;
+    onOpenTemplates?: () => void;
   };
 
 const MODES: { value: CommandMode; label: string }[] = [
@@ -129,6 +133,8 @@ export default function ChatInput({
   onFileClick,
   isAuthenticated = true,
   onSignUp,
+  selectedTemplate,
+  onOpenTemplates,
 }: ChatInputProps) {
   type InputTab = "ask" | "docChat" | "draft";
   const [inputTab, setInputTab] = useState<InputTab>(
@@ -263,6 +269,27 @@ export default function ChatInput({
             </button>
           ))}
         </div>
+
+        {/* Template chip — draft mode only */}
+        {inputTab === "draft" && (
+          <div className="flex items-center gap-2 mb-2 px-1">
+            <button
+              type="button"
+              onClick={onOpenTemplates}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors border ${
+                selectedTemplate
+                  ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                  : "border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]"
+              }`}
+            >
+              <LayoutTemplate className="w-3 h-3" />
+              {selectedTemplate ? selectedTemplate.name : "Use a template"}
+            </button>
+            {selectedTemplate && (
+              <span className="text-[10px] text-[var(--text-muted)] italic">format locked to template</span>
+            )}
+          </div>
+        )}
 
         {/* Main input bar */}
         <div className="flex items-center gap-2 sm:gap-3 rounded-full border border-[var(--oracle-outline-variant,#d0c5b6)]/30 bg-transparent px-3 sm:px-4 py-2.5 shadow-[var(--input-shadow)] focus-within:border-[var(--oracle-primary-container,#c6a76e)]/60 focus-within:shadow-[0_0_0_2px_rgba(198,167,110,0.15),var(--input-shadow)] transition-all duration-300">

@@ -28,6 +28,7 @@ import ChatThread from "./components/ChatThread";
 import ChatInput from "./components/ChatInput";
 import AuthoritiesPanel from "./components/AuthoritiesPanel";
 import ShortcutsModal from "./components/ShortcutsModal";
+import TemplatesPanel from "./components/TemplatesPanel";
 import DocumentDialog from "./components/DocumentDialog";
 import SuggestionsPopup from "./components/SuggestionsPopup";
 import demoConversation from "./demo-conversation.json";
@@ -91,6 +92,8 @@ export default function Research2Page() {
   // happened in the sidebar without needing a global event bus.
 
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showTemplatesPanel, setShowTemplatesPanel] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<import("./components/TemplatesPanel").DraftTemplate | null>(null);
 
   const {
     sessions, sessionsReady, messages, setMessages, currentSessionId,
@@ -235,7 +238,7 @@ export default function Research2Page() {
     selectedPromptPreset, setSelectedPromptPreset,
     liveEditorContent, activeRunMode, streamingSources, handleSubmit, retryLastQuery, stopGeneration,
     addFiles, attachCaseDocs, buildSessionDraft,
-  } = useResearchChat(messages, setMessages, { ensureSession, currentSessionId, refreshSessions });
+  } = useResearchChat(messages, setMessages, { ensureSession, currentSessionId, refreshSessions, templateStructure: selectedTemplate?.structure ?? null });
 
   const lastAi = [...messages].reverse().find((m) => m.role === "ai");
   useEffect(() => { setSelectedSourceMessageId(null); }, [lastAi?.id]);
@@ -560,6 +563,8 @@ export default function Research2Page() {
     onFileClick: () => setShowDocumentDialog(true),
     isAuthenticated,
     onSignUp: goToSignUp,
+    selectedTemplate,
+    onOpenTemplates: () => setShowTemplatesPanel(true),
   };
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -897,6 +902,12 @@ export default function Research2Page() {
       />
 
       <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      <TemplatesPanel
+        open={showTemplatesPanel}
+        onClose={() => setShowTemplatesPanel(false)}
+        selectedTemplate={selectedTemplate}
+        onSelect={setSelectedTemplate}
+      />
       <DocumentDialog
         open={showDocumentDialog}
         onOpenChange={setShowDocumentDialog}

@@ -395,6 +395,8 @@ export interface UseResearchChatOptions {
    * in the query response payload).
    */
   refreshSessions?: () => void;
+  /** Compact structure JSON from the selected draft template — forwarded to the backend. */
+  templateStructure?: object | null;
 }
 
 export function useResearchChat(
@@ -746,7 +748,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
             setError(friendly); setErrorKind(kind);
           },
         },
-        { signal: controller.signal }
+        { signal: controller.signal, templateStructure: queryMode === "draft" ? (options.templateStructure ?? null) : null }
       );
 
       // Silent drop guard: if the stream closed cleanly (no error thrown) but

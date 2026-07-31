@@ -48,6 +48,30 @@ export type DraftBlock        = { type: "draft";       data: string };          
 export type PlanBlock         = { type: "plan";        data: string };          // drafting plan awaiting user confirmation
 export type UiBlock = MindmapBlock | AuthoritiesBlock | DraftBlock | PlanBlock;
 
+// ─── Precedent graph (programmatic — comes from Neo4j via side channel) ────────
+export type PrecedentGraphNode = {
+  id: string;
+  title: string;
+  year: string;
+  citation: string;
+  is_overruled: boolean;
+  is_seed: boolean;
+  decision: string;
+  source_url: string;
+  cls: "followed" | "overruled" | "reliedOn" | "neutral";
+};
+export type PrecedentGraphEdge = {
+  from: string;
+  to: string;
+  label: string;
+  bucket: "followed" | "overruled" | "reliedOn" | "neutral";
+  context: string;
+};
+export type PrecedentGraph = {
+  nodes: PrecedentGraphNode[];
+  edges: PrecedentGraphEdge[];
+};
+
 export type LegalAnswer = {
   thinkingText?: string;
   streamText?: string;
@@ -82,6 +106,9 @@ export type LegalAnswer = {
 
   // ─── Inline UI blocks (preferred path) ─────────────────────────────────────
   uiBlocks?: UiBlock[];
+
+  // ─── Precedent graph — programmatic, from Neo4j side channel ───────────────
+  precedentGraph?: PrecedentGraph;
 };
 
 export type Message = {

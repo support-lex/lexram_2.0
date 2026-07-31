@@ -36,6 +36,7 @@ import MermaidDiagram from "./inline/MermaidDiagram";
 import InlineAuthorities from "./inline/InlineAuthorities";
 import InlineDraftEditor from "./inline/InlineDraftEditor";
 import ProceduralTimeline from "./ProceduralTimeline";
+import PrecedentGraph from "./PrecedentGraph";
 import { ExternalLink } from "lucide-react";
 import { feedbackRepository, type FeedbackRating } from "@/modules/chat/repository/feedback.repository";
 import { useNetworkAvatar } from "@/hooks/use-network-avatar";
@@ -747,6 +748,10 @@ export default function MessageBubble({
               })}
             </div>
           )}
+        {/* ── Precedent graph — programmatic, from Neo4j side channel ──── */}
+        {response.precedentGraph && response.precedentGraph.nodes.length > 0 && (
+          <PrecedentGraph data={response.precedentGraph} />
+        )}
         </div>
 
         {/* Suggested answers — quick-reply chips shown when the assistant

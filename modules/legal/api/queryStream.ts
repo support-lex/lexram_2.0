@@ -39,6 +39,9 @@ export interface QueryStreamCallbacks {
   /** Called each time a tool completes with the retrieved chunk sources.
    *  Arrives progressively during the stream, before `onDone`. */
   onChunks?: (tool: string, sources: unknown[]) => void;
+  /** Called when the backend emits a precedent graph via the side channel.
+   *  Arrives during the stream (after trace_law_evolution completes), before `onDone`. */
+  onGraph?: (graph: { nodes: unknown[]; edges: unknown[] }) => void;
 }
 
 export interface QueryStreamOptions {
@@ -237,6 +240,11 @@ export async function streamLexRamQuery(
             case "chunks":
               if (Array.isArray(event.sources)) {
                 callbacks.onChunks?.(String(event.tool ?? ""), event.sources);
+              }
+              break;
+            case "graph":
+              if (event.data && Array.isArray(event.data.nodes)) {
+                callbacks.onGraph?.(event.data as { nodes: unknown[]; edges: unknown[] });
               }
               break;
             case "error":

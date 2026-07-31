@@ -16,6 +16,7 @@ import {
   type LegalAnswer,
   type Message,
   type OutputFormat,
+  type PrecedentGraph,
   type UiBlock,
   type WritingStyle,
   type WorkflowStep,
@@ -477,6 +478,7 @@ export function useResearchChat(
   refreshSessionsRef.current = options.refreshSessions;
 
   const streamRef = useRef("");
+  const pendingGraphRef = useRef<PrecedentGraph | null>(null);
   const lastSubmittedQueryRef = useRef("");
   const abortRef = useRef<AbortController | null>(null);
   // True at the start of each query; the first onChunks call resets it after
@@ -653,6 +655,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     setStatusDetail([]);
     firstChunkOfQueryRef.current = true; // next onChunks replaces instead of appending
     streamRef.current = "";
+    pendingGraphRef.current = null;
     setActiveRunMode(effectiveMode);
     setLiveEditorContent("");
 
@@ -746,6 +749,9 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
           onError: (message) => {
             const { message: friendly, kind } = classifyError(message);
             setError(friendly); setErrorKind(kind);
+          },
+          onGraph: (graph) => {
+            pendingGraphRef.current = graph as PrecedentGraph;
           },
         },
         { signal: controller.signal, templateStructure: queryMode === "draft" ? (options.templateStructure ?? null) : null }
@@ -1084,6 +1090,11 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         answer.streamText = `${answer.streamText}${extras}`;
       } else if (extras) {
         answer.streamText = extras.trim();
+      }
+
+      // Attach precedent graph if one arrived via the side channel
+      if (pendingGraphRef.current && pendingGraphRef.current.nodes.length > 0) {
+        answer.precedentGraph = pendingGraphRef.current;
       }
 
       const aiMessage: Message = {

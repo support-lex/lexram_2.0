@@ -478,8 +478,8 @@ export function useResearchChat(
   refreshSessionsRef.current = options.refreshSessions;
 
   const streamRef = useRef("");
-  // useRef<T>(undefined) → MutableRefObject<T | undefined> so current is writable
-  const pendingGraphRef = useRef<PrecedentGraph | undefined>(undefined);
+  // Stored as a plain structural type to avoid TS 5.9 alias-narrowing to never
+  const pendingGraphRef = useRef<{ nodes: unknown[]; edges: unknown[] } | undefined>(undefined);
   const lastSubmittedQueryRef = useRef("");
   const abortRef = useRef<AbortController | null>(null);
   // True at the start of each query; the first onChunks call resets it after
@@ -752,7 +752,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
             setError(friendly); setErrorKind(kind);
           },
           onGraph: (graph) => {
-            pendingGraphRef.current = graph as unknown as PrecedentGraph;
+            pendingGraphRef.current = graph;
           },
         },
         { signal: controller.signal, templateStructure: queryMode === "draft" ? (options.templateStructure ?? null) : null }
@@ -1096,7 +1096,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       // Attach precedent graph if one arrived via the side channel
       const pg = pendingGraphRef.current;
       if (pg && pg.nodes.length > 0) {
-        answer.precedentGraph = pg;
+        answer.precedentGraph = pg as PrecedentGraph;
       }
 
       const aiMessage: Message = {

@@ -54,11 +54,27 @@ export default function TrendChart({
   const [asTable, setAsTable] = useState(false);
   const tableId = useId();
 
+  // A year of daily columns inside a card is ~0.2px per bar — unreadable. Past a quarter,
+  // roll days up into weeks so the mark keeps a usable width and the trend stays legible.
+  // The label says which, so nobody reads a weekly total as a daily one.
+  const { points: plotted, bucket } = useMemo(() => {
+    if (points.length <= 92) return { points, bucket: "day" as const };
+    const weeks: TrendPoint[] = [];
+    for (let i = 0; i < points.length; i += 7) {
+      const chunk = points.slice(i, i + 7);
+      weeks.push({
+        date: chunk[0].date,
+        value: chunk.reduce((s, p) => s + p.value, 0),
+      });
+    }
+    return { points: weeks, bucket: "week" as const };
+  }, [points]);
+
   const { max, total, peakIndex, allZero } = useMemo(() => {
     let max = 0;
     let total = 0;
     let peakIndex = -1;
-    points.forEach((p, i) => {
+    plotted.forEach((p, i) => {
       total += p.value;
       if (p.value > max) {
         max = p.value;
@@ -66,16 +82,17 @@ export default function TrendChart({
       }
     });
     return { max, total, peakIndex, allZero: max === 0 };
-  }, [points]);
+  }, [plotted]);
 
-  const active = hover != null ? points[hover] : null;
+  const active = hover != null ? plotted[hover] : null;
+  const spanLabel = `${plotted.length} ${bucket}${plotted.length === 1 ? "" : "s"}`;
 
   return (
     <div>
       <div className="flex items-center justify-between gap-3 px-4 pt-3">
         <div className="text-xs text-[var(--text-secondary)]">
           <span className="font-semibold text-[var(--text-primary)] tabular-nums">{formatValue(total)}</span>{" "}
-          <span className="text-[var(--text-muted)]">over 30 days</span>
+          <span className="text-[var(--text-muted)]">over {spanLabel}</span>
         </div>
         <button
           type="button"
@@ -135,9 +152,11 @@ export default function TrendChart({
             {active && (
               <div
                 className="absolute -translate-x-1/2 -translate-y-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] px-2.5 py-1.5 shadow-[var(--shadow-lg)] whitespace-nowrap"
-                style={{ left: `${((hover! + 0.5) / points.length) * 100}%` }}
+                style={{ left: `${((hover! + 0.5) / plotted.length) * 100}%` }}
               >
-                <div className="text-[10px] text-[var(--text-muted)]">{longDay(active.date)}</div>
+                <div className="text-[10px] text-[var(--text-muted)]">
+                  {bucket === "week" ? `Week of ${longDay(active.date)}` : longDay(active.date)}
+                </div>
                 <div className="text-xs font-bold text-[var(--text-primary)] tabular-nums">
                   {formatValue(active.value)}
                 </div>
@@ -148,7 +167,7 @@ export default function TrendChart({
           {/* Columns. Each wrapper is a full-height hit target — much larger
               than the mark itself, so short columns are still easy to hover. */}
           <div className="relative flex items-end gap-[2px] h-32" onMouseLeave={() => setHover(null)}>
-            {points.map((p, i) => {
+            {plotted.map((p, i) => {
               const pct = max === 0 ? 0 : (p.value / max) * 100;
               const isHover = hover === i;
               const isPeak = i === peakIndex && max > 0;
@@ -189,8 +208,8 @@ export default function TrendChart({
 
           {/* Axis: three ticks, not thirty. */}
           <div className="mt-2 flex justify-between text-[10px] text-[var(--text-muted)] tabular-nums">
-            <span>{shortDay(points[0]?.date)}</span>
-            <span>{shortDay(points[Math.floor(points.length / 2)]?.date)}</span>
+            <span>{shortDay(plotted[0]?.date)}</span>
+            <span>{shortDay(plotted[Math.floor(plotted.length / 2)]?.date)}</span>
             <span>Today</span>
           </div>
 

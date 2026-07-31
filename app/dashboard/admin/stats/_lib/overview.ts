@@ -66,6 +66,45 @@ function toDailySeries<T>(
   return [...buckets].map(([date, value]) => ({ date, value }));
 }
 
+/**
+ * Dense daily series over the WHOLE dataset (earliest record → today), IST.
+ *
+ * This is what lets the page carry a real date-range filter. Sending one full-history
+ * series per metric (a few hundred small points) instead of a fixed 30-day window means
+ * the client can recompute every KPI and chart for 7d / 30d / 90d / 12m / all-time
+ * instantly, with no refetch — and the raw row-level data never has to cross the wire.
+ */
+function toFullSeries<T>(
+  rows: T[],
+  getDate: (row: T) => string | null | undefined,
+  getValue: (row: T) => number = () => 1
+): DailyPoint[] {
+  const buckets = new Map<string, number>();
+  let earliest: string | null = null;
+  for (const row of rows) {
+    const iso = getDate(row);
+    if (!iso) continue;
+    const key = istDayKey(iso);
+    if (!earliest || key < earliest) earliest = key;
+    buckets.set(key, (buckets.get(key) ?? 0) + getValue(row));
+  }
+  if (!earliest) return [];
+
+  // Fill the gaps: a sparse series drawn as evenly spaced columns turns quiet days into
+  // no gap at all, which misreads the trend.
+  const out: DailyPoint[] = [];
+  const todayKey = new Date(istDayStart(0).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+  const cursor = new Date(`${earliest}T00:00:00Z`);
+  const end = new Date(`${todayKey}T00:00:00Z`);
+  // Guard against a bad timestamp producing a runaway loop (10 years of days).
+  for (let i = 0; cursor <= end && i < 3700; i++) {
+    const key = cursor.toISOString().slice(0, 10);
+    out.push({ date: key, value: buckets.get(key) ?? 0 });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return out;
+}
+
 // ── Query helpers ───────────────────────────────────────────────────────────
 
 async function safe<T>(label: string, fallback: T, run: () => Promise<T>, warnings: string[]): Promise<T> {
@@ -159,9 +198,26 @@ export interface SessionRow {
   lastActive: string | null;
 }
 
+/**
+ * Full-history daily series, one per metric. The client slices these to whatever range
+ * the operator picks — every headline number on the page is derived from here, so the
+ * range filter is real rather than decorative.
+ */
+export interface AdminSeries {
+  signups: DailyPoint[];
+  revenue: DailyPoint[];
+  orders: DailyPoint[];
+  paidOrders: DailyPoint[];
+  creditsGranted: DailyPoint[];
+  creditsSpent: DailyPoint[];
+  sessions: DailyPoint[];
+  tokens: DailyPoint[];
+}
+
 export interface AdminOverview {
   generatedAt: string;
   warnings: string[];
+  series: AdminSeries;
 
   users: {
     total: number;
@@ -363,16 +419,19 @@ export async function loadAdminOverview(): Promise<AdminOverview> {
         warnings
       ),
 
+      // Paged in full (not the old limit(12)) because the sessions-per-day series and any
+      // range-filtered session count are derived from these timestamps. Only the derived
+      // series and a short recent list ever leave the server.
       safe(
         "chat_sessions",
         [] as ChatSessionRow[],
         async () =>
-          unwrap<ChatSessionRow[]>(
-            await sb
+          pageAll<ChatSessionRow>((from, to) =>
+            sb
               .from("chat_sessions")
               .select("id, user_id, title, created_at, last_active_at, updated_at")
               .order("created_at", { ascending: false })
-              .limit(12)
+              .range(from, to)
           ),
         warnings
       ),
@@ -530,6 +589,27 @@ export async function loadAdminOverview(): Promise<AdminOverview> {
     generatedAt: new Date().toISOString(),
     warnings,
 
+    // Everything the range filter reads. Revenue is dated by capture (paid_at), not by
+    // order creation — an order raised Monday and captured Wednesday is Wednesday's money.
+    series: {
+      signups: toFullSeries(userRows, (u) => u.joined),
+      revenue: toFullSeries(paid, (p) => p.paid_at ?? p.created_at, (p) => Number(p.amount_inr) || 0),
+      orders: toFullSeries(payments, (p) => p.created_at),
+      paidOrders: toFullSeries(paid, (p) => p.paid_at ?? p.created_at),
+      creditsGranted: toFullSeries(
+        transactions.filter((t) => (Number(t.delta) || 0) > 0),
+        (t) => t.created_at,
+        (t) => Number(t.delta) || 0
+      ),
+      creditsSpent: toFullSeries(
+        transactions.filter((t) => (Number(t.delta) || 0) < 0),
+        (t) => t.created_at,
+        (t) => Math.abs(Number(t.delta) || 0)
+      ),
+      sessions: toFullSeries(sessions, (s) => s.created_at),
+      tokens: toFullSeries(tokenUsage, (t) => t.created_at, (t) => Number(t.total_tokens) || 0),
+    },
+
     users: {
       total: allIds.size,
       verified: userRows.filter((u) => u.verified).length,
@@ -555,7 +635,9 @@ export async function loadAdminOverview(): Promise<AdminOverview> {
       conversionPct: payments.length ? Math.round((paid.length / payments.length) * 100) : 0,
       revenue30dInr: paidIn30d.reduce((s, p) => s + (Number(p.amount_inr) || 0), 0),
       revenueSeries: toDailySeries(paidIn30d, 30, (p) => p.paid_at ?? p.created_at, (p) => Number(p.amount_inr) || 0),
-      topUps: payments.slice(0, 60).map((p) => ({
+      // Every order, not a page of them — the table filters by date range client-side, and
+      // a truncated list would silently under-report any range the operator picks.
+      topUps: payments.slice(0, 2000).map((p) => ({
         id: p.id ?? p.order_id ?? "",
         orderId: p.order_id ?? "—",
         userLabel: labelFor(p.user_id, p.customer_email ?? p.customer_name),
@@ -603,7 +685,7 @@ export async function loadAdminOverview(): Promise<AdminOverview> {
       evalPassed: counts.evalPassed ?? 0,
       feedbackUp: counts.feedbackUp ?? 0,
       feedbackDown: counts.feedbackDown ?? 0,
-      recentSessions: sessions.map((s) => ({
+      recentSessions: sessions.slice(0, 40).map((s) => ({
         id: s.id,
         title: s.title || "Untitled",
         userLabel: labelFor(s.user_id),

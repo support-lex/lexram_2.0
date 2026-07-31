@@ -14,8 +14,8 @@ import { redirect } from "next/navigation";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { loadAdminOverview, istDayStart } from "./_lib/overview";
-import OverviewBody from "./_components/OverviewBody";
+import { loadAdminOverview } from "./_lib/overview";
+import DashboardShell from "./_components/DashboardShell";
 
 export const metadata = { title: "Admin overview | LexRam" };
 
@@ -41,7 +41,10 @@ export default async function AdminStatsPage() {
     .maybeSingle();
   if (!me?.is_super_admin) redirect("/dashboard");
 
+  // The whole snapshot is loaded once here and filtered in the browser: the datasets are
+  // small (hundreds of rows, pre-aggregated into daily series), so range and tab switching
+  // is instant and never refetches.
   const data = await loadAdminOverview();
 
-  return <OverviewBody data={data} sevenDaysAgo={istDayStart(7).toISOString()} />;
+  return <DashboardShell data={data} />;
 }

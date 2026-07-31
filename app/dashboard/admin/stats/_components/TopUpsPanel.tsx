@@ -2,76 +2,111 @@
 
 // Top-up (credit purchase) history — read-only.
 //
-// Rows come from public.payments, which is the Cashfree order ledger: a row is
-// created at "create order" time with status 'pending' and only flips to 'paid'
-// on the webhook. That means a pending row is an *abandoned or in-flight*
-// checkout, not a debt — hence the status filter defaulting to all, and the
-// separate pending-value tile on the page rather than folding it into revenue.
+// Rows come from public.payments, the Cashfree order ledger: a row is created at
+// "create order" time with status 'pending' and only flips to 'paid' on the webhook. A
+// pending row is therefore an abandoned or in-flight checkout, not money owed — which is
+// why pending value is reported separately from revenue and never folded into it.
+//
+// Date filtering follows the page's global range and uses the same rule as the revenue
+// chart: paid orders are dated by CAPTURE (paid_at), everything else by creation. An order
+// raised Monday and captured Wednesday belongs to Wednesday.
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
 import type { TopUpRow } from "../_lib/overview";
-import { Badge, Table, fmtINR, fmtInt, fmtDateTime, statusTone } from "./ui";
+import { inRange, rangeLabel, type RangeKey } from "./range";
+import {
+  Badge,
+  FilterBar,
+  PillFilter,
+  SearchInput,
+  Table,
+  TableFooter,
+  fmtDateTime,
+  fmtINR,
+  fmtInt,
+  statusTone,
+} from "./ui";
 
 const PAGE = 20;
+const PAID = new Set(["paid", "success", "completed", "captured"]);
 
-export default function TopUpsPanel({ rows }: { rows: TopUpRow[] }) {
+function effectiveDate(r: TopUpRow): string | null {
+  return PAID.has(r.status) ? r.paidAt ?? r.createdAt : r.createdAt;
+}
+
+export default function TopUpsPanel({ rows, range }: { rows: TopUpRow[]; range: RangeKey }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<string>("all");
+  const [scope, setScope] = useState<"range" | "all">("range");
   const [limit, setLimit] = useState(PAGE);
 
-  const statuses = useMemo(() => ["all", ...new Set(rows.map((r) => r.status))], [rows]);
+  const label = rangeLabel(range).toLowerCase();
+
+  const dated = useMemo(
+    () => (scope === "all" ? rows : rows.filter((r) => inRange(effectiveDate(r), range))),
+    [rows, range, scope]
+  );
+
+  const statuses = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of dated) counts.set(r.status, (counts.get(r.status) ?? 0) + 1);
+    return [
+      { key: "all", label: "All", count: dated.length },
+      ...[...counts].sort((a, b) => b[1] - a[1]).map(([k, c]) => ({ key: k, label: k, count: c })),
+    ];
+  }, [dated]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return rows.filter((r) => {
+    return dated.filter((r) => {
       if (status !== "all" && r.status !== status) return false;
       if (!q) return true;
-      return [r.orderId, r.userLabel, r.invoiceNumber, r.method].some((f) => f?.toLowerCase().includes(q));
+      return [r.orderId, r.userLabel, r.invoiceNumber, r.method].some((f) =>
+        f?.toLowerCase().includes(q)
+      );
     });
-  }, [rows, query, status]);
+  }, [dated, query, status]);
 
   const visible = filtered.slice(0, limit);
   const filteredValue = filtered.reduce((s, r) => s + r.amountInr, 0);
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[var(--border-light)]">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
-          <input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setLimit(PAGE);
-            }}
-            placeholder="Search order, customer, invoice…"
-            aria-label="Search top-ups"
-            className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-primary)]/20 pl-8 pr-3 py-1.5 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-accent)]"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-1">
-          {statuses.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => {
-                setStatus(s);
-                setLimit(PAGE);
-              }}
-              aria-pressed={status === s}
-              className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide border transition-colors ${
-                status === s
-                  ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
-                  : "border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--accent)]/[0.06]"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-        <span className="text-[11px] text-[var(--text-muted)] tabular-nums">{fmtINR(filteredValue)} in view</span>
-      </div>
+      <FilterBar>
+        <SearchInput
+          value={query}
+          onChange={(v) => {
+            setQuery(v);
+            setLimit(PAGE);
+          }}
+          placeholder="Search order, customer, invoice…"
+          ariaLabel="Search top-ups"
+        />
+        <PillFilter
+          options={statuses}
+          value={status}
+          onChange={(k) => {
+            setStatus(k);
+            setLimit(PAGE);
+          }}
+          ariaLabel="Payment status"
+        />
+        <PillFilter
+          options={[
+            { key: "range" as const, label: label },
+            { key: "all" as const, label: "All time" },
+          ]}
+          value={scope}
+          onChange={(k) => {
+            setScope(k);
+            setLimit(PAGE);
+          }}
+          ariaLabel="Date scope"
+        />
+        <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
+          {fmtINR(filteredValue)} in view
+        </span>
+      </FilterBar>
 
       <Table
         headers={["Order", "Customer", "Amount", "Credits", "Method", "Created", "Paid", "Status"]}
@@ -97,23 +132,14 @@ export default function TopUpsPanel({ rows }: { rows: TopUpRow[] }) {
             {r.status}
           </Badge>,
         ])}
-        empty="No top-ups match this filter."
+        empty={`No top-ups in the ${label}. Switch to All time to see the full ledger.`}
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-[var(--border-light)]">
-        <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
-          Showing {fmtInt(visible.length)} of {fmtInt(filtered.length)}
-        </span>
-        {visible.length < filtered.length && (
-          <button
-            type="button"
-            onClick={() => setLimit((l) => l + PAGE * 2)}
-            className="rounded-md border border-[var(--border-default)] px-3 py-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--accent)]/[0.06] transition-colors"
-          >
-            Show more
-          </button>
-        )}
-      </div>
+      <TableFooter
+        shown={visible.length}
+        total={filtered.length}
+        onMore={() => setLimit((l) => l + PAGE * 2)}
+      />
     </div>
   );
 }

@@ -149,12 +149,15 @@ export function Kpi({
   sub,
   icon,
   emphasis = false,
+  delta,
 }: {
   label: string;
   value: string;
   sub?: string;
   icon?: ReactNode;
   emphasis?: boolean;
+  /** Percent change vs. the preceding window; omit when there's nothing to compare. */
+  delta?: number | null;
 }) {
   return (
     <div
@@ -166,8 +169,175 @@ export function Kpi({
         {icon && <span className={emphasis ? "text-[var(--accent)]" : ""}>{icon}</span>}
         <span className="truncate">{label}</span>
       </div>
-      <div className="mt-1.5 text-2xl font-bold text-[var(--text-primary)] leading-tight">{value}</div>
+      <div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
+        <span className="text-2xl font-bold text-[var(--text-primary)] leading-tight">{value}</span>
+        {delta != null && <Delta pct={delta} />}
+      </div>
       {sub && <div className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{sub}</div>}
+    </div>
+  );
+}
+
+/**
+ * Change vs. the preceding window. Direction is carried by the arrow glyph and the sign,
+ * not by colour alone — the tint is a secondary cue only.
+ */
+export function Delta({ pct }: { pct: number }) {
+  const flat = pct === 0;
+  const up = pct > 0;
+  const cls = flat
+    ? "text-[var(--text-muted)]"
+    : up
+    ? "text-[#0a7a0a]"
+    : "text-[#a82c2c]";
+  return (
+    <span className={`text-[11px] font-semibold tabular-nums ${cls}`}>
+      {flat ? "±" : up ? "↑" : "↓"}
+      {Math.abs(pct)}%
+    </span>
+  );
+}
+
+/** Segmented control. Used for the global date range and any in-tab toggle. */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  options: Array<{ key: T; label: string }>;
+  value: T;
+  onChange: (key: T) => void;
+  ariaLabel: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className="inline-flex items-center gap-0.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)]/25 p-0.5"
+    >
+      {options.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          onClick={() => onChange(o.key)}
+          aria-pressed={value === o.key}
+          className={`rounded-md px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap transition-colors ${
+            value === o.key
+              ? "bg-[var(--accent)] text-[var(--accent-text)]"
+              : "text-[var(--text-secondary)] hover:bg-[var(--accent)]/[0.08]"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Search box used above every table, so filtering looks the same everywhere. */
+export function SearchInput({
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+}) {
+  return (
+    <div className="relative flex-1 min-w-[180px]">
+      <svg
+        className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        aria-hidden
+      >
+        <circle cx="11" cy="11" r="8" />
+        <path d="m21 21-4.3-4.3" />
+      </svg>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-primary)]/20 pl-8 pr-3 py-1.5 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-accent)]"
+      />
+    </div>
+  );
+}
+
+/** Pill row used for categorical filters (segments, statuses, plans). */
+export function PillFilter<T extends string>({
+  options,
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  options: Array<{ key: T; label: string; count?: number }>;
+  value: T;
+  onChange: (key: T) => void;
+  ariaLabel: string;
+}) {
+  return (
+    <div role="group" aria-label={ariaLabel} className="flex flex-wrap items-center gap-1">
+      {options.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          onClick={() => onChange(o.key)}
+          aria-pressed={value === o.key}
+          className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide border transition-colors ${
+            value === o.key
+              ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+              : "border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--accent)]/[0.06]"
+          }`}
+        >
+          {o.label}
+          {o.count != null && <span className="ml-1 opacity-60 tabular-nums">{o.count}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** One row above the data: search on the left, filters and counts on the right. */
+export function FilterBar({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[var(--border-light)]">
+      {children}
+    </div>
+  );
+}
+
+/** Row count + "show more", so a truncated table never looks complete. */
+export function TableFooter({
+  shown,
+  total,
+  onMore,
+}: {
+  shown: number;
+  total: number;
+  onMore?: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-[var(--border-light)]">
+      <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
+        Showing {fmtInt(shown)} of {fmtInt(total)}
+      </span>
+      {onMore && shown < total && (
+        <button
+          type="button"
+          onClick={onMore}
+          className="rounded-md border border-[var(--border-default)] px-3 py-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--accent)]/[0.06] transition-colors"
+        >
+          Show more
+        </button>
+      )}
     </div>
   );
 }

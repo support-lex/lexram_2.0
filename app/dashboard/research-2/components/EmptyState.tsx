@@ -1,9 +1,30 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Scale, Paperclip, ArrowRight, Mic, MicOff, LayoutTemplate } from "lucide-react";
+import { Scale, Paperclip, ArrowRight, Mic, MicOff, LayoutTemplate, ArrowUpRight } from "lucide-react";
 import { useVoiceTyping } from "@/hooks/use-voice-typing";
 import type { DraftTemplate } from "./TemplatesPanel";
+
+const EXAMPLE_QUESTIONS: Record<"ask" | "docChat" | "draft", string[]> = {
+  ask: [
+    "Can a co-accused claim parity of bail with an accused who was released?",
+    "Has the Supreme Court passed any recent interim stay on demolition orders?",
+    "What does Section 138 of the Negotiable Instruments Act require to prove dishonour?",
+    "Is anticipatory bail maintainable after chargesheet is filed — what do High Courts say?",
+  ],
+  docChat: [
+    "Summarise the key arguments and findings in this judgment",
+    "What are the main obligations and conditions in this document?",
+    "Identify any unusual or one-sided clauses in this agreement",
+    "What reliefs were granted and on what grounds?",
+  ],
+  draft: [
+    "Draft a bail application for an accused charged under Section 302 IPC",
+    "Write a legal notice for recovery of unpaid dues from a contractor",
+    "Draft a writ petition challenging an arbitrary termination of service",
+    "Prepare a reply to a Section 138 NI Act complaint",
+  ],
+};
 
 interface EmptyStateProps {
   onPickQuickStart: (query: string) => void;
@@ -161,6 +182,24 @@ export default function EmptyState({
               )}
             </div>
           )}
+
+          {/* Example questions grid */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {EXAMPLE_QUESTIONS[inputTab].map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => {
+                  setQuery(q);
+                  setTimeout(() => onSubmit(), 50);
+                }}
+                className="group/eq text-left rounded-xl border border-[var(--border-default)] bg-white px-4 py-3 text-[13px] text-[var(--text-secondary)] leading-snug hover:border-[var(--lex-rust)] hover:text-[var(--text-primary)] hover:shadow-[var(--lex-shadow-soft)] transition-all duration-150 flex items-start justify-between gap-2"
+              >
+                <span>{q}</span>
+                <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-[var(--text-muted)] group-hover/eq:text-[var(--lex-rust)] transition-colors" />
+              </button>
+            ))}
+          </div>
 
           <div
             data-no-focus-ring

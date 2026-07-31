@@ -1093,10 +1093,10 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         answer.streamText = extras.trim();
       }
 
-      // Attach precedent graph if one arrived via the side channel
-      const pg = pendingGraphRef.current;
-      if (pg && pg.nodes.length > 0) {
-        answer.precedentGraph = pg as PrecedentGraph;
+      // Attach precedent graph if one arrived via the side channel.
+      // Length check omitted — PrecedentGraph component returns null when empty.
+      if (pendingGraphRef.current) {
+        answer.precedentGraph = pendingGraphRef.current as unknown as PrecedentGraph;
       }
 
       const aiMessage: Message = {

@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import type { ReactNode } from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -25,6 +25,8 @@ import {
   CornerDownLeft,
   Send,
   X,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -256,6 +258,16 @@ export default function MessageBubble({
   const [copied, setCopied] = useState(false);
   const userAvatarUrl = useNetworkAvatar();
   const [vote, setVote] = useState<FeedbackRating | null>(null);
+
+  // TTS state
+  type AudioState = "idle" | "loading" | "playing";
+  const [audioState, setAudioState] = useState<AudioState>("idle");
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState<string>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("tts_voice") || "alloy";
+    return "alloy";
+  });
+  const audioElemRef = useRef<HTMLAudioElement | null>(null);
   // Dislike → opens a small report popover anchored to the thumbs-down
   // button. The textarea is optional; clicking Send saves the comment to
   // message_feedback.comment in Supabase alongside the down-vote rating.
@@ -336,6 +348,53 @@ export default function MessageBubble({
       setTimeout(() => setCopied(false), 1500);
     });
   };
+
+  const handleSpeak = async (text: string) => {
+    if (audioState === "playing") {
+      audioElemRef.current?.pause();
+      audioElemRef.current = null;
+      setAudioState("idle");
+      return;
+    }
+    if (audioState === "loading") return;
+
+    setAudioState("loading");
+    try {
+      const { getAccessToken } = await import("@/lib/auth-store");
+      const token = await getAccessToken();
+      const resp = await fetch("/legal-api/tts/speak", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ text: text.slice(0, 4096), voice: selectedVoice }),
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioElemRef.current = audio;
+      audio.onended = () => {
+        setAudioState("idle");
+        URL.revokeObjectURL(url);
+        audioElemRef.current = null;
+      };
+      audio.onerror = () => {
+        setAudioState("idle");
+        URL.revokeObjectURL(url);
+        audioElemRef.current = null;
+      };
+      setAudioState("playing");
+      audio.play();
+    } catch (err) {
+      console.error("TTS error", err);
+      toast.error("Couldn't play audio");
+      setAudioState("idle");
+    }
+  };
+
+  const TTS_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"] as const;
 
   // ── User message (right-aligned) ──────────────────────────────────────────
   if (message.role === "user") {
@@ -807,7 +866,7 @@ export default function MessageBubble({
             message. The inline `<cite>N</cite>` superscripts in the prose
             still scroll-to / select the matching authority on click. */}
 
-        {/* Hover toolbar — copy, regenerate, share, pin, thumbs */}
+        {/* Hover toolbar — copy, speak, regenerate, share, pin, thumbs */}
         <div className="flex items-center gap-0.5 mt-2 px-1">
           <button
             onClick={() => handleCopy(contentText)}
@@ -817,6 +876,60 @@ export default function MessageBubble({
             {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
             Copy
           </button>
+
+          {/* TTS speaker button */}
+          <button
+            onClick={() => handleSpeak(contentText)}
+            className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] transition-colors ${
+              audioState === "playing"
+                ? "text-indigo-600 bg-indigo-50 hover:bg-indigo-100"
+                : "text-[var(--text-muted)] hover:text-indigo-600 hover:bg-indigo-50"
+            }`}
+            title={audioState === "playing" ? "Stop audio" : "Listen"}
+            disabled={audioState === "loading"}
+          >
+            {audioState === "loading" ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : audioState === "playing" ? (
+              <VolumeX className="w-3 h-3" />
+            ) : (
+              <Volume2 className="w-3 h-3" />
+            )}
+            {audioState === "playing" ? "Stop" : "Listen"}
+          </button>
+
+          {/* Voice selector */}
+          <div className="relative">
+            <button
+              onClick={() => setVoiceOpen((o) => !o)}
+              className="inline-flex items-center gap-0.5 rounded-lg px-1.5 py-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+              title="Choose voice"
+            >
+              {selectedVoice}
+              <ChevronDown className="w-2.5 h-2.5" />
+            </button>
+            {voiceOpen && (
+              <div className="absolute left-0 bottom-full mb-1 z-50 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg shadow-lg overflow-hidden min-w-[90px]">
+                {TTS_VOICES.map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => {
+                      setSelectedVoice(v);
+                      localStorage.setItem("tts_voice", v);
+                      setVoiceOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${
+                      v === selectedVoice
+                        ? "text-indigo-600 bg-indigo-50"
+                        : "text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+                    }`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             onClick={() => {
               if (!onRegenerate) return;

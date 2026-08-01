@@ -1,24 +1,48 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ArtifactTab, Message } from "../types";
 
 export function useResearchUI({
   lastAi,
   queryTextareaRef,
   handleSubmitRef,
+  streamingSourcesCount = 0,
+  isSearching = false,
 }: {
   lastAi?: Message;
   queryTextareaRef: React.RefObject<HTMLTextAreaElement | null>;
   handleSubmitRef: React.RefObject<() => void>;
+  streamingSourcesCount?: number;
+  isSearching?: boolean;
 }) {
   const [showArtifacts, setShowArtifacts] = useState(false);
-  const [artifactTab, setArtifactTab] = useState<ArtifactTab>("workflow");
+  const [artifactTab, _setArtifactTab] = useState<ArtifactTab>("workflow");
+
+  // Tracks whether the user manually picked a tab in the current query.
+  // Prevents auto-switches (sources open, authorities open) from yanking them
+  // off a tab they deliberately chose. Reset at the start of each new query.
+  const userPickedTabRef = useRef(false);
+  const setArtifactTab = useCallback((tab: ArtifactTab) => {
+    userPickedTabRef.current = true;
+    _setArtifactTab(tab);
+  }, []);
+
+  // Detect new query start (isSearching false → true) and reset both guards so
+  // the auto-open logic fires fresh for the upcoming query.
+  const prevIsSearchingRef = useRef(false);
+  useEffect(() => {
+    if (isSearching && !prevIsSearchingRef.current) {
+      userPickedTabRef.current = false;
+      sourcesOpenedRef.current = false;
+    }
+    prevIsSearchingRef.current = isSearching;
+  }, [isSearching]);
   const [showHistory, setShowHistory] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [mobilePane, setMobilePane] = useState<"chat" | "authorities">("chat");
   const [selectedAuthorityIndex, setSelectedAuthorityIndex] = useState<number | null>(null);
-  const [artifactsWidth, setArtifactsWidth] = useState(50);
+  const [artifactsWidth, setArtifactsWidth] = useState(35);
   const [isDragging, setIsDragging] = useState(false);
   const [expandedWorking, setExpandedWorking] = useState<Record<string, boolean>>({});
   const [expandedThinkingTokens, setExpandedThinkingTokens] = useState<Record<string, boolean>>({});
@@ -34,20 +58,27 @@ export function useResearchUI({
   // at full width by default and avoids fighting for screen real estate on
   // smaller laptops.
 
-  // Auto-open the right-side authorities rail whenever a new AI response
-  // arrives with parsed sources. The LexRam backend ships inline citations
-  // (<cite>N</cite>) plus a structured authorities list — clicking a citation
-  // pill in the prose scrolls the matching card into view in this panel.
+  // Auto-open the sources panel as soon as the first chunk arrives.
+  // Only switches tab if the user hasn't manually picked one this query.
+  const sourcesOpenedRef = useRef(false);
+  useEffect(() => {
+    if (streamingSourcesCount > 0 && !sourcesOpenedRef.current) {
+      sourcesOpenedRef.current = true;
+      setShowArtifacts(true);
+      if (!userPickedTabRef.current) {
+        _setArtifactTab("sources");
+        // Lock the tab so the authorities auto-switch (firing when onDone
+        // arrives) doesn't yank the user off the sources they're reading.
+        userPickedTabRef.current = true;
+      }
+    }
+  }, [streamingSourcesCount]);
+
+  // Authorities are shown inline below the answer in the chat bubble —
+  // no auto-switch needed in the side panel.
   useEffect(() => {
     if (!lastAi?.id || !lastAi.response) return;
-    if (lastAi.id === lastAutoArtifactResponseIdRef.current) return;
-
-    const auths = lastAi.response.authorities ?? [];
-    if (auths.length > 0) {
-      lastAutoArtifactResponseIdRef.current = lastAi.id;
-      setShowArtifacts(true);
-      setArtifactTab("authorities");
-    }
+    lastAutoArtifactResponseIdRef.current = lastAi.id;
   }, [lastAi]);
 
   // CustomEvent listeners from the global dashboard header

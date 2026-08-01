@@ -11,6 +11,7 @@ import {
   type AnalysisDepth,
   type AttachedFile,
   type Authority,
+  type ChunkSource,
   type CommandMode,
   type LegalAnswer,
   type Message,
@@ -359,6 +360,28 @@ function normalizeAnswer(raw: any, rootQuery = "Query"): LegalAnswer {
   };
 }
 
+function classifyError(raw: string): { message: string; kind: "auth" | "retryable" } {
+  const s = (raw ?? "").toLowerCase();
+  // Status-code patterns (encoded as [NNN] by the API layer) take priority over string matching
+  if (s.includes("[401]") || s.includes("token expired") || s.includes("unauthorized") || s.includes("not authenticated") || s.includes("could not validate credentials") || s.includes("sign in to start"))
+    return { message: "Your session has expired. Please sign in again.", kind: "auth" };
+  if (s.includes("[429]") || s.includes("rate limit") || s.includes("too many requests"))
+    return { message: "Too many requests. Please wait a moment and try again.", kind: "retryable" };
+  if (s.includes("[402]") || s.includes("credits") || s.includes("quota") || s.includes("billing") || s.includes("payment required"))
+    return { message: "We're experiencing high demand. Please try again in a few minutes.", kind: "retryable" };
+  if (s.includes("failed to fetch") || s.includes("networkerror") || s.includes("load failed") || s.includes("network request failed"))
+    return { message: "Check your internet connection and try again.", kind: "retryable" };
+  if (s.includes("[500]") || s.includes("[502]") || s.includes("[503]") || s.includes("internal server error"))
+    return { message: "Something went wrong on our end. Please try again.", kind: "retryable" };
+  if (s.includes("took too long") || s.includes("stopped responding") || s.includes("timed out"))
+    return { message: raw, kind: "retryable" };
+  if (s.includes("could not create") || s.includes("could not start") || s.includes("chat session"))
+    return { message: "Could not start a research session. Please refresh and try again.", kind: "retryable" };
+  if (s.includes("knowledge base") || s.includes("weaviate") || s.includes("neo4j"))
+    return { message: "Could not reach the knowledge base. Please try again.", kind: "retryable" };
+  return { message: "Something went wrong. Please try again.", kind: "retryable" };
+}
+
 export interface UseResearchChatOptions {
   /** Ensure a LexRam session exists, creating one on demand. Returns the session id. */
   ensureSession: (titleHint: string) => Promise<string | null>;
@@ -372,6 +395,8 @@ export interface UseResearchChatOptions {
    * in the query response payload).
    */
   refreshSessions?: () => void;
+  /** Compact structure JSON from the selected draft template — forwarded to the backend. */
+  templateStructure?: object | null;
 }
 
 export function useResearchChat(
@@ -384,6 +409,7 @@ export function useResearchChat(
   const [queryMode, setQueryMode] = useState<QueryMode>("deep");
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<"auth" | "retryable" | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   // Optional sub-lines that the backend now ships alongside the status
@@ -402,15 +428,12 @@ export function useResearchChat(
   const [writingStyle, setWritingStyle] = useState<WritingStyle>("neutral");
   const [liveEditorContent, setLiveEditorContent] = useState("");
   const [activeRunMode, setActiveRunMode] = useState<CommandMode | null>(null);
+  const [streamingSources, setStreamingSources] = useState<ChunkSource[]>([]);
 
   const ensureSessionRef = useRef(options.ensureSession);
   ensureSessionRef.current = options.ensureSession;
 
   // ── Reset streaming state on new chat ──────────────────────────────────────
-  // When currentSessionId becomes null (user clicked "New Chat"), abort any
-  // in-flight SSE stream and clear the Working... state. Without this, a stale
-  // ensureSession closure can route the new request to the old session on the
-  // backend, which never sends a done event → isSearching stays true forever.
   useEffect(() => {
     if (options.currentSessionId === null) {
       if (abortRef.current) {
@@ -422,14 +445,43 @@ export function useResearchChat(
       setStatusMessage("");
       streamRef.current = "";
       setActiveRunMode(null);
+      setStreamingSources([]);
     }
   }, [options.currentSessionId]);
+
+  // ── Hydrate sources from sessionStorage when switching sessions ─────────────
+  useEffect(() => {
+    const sid = options.currentSessionId;
+    if (!sid || sid.startsWith("temp_")) {
+      setStreamingSources([]);
+      return;
+    }
+    try {
+      const stored = sessionStorage.getItem(`lexram-sources-${sid}`);
+      setStreamingSources(stored ? JSON.parse(stored) : []);
+    } catch {
+      setStreamingSources([]);
+    }
+  }, [options.currentSessionId]);
+
+  // ── Persist sources to sessionStorage whenever they change ──────────────────
+  useEffect(() => {
+    const sid = options.currentSessionId;
+    if (!sid || sid.startsWith("temp_") || streamingSources.length === 0) return;
+    try {
+      sessionStorage.setItem(`lexram-sources-${sid}`, JSON.stringify(streamingSources));
+    } catch { /* quota exceeded — non-fatal */ }
+  }, [streamingSources, options.currentSessionId]);
 
   const refreshSessionsRef = useRef(options.refreshSessions);
   refreshSessionsRef.current = options.refreshSessions;
 
   const streamRef = useRef("");
+  const lastSubmittedQueryRef = useRef("");
   const abortRef = useRef<AbortController | null>(null);
+  // True at the start of each query; the first onChunks call resets it after
+  // replacing (not appending) so old sources don't flash empty between queries.
+  const firstChunkOfQueryRef = useRef(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryTextareaRef = useRef<HTMLTextAreaElement>(null);
   const handleSubmitRef = useRef<() => void>(() => {});
@@ -590,13 +642,16 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       mode: effectiveMode,
     };
 
+    lastSubmittedQueryRef.current = prompt;
     setMessages((prev) => [...prev, userMessage]);
     setQuery("");
     setError(null);
+    setErrorKind(null);
     setIsSearching(true);
     setStreamingText("");
     setStatusMessage("");
     setStatusDetail([]);
+    firstChunkOfQueryRef.current = true; // next onChunks replaces instead of appending
     streamRef.current = "";
     setActiveRunMode(effectiveMode);
     setLiveEditorContent("");
@@ -612,7 +667,8 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     try {
       sessionId = await ensureSessionRef.current(prompt);
     } catch (err: any) {
-      setError(err?.message || "Could not create session.");
+      const { message, kind } = classifyError(err?.message || "Could not create session.");
+      setError(message); setErrorKind(kind);
       setIsSearching(false);
       return;
     }
@@ -624,12 +680,12 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
       return;
     }
     if (!sessionId) {
-      setError("Could not create a chat session.");
+      setError("Could not start a research session. Please refresh and try again."); setErrorKind("retryable");
       setIsSearching(false);
       return;
     }
     if (sessionId.startsWith("temp_")) {
-      setError("Please sign in to start a research session.");
+      setError("Please sign in to start a research session."); setErrorKind("auth");
       setIsSearching(false);
       return;
     }
@@ -662,12 +718,46 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
           onDone: (event) => {
             doneEventRef.current = event;
           },
+          onChunks: (_tool, sources) => {
+            const dedup = (existing: ChunkSource[], incoming: ChunkSource[]): ChunkSource[] => {
+              const seen = new Set(existing.map((s) => (s.chunk_text ?? "").slice(0, 120)));
+              return incoming.filter((s) => {
+                const key = (s.chunk_text ?? "").slice(0, 120);
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+            };
+            if (firstChunkOfQueryRef.current) {
+              firstChunkOfQueryRef.current = false;
+              const incoming = sources as ChunkSource[];
+              // Deduplicate within the first batch itself
+              const unique: ChunkSource[] = [];
+              const seen = new Set<string>();
+              for (const s of incoming) {
+                const key = (s.chunk_text ?? "").slice(0, 120);
+                if (!seen.has(key)) { seen.add(key); unique.push(s); }
+              }
+              setStreamingSources(unique);
+            } else {
+              setStreamingSources((prev) => [...prev, ...dedup(prev, sources as ChunkSource[])]);
+            }
+          },
           onError: (message) => {
-            setError(message);
+            const { message: friendly, kind } = classifyError(message);
+            setError(friendly); setErrorKind(kind);
           },
         },
-        { signal: controller.signal }
+        { signal: controller.signal, templateStructure: queryMode === "draft" ? (options.templateStructure ?? null) : null }
       );
+
+      // Silent drop guard: if the stream closed cleanly (no error thrown) but
+      // delivered zero content and no done event, the backend silently dropped
+      // the connection. Surface a retryable error instead of leaving the chat idle.
+      if (!streamRef.current.trim() && !doneEventRef.current) {
+        setError("The response was empty. Please try again."); setErrorKind("retryable");
+        return;
+      }
 
       // Build the final answer. Token order of preference:
       //   1. concatenated streaming tokens (the normal happy path)
@@ -1019,7 +1109,8 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
         setMessages((prev) => [...prev, fallback]);
       }
       if (err?.name !== "AbortError") {
-        setError(err?.message || "Research failed.");
+        const { message, kind } = classifyError(err?.message || "Research failed.");
+        setError(message); setErrorKind(kind);
       }
     } finally {
       setIsSearching(false);
@@ -1049,6 +1140,13 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     // which startResearch's catch treats as a clean cancel. The next query
     // creates a fresh controller, so there's nothing to clear here.
     abortRef.current?.abort();
+  };
+
+  const retryLastQuery = () => {
+    const last = lastSubmittedQueryRef.current;
+    if (!last) return;
+    setQuery(last);
+    setTimeout(() => handleSubmitRef.current?.(), 50);
   };
 
   const handleSubmit = () => {
@@ -1216,6 +1314,7 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     statusDetail,
     isSearching,
     error,
+    errorKind,
     streamingText,
     attachedFiles,
     removeFile,
@@ -1236,7 +1335,9 @@ If your answer needs no diagram, no authorities, and no draft, just return the p
     setWritingStyle,
     liveEditorContent,
     activeRunMode,
+    streamingSources,
     handleSubmit,
+    retryLastQuery,
     stopGeneration,
     addFiles,
     attachCaseDocs,

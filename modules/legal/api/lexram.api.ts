@@ -11,7 +11,7 @@
 // Auth: HTTPBearer. We use the Supabase access token by default; callers can
 // override by passing an explicit token.
 
-import { getAccessToken } from "@/lib/auth-store";
+import { getAccessToken, refreshAuthToken } from "@/lib/auth-store";
 import { begin as activityBegin, end as activityEnd } from "@/lib/api-activity";
 
 export const LEXRAM_BASE =
@@ -25,6 +25,8 @@ const BASE = LEXRAM_BASE;
 export async function getAuthToken(): Promise<string | null> {
   return getAccessToken();
 }
+
+export { refreshAuthToken };
 
 export interface LexRamRequestOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
@@ -99,10 +101,8 @@ export async function lexramRequest<T = unknown>(
         const errBody = await res.json();
         detail = errBody?.detail ?? errBody?.message ?? detail;
         if (Array.isArray(detail)) detail = detail.map((d: any) => d.msg ?? d).join("; ");
-      } catch {
-        /* ignore */
-      }
-      throw new Error(detail);
+      } catch { /* ignore */ }
+      throw new Error(`[${res.status}] ${detail}`);
     }
 
     // Some endpoints return empty 200s

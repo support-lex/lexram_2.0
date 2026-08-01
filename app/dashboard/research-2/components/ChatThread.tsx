@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RefreshCw, LogIn } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import MessageBubble from "./MessageBubble";
 import StreamingIndicator from "./StreamingIndicator";
@@ -33,6 +33,9 @@ type ChatThreadProps = {
   onPinSession?: () => void;
   onEditMessage?: (content: string) => void;
   onProceedWithDraft?: () => void;
+  errorKind?: "auth" | "retryable" | null;
+  onRetry?: () => void;
+  onSignIn?: () => void;
 };
 
 export default function ChatThread({
@@ -62,6 +65,9 @@ export default function ChatThread({
   onPinSession,
   onEditMessage,
   onProceedWithDraft,
+  errorKind,
+  onRetry,
+  onSignIn,
 }: ChatThreadProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -125,9 +131,33 @@ export default function ChatThread({
         )}
 
         {error && (
-          <div className="flex items-start gap-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl p-4">
-            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-            <span>{error}</span>
+          <div className="flex flex-col gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="flex items-start gap-2 text-sm font-medium text-red-700">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+            <div className="flex items-center gap-2 pl-6">
+              {errorKind === "auth" && onSignIn && (
+                <button
+                  type="button"
+                  onClick={onSignIn}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  Sign in again
+                </button>
+              )}
+              {errorKind === "retryable" && onRetry && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Try again
+                </button>
+              )}
+            </div>
           </div>
         )}
 

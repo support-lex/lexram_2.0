@@ -28,6 +28,7 @@ import ChatThread from "./components/ChatThread";
 import ChatInput from "./components/ChatInput";
 import AuthoritiesPanel from "./components/AuthoritiesPanel";
 import ShortcutsModal from "./components/ShortcutsModal";
+import TemplatesPanel from "./components/TemplatesPanel";
 import DocumentDialog from "./components/DocumentDialog";
 import SuggestionsPopup from "./components/SuggestionsPopup";
 import demoConversation from "./demo-conversation.json";
@@ -91,6 +92,8 @@ export default function Research2Page() {
   // happened in the sidebar without needing a global event bus.
 
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showTemplatesPanel, setShowTemplatesPanel] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<import("./components/TemplatesPanel").DraftTemplate | null>(null);
 
   const {
     sessions, sessionsReady, messages, setMessages, currentSessionId,
@@ -227,15 +230,15 @@ export default function Research2Page() {
 
   const {
     query, setQuery, mode, setMode, queryMode, setQueryMode,
-    statusMessage, statusDetail, isSearching, error, streamingText,
+    statusMessage, statusDetail, isSearching, error, errorKind, streamingText,
     attachedFiles, removeFile, isDragActive, dropHandlers,
     fileInputRef, queryTextareaRef, handleSubmitRef, resizeTextarea,
     webSearchEnabled, setWebSearchEnabled, outputFormat, setOutputFormat,
     analysisDepth, setAnalysisDepth, writingStyle, setWritingStyle,
     selectedPromptPreset, setSelectedPromptPreset,
-    liveEditorContent, activeRunMode, handleSubmit, stopGeneration,
+    liveEditorContent, activeRunMode, streamingSources, handleSubmit, retryLastQuery, stopGeneration,
     addFiles, attachCaseDocs, buildSessionDraft,
-  } = useResearchChat(messages, setMessages, { ensureSession, currentSessionId, refreshSessions });
+  } = useResearchChat(messages, setMessages, { ensureSession, currentSessionId, refreshSessions, templateStructure: selectedTemplate?.structure ?? null });
 
   const lastAi = [...messages].reverse().find((m) => m.role === "ai");
   useEffect(() => { setSelectedSourceMessageId(null); }, [lastAi?.id]);
@@ -249,7 +252,7 @@ export default function Research2Page() {
     mobilePane, setMobilePane, selectedAuthorityIndex, setSelectedAuthorityIndex,
     artifactsWidth, isDragging, containerRef, handleDragStart,
     expandedWorking, expandedThinkingTokens, toggleWorking, toggleThinkingTokens,
-  } = useResearchUI({ lastAi, queryTextareaRef, handleSubmitRef });
+  } = useResearchUI({ lastAi, queryTextareaRef, handleSubmitRef, streamingSourcesCount: streamingSources.length, isSearching });
 
   const shouldAutoSubmit = useRef(false);
   useEffect(() => {
@@ -560,6 +563,8 @@ export default function Research2Page() {
     onFileClick: () => setShowDocumentDialog(true),
     isAuthenticated,
     onSignUp: goToSignUp,
+    selectedTemplate,
+    onOpenTemplates: () => setShowTemplatesPanel(true),
   };
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -759,7 +764,9 @@ export default function Research2Page() {
               {hasThread ? (
                 <ChatThread
                   messages={messages} isSearching={isSearching || demoTyping} streamingText={streamingText}
-                  statusMessage={statusMessage} statusDetail={statusDetail} error={error} userInitials={userInitials}
+                  statusMessage={statusMessage} statusDetail={statusDetail} error={error} errorKind={errorKind} userInitials={userInitials}
+                  onRetry={retryLastQuery}
+                  onSignIn={() => { window.location.href = "/sign-in"; }}
                   expandedWorking={expandedWorking} expandedThinkingTokens={expandedThinkingTokens}
                   toggleWorking={toggleWorking} toggleThinkingTokens={toggleThinkingTokens}
                   onOpenAuthorities={handleOpenAuthorities} onOpenEditor={handleOpenEditor}
@@ -802,6 +809,8 @@ export default function Research2Page() {
                   onToggleDraftMode={() =>
                     setQueryMode(queryMode === "draft" ? "deep" : "draft")
                   }
+                  selectedTemplate={selectedTemplate}
+                  onOpenTemplates={() => setShowTemplatesPanel(true)}
                 />
               )}
 
@@ -830,6 +839,25 @@ export default function Research2Page() {
           </div>
 
         </div>
+
+        {/* ── Sources / Authorities panel ─── */}
+        <AuthoritiesPanel
+          showArtifacts={showArtifacts}
+          mobilePane={mobilePane}
+          artifactTab={artifactTab}
+          setArtifactTab={setArtifactTab}
+          lastResponse={sourceMessage?.response}
+          currentQuestion={sourceMessage?.content}
+          workflowCount={sourceMessage?.response?.uiBlocks?.filter(b => b.type === "mindmap").length ?? 0}
+          authorityCount={sourceMessage?.response?.authorities?.length ?? 0}
+          selectedAuthorityIndex={selectedAuthorityIndex}
+          onSelectAuthority={setSelectedAuthorityIndex}
+          liveEditorContent={liveEditorContent}
+          isDraftArtifactStreaming={isSearching && activeRunMode === "draft"}
+          sessionId={currentSessionId}
+          width={artifactsWidth}
+          streamingSources={streamingSources}
+        />
 
         {/* ── Case Hub — rightmost sibling of the chat area ─── */}
         <CasesPanel
@@ -876,6 +904,12 @@ export default function Research2Page() {
       />
 
       <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      <TemplatesPanel
+        open={showTemplatesPanel}
+        onClose={() => setShowTemplatesPanel(false)}
+        selectedTemplate={selectedTemplate}
+        onSelect={setSelectedTemplate}
+      />
       <DocumentDialog
         open={showDocumentDialog}
         onOpenChange={setShowDocumentDialog}

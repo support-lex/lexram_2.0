@@ -41,6 +41,16 @@ const listeners = new Set<() => void>();
 
 let initialized = false;
 let readyResolved = false;
+
+// Wake-refresh gate. When the tab returns from a long absence (> 5 min) the
+// Supabase auto-refresh timer will have been paused and the access token may be
+// expired. We force an explicit refreshSession() and hold any outgoing request
+// (via getAccessToken) behind this promise until the fresh token is stored.
+// This prevents the "Working... forever" hang caused by stale tokens slipping
+// through immediately after a tab wake.
+let wakeRefreshPromise: Promise<void> | null = null;
+let hiddenAt: number | null = null;
+const STALE_AFTER_MS = 5 * 60 * 1000; // 5 minutes idle = force refresh on wake
 let resolveReady!: () => void;
 const readyPromise = new Promise<void>((resolve) => {
   resolveReady = resolve;
@@ -104,12 +114,39 @@ function init() {
       applySession(null, null, true);
     });
 
-  // After laptop sleep / tab wake, Supabase's background refresh timer was
-  // paused and TOKEN_REFRESHED never fires. Re-run getSession() when the page
-  // becomes visible — it silently refreshes an expired token, then
-  // onAuthStateChange fires TOKEN_REFRESHED and updates the snapshot for free.
+  // After laptop sleep / tab wake, Supabase's background refresh timer will
+  // have been paused and the access token may be expired. Track how long the
+  // tab was hidden; if > STALE_AFTER_MS, force an explicit refreshSession()
+  // and gate getAccessToken() on it — so no request goes out with a stale token.
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
+    if (document.visibilityState === "hidden") {
+      hiddenAt = Date.now();
+      return;
+    }
+    // Tab is visible again
+    const absenceMs = hiddenAt ? Date.now() - hiddenAt : 0;
+    hiddenAt = null;
+
+    if (absenceMs > STALE_AFTER_MS) {
+      // Long absence — token likely expired. Force a refresh and gate any
+      // outgoing request on the result via wakeRefreshPromise.
+      wakeRefreshPromise = sb.auth
+        .refreshSession()
+        .then(({ data }) => {
+          if (data.session) {
+            applySession(data.session.user, data.session.access_token, true);
+          }
+        })
+        .catch(() => {
+          // Refresh failed (e.g. refresh token also expired) — fall back to
+          // getSession() so onAuthStateChange can redirect to sign-in if needed.
+          sb.auth.getSession().catch(() => {}); // fire-and-forget, keep return type void
+        })
+        .finally(() => {
+          wakeRefreshPromise = null;
+        });
+    } else {
+      // Short absence — proactive getSession() is enough; no need to gate.
       sb.auth.getSession().catch(() => {});
     }
   });
@@ -160,10 +197,33 @@ export const authStore = {
  * reads a fresh token via getSession() (which transparently refreshes an
  * expiring token). Returns null on the server or when signed out.
  */
+/**
+ * Explicitly exchange the refresh token for a new access token.
+ * Call this after a 401 to silently recover the session before retrying.
+ */
+export async function refreshAuthToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const { data, error } = await supabase().auth.refreshSession();
+    if (error || !data.session) return null;
+    // applySession fires via onAuthStateChange (TOKEN_REFRESHED), but also
+    // update the snapshot immediately so the next getAccessToken() call reads
+    // the new token without waiting for the event loop.
+    applySession(data.session.user, data.session.access_token, true);
+    return data.session.access_token;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAccessToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
   init();
   await readyPromise;
+  // If the tab just woke from a long sleep, wait for the forced refresh to
+  // complete before returning a token — prevents stale tokens causing the
+  // "Working... forever" hang on the first post-idle query.
+  if (wakeRefreshPromise) await wakeRefreshPromise;
   // Prefer the freshest token; getSession() auto-refreshes if near expiry.
   //
   // BUT getSession() serialises behind Supabase's cross-tab navigator Web Lock

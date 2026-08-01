@@ -8,7 +8,7 @@
 //   data: {"type":"done","session_id":"...","query_type":"...", ...}\n\n
 //   data: {"type":"error","message":"..."}\n\n
 
-import { LEXRAM_BASE, getAuthToken, jsonAsciiSafe } from "./lexram.api";
+import { LEXRAM_BASE, getAuthToken, refreshAuthToken, jsonAsciiSafe } from "./lexram.api";
 
 // Query modes sent to the backend. "instant" = quick answer, "deep" = full
 // research + authorities, "draft" = produce a legal-document draft using the
@@ -36,10 +36,15 @@ export interface QueryStreamCallbacks {
   onToken?: (content: string) => void;
   onDone?: (event: QueryStreamDoneEvent) => void;
   onError?: (message: string) => void;
+  /** Called each time a tool completes with the retrieved chunk sources.
+   *  Arrives progressively during the stream, before `onDone`. */
+  onChunks?: (tool: string, sources: unknown[]) => void;
 }
 
 export interface QueryStreamOptions {
   signal?: AbortSignal;
+  /** Compact structure JSON from a saved draft template — injected into the draft prompt. */
+  templateStructure?: object | null;
 }
 
 export async function streamLexRamQuery(
@@ -90,7 +95,11 @@ export async function streamLexRamQuery(
         method: "POST",
         headers,
         // ASCII-safe encoding — see jsonAsciiSafe doc for the backend bug we work around.
-        body: jsonAsciiSafe({ query, mode }),
+        body: jsonAsciiSafe({
+          query,
+          mode,
+          ...(options.templateStructure ? { template_structure: JSON.stringify(options.templateStructure) } : {}),
+        }),
         signal: connectController.signal,
       }
     );
@@ -106,13 +115,33 @@ export async function streamLexRamQuery(
     ) {
       throw new Error("The server took too long to respond. Please try again.");
     }
-    throw err;
+    throw err; // classifyError in use-research-chat maps "Failed to fetch" / "Load failed" → friendly network message
   }
   // Headers arrived — disarm the connect timer, but KEEP the caller-abort →
   // connectController link wired: the response body below was opened with
   // connectController.signal, so the user's Stop must still propagate to it.
   // The wiring is torn down in the reader cleanup finally at the end.
   clearTimeout(connectTimer);
+
+  // On 401: silently refresh the token and retry once before giving up.
+  if (res.status === 401) {
+    try {
+      const freshToken = await refreshAuthToken();
+      if (freshToken) {
+        headers.Authorization = `Bearer ${freshToken}`;
+        const retryRes = await fetch(
+          `${LEXRAM_BASE}/sessions/${encodeURIComponent(sessionId)}/query/stream`,
+          { method: "POST", headers, body: jsonAsciiSafe({ query, mode, ...(options.templateStructure ? { template_structure: JSON.stringify(options.templateStructure) } : {}) }), signal: connectController.signal }
+        );
+        if (retryRes.ok) {
+          // Swap in the successful retry response and continue
+          res = retryRes;
+        } else {
+          res = retryRes; // fall through to error handling below with the retry status
+        }
+      }
+    } catch { /* refresh or retry failed — fall through */ }
+  }
 
   if (!res.ok) {
     options.signal?.removeEventListener("abort", onCallerAbort);
@@ -121,10 +150,8 @@ export async function streamLexRamQuery(
       const errBody = await res.json();
       detail = errBody?.detail ?? errBody?.message ?? detail;
       if (Array.isArray(detail)) detail = detail.map((d: any) => d.msg ?? d).join("; ");
-    } catch {
-      /* ignore */
-    }
-    throw new Error(detail);
+    } catch { /* ignore */ }
+    throw new Error(`[${res.status}] ${detail}`);
   }
 
   if (!res.body) {
@@ -207,8 +234,14 @@ export async function streamLexRamQuery(
               callbacks.onDone?.(event as QueryStreamDoneEvent);
               streamDone = true;
               break;
+            case "chunks":
+              if (Array.isArray(event.sources)) {
+                callbacks.onChunks?.(String(event.tool ?? ""), event.sources);
+              }
+              break;
             case "error":
               callbacks.onError?.(String(event.message ?? "Unknown error"));
+              streamDone = true;
               break;
             default:
               // ignore unknown event types

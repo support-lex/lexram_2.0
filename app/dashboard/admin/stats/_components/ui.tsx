@@ -468,12 +468,15 @@ export function Table({
   rows,
   align = [],
   empty = "Nothing to show yet.",
+  onRowClick,
 }: {
   headers: string[];
   rows: ReactNode[][];
   /** Per-column alignment; numeric columns should be "right". */
   align?: Array<"left" | "right">;
   empty?: string;
+  /** When set, every row becomes a button — clickable and keyboard-activatable. */
+  onRowClick?: (index: number) => void;
 }) {
   if (rows.length === 0) {
     return <p className="px-4 py-8 text-sm text-[var(--text-muted)] text-center">{empty}</p>;
@@ -500,7 +503,22 @@ export function Table({
           {rows.map((row, i) => (
             <tr
               key={i}
-              className="border-b border-[var(--border-default)] last:border-b-0 hover:bg-[var(--lex-maroon)]/[0.05] transition-colors"
+              onClick={onRowClick ? () => onRowClick(i) : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onRowClick(i);
+                      }
+                    }
+                  : undefined
+              }
+              tabIndex={onRowClick ? 0 : undefined}
+              role={onRowClick ? "button" : undefined}
+              className={`border-b border-[var(--border-default)] last:border-b-0 hover:bg-[var(--lex-maroon)]/[0.05] transition-colors ${
+                onRowClick ? "cursor-pointer focus:outline-none focus:bg-[var(--lex-maroon)]/[0.08]" : ""
+              }`}
             >
               {row.map((cell, j) => (
                 <td

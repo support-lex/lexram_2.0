@@ -24,7 +24,6 @@ import {
   TrendingDown,
   MessageSquare,
   Cpu,
-  Building2,
   FileText,
   AlertTriangle,
   ShieldCheck,
@@ -32,14 +31,12 @@ import {
   Activity,
   LayoutGrid,
   ThumbsUp,
-  Network,
 } from "lucide-react";
 
 import type { AdminOverview } from "../_lib/overview";
 import TrendChart from "./TrendChart";
 import UsersPanel from "./UsersPanel";
 import TopUpsPanel from "./TopUpsPanel";
-import OrgsPanel from "./OrgsPanel";
 import SessionsPanel from "./SessionsPanel";
 import { RANGES, type RangeKey, deltaPct, inRange, rangeLabel, sliceSeries, sum } from "./range";
 import {
@@ -56,7 +53,7 @@ import {
   fmtInt,
 } from "./ui";
 
-type TabKey = "overview" | "users" | "topups" | "credits" | "usage" | "orgs";
+type TabKey = "overview" | "users" | "topups" | "credits" | "usage";
 
 const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
   { key: "overview", label: "Overview", icon: <LayoutGrid className="w-3.5 h-3.5" /> },
@@ -64,7 +61,6 @@ const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
   { key: "topups", label: "Top-ups", icon: <Wallet className="w-3.5 h-3.5" /> },
   { key: "credits", label: "Credits", icon: <Coins className="w-3.5 h-3.5" /> },
   { key: "usage", label: "Usage", icon: <Cpu className="w-3.5 h-3.5" /> },
-  { key: "orgs", label: "Organisations", icon: <Building2 className="w-3.5 h-3.5" /> },
 ];
 
 export default function DashboardShell({ data }: { data: AdminOverview }) {
@@ -451,24 +447,6 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
 
             <Card title="Recent research sessions" icon={<MessageSquare className="w-4 h-4" />}>
               <SessionsPanel rows={usage.recentSessions} range={range} />
-            </Card>
-          </div>
-        )}
-
-        {/* ── Organisations ───────────────────────────────────────────────── */}
-        {tab === "orgs" && (
-          <div className="space-y-4">
-            <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-              <Kpi icon={<Building2 className="w-3.5 h-3.5" />} label="Organisations" value={fmtInt(orgs.total)} sub={`${fmtInt(orgs.active)} active`} emphasis />
-              <Kpi icon={<Users className="w-3.5 h-3.5" />} label="Seats used" value={fmtInt(orgs.members)} sub="Active memberships" />
-              <Kpi icon={<Clock className="w-3.5 h-3.5" />} label="Pending requests" value={fmtInt(orgs.pendingRequests)} sub="Awaiting review" emphasis={orgs.pendingRequests > 0} />
-              <Kpi icon={<FileText className="w-3.5 h-3.5" />} label="TSR cases" value={fmtInt(orgs.tsrCases)} sub={`${fmtInt(orgs.tsrDocuments)} documents`} />
-              <Kpi icon={<FileText className="w-3.5 h-3.5" />} label="LOD cases" value={fmtInt(orgs.lodCases)} sub="List of documents" />
-              <Kpi icon={<Network className="w-3.5 h-3.5" />} label="Network profiles" value={fmtInt(content.networkProfiles)} sub={`${fmtInt(content.networkConnections)} connections`} />
-            </section>
-
-            <Card title="Organisations" hint="Search and filter every tenant" icon={<Building2 className="w-4 h-4" />}>
-              <OrgsPanel rows={orgs.rows} />
             </Card>
           </div>
         )}

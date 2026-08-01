@@ -639,6 +639,12 @@ export default function MessageBubble({
             screens narrower than lg, the right column stacks below the bubble. */}
         <div className="flex-1 min-w-0">
 
+        {/* ── Precedent graph — programmatic, from Neo4j side channel ──── */}
+        {/* Rendered ABOVE the prose so the LLM's "See the Precedent Map above" is accurate */}
+        {response.precedentGraph && response.precedentGraph.nodes.length > 0 && (
+          <PrecedentGraph data={response.precedentGraph} />
+        )}
+
         {/* Main content bubble */}
         <div className="px-1 py-2 text-[15px]">
           {renderContentWithCitations(contentText, 0)}
@@ -748,10 +754,6 @@ export default function MessageBubble({
               })}
             </div>
           )}
-        {/* ── Precedent graph — programmatic, from Neo4j side channel ──── */}
-        {response.precedentGraph && response.precedentGraph.nodes.length > 0 && (
-          <PrecedentGraph data={response.precedentGraph} />
-        )}
         </div>
 
         {/* Suggested answers — quick-reply chips shown when the assistant

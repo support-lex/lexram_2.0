@@ -70,18 +70,14 @@ export default function TrendChart({
     return { points: weeks, bucket: "week" as const };
   }, [points]);
 
-  const { max, total, peakIndex, allZero } = useMemo(() => {
+  const { max, total, allZero } = useMemo(() => {
     let max = 0;
     let total = 0;
-    let peakIndex = -1;
-    plotted.forEach((p, i) => {
+    plotted.forEach((p) => {
       total += p.value;
-      if (p.value > max) {
-        max = p.value;
-        peakIndex = i;
-      }
+      if (p.value > max) max = p.value;
     });
-    return { max, total, peakIndex, allZero: max === 0 };
+    return { max, total, allZero: max === 0 };
   }, [plotted]);
 
   const active = hover != null ? plotted[hover] : null;
@@ -99,7 +95,7 @@ export default function TrendChart({
           onClick={() => setAsTable((v) => !v)}
           aria-expanded={asTable}
           aria-controls={tableId}
-          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-default)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:bg-[var(--accent)]/[0.06] transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-default)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] hover:bg-[var(--lex-maroon)]/[0.06] transition-colors"
         >
           {asTable ? <BarChart3 className="w-3 h-3" /> : <Table2 className="w-3 h-3" />}
           {asTable ? "Chart" : "Table"}
@@ -110,11 +106,11 @@ export default function TrendChart({
         <div id={tableId} className="max-h-64 overflow-y-auto px-4 pb-4 pt-2">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-[var(--bg-surface)]">
-              <tr className="border-b border-[var(--border-light)]">
-                <th scope="col" className="text-left py-1.5 font-semibold text-[var(--text-muted)] uppercase tracking-wide text-[10px]">
+              <tr className="border-b border-[var(--border-default)]">
+                <th scope="col" className="text-left py-1.5 font-bold text-[var(--text-muted)] uppercase tracking-wide text-[10px]">
                   Day
                 </th>
-                <th scope="col" className="text-right py-1.5 font-semibold text-[var(--text-muted)] uppercase tracking-wide text-[10px]">
+                <th scope="col" className="text-right py-1.5 font-bold text-[var(--text-muted)] uppercase tracking-wide text-[10px]">
                   {valueLabel}
                 </th>
               </tr>
@@ -131,19 +127,24 @@ export default function TrendChart({
         </div>
       ) : (
         <div className="relative px-4 pb-3 pt-4">
-          {/* Recessive gridlines — hairline, behind the marks, never competing
-              with the data. Suppressed when every value is zero so we don't
-              draw a fake scale. */}
+          {/* Recessive gridlines PLUS the max value as a real number at the top-left —
+              blank space above a short bar needs to read as "the scale goes up to
+              here", not "the chart is empty or broken". */}
           {!allZero && (
-            <div className="absolute inset-x-4 top-4 bottom-9 pointer-events-none" aria-hidden>
-              {[0, 0.5, 1].map((f) => (
-                <div
-                  key={f}
-                  className="absolute inset-x-0 border-t border-[var(--border-light)]"
-                  style={{ top: `${f * 100}%` }}
-                />
-              ))}
-            </div>
+            <>
+              <div className="absolute inset-x-4 top-4 bottom-9 pointer-events-none" aria-hidden>
+                {[0, 0.5, 1].map((f) => (
+                  <div
+                    key={f}
+                    className="absolute inset-x-0 border-t border-[var(--border-default)]"
+                    style={{ top: `${f * 100}%` }}
+                  />
+                ))}
+              </div>
+              <span className="absolute left-4 top-2.5 text-[9px] font-bold text-[var(--text-muted)] tabular-nums pointer-events-none">
+                {formatValue(max)}
+              </span>
+            </>
           )}
 
           {/* Tooltip. Pinned above the plot rather than following the cursor so
@@ -165,12 +166,20 @@ export default function TrendChart({
           </div>
 
           {/* Columns. Each wrapper is a full-height hit target — much larger
-              than the mark itself, so short columns are still easy to hover. */}
-          <div className="relative flex items-end gap-[2px] h-32" onMouseLeave={() => setHover(null)}>
+              than the mark itself, so short columns are still easy to hover.
+              No floating "peak" label here — the max-value scale readout above
+              and the hover tooltip already cover that, and a label pinned to
+              whichever bar happens to be tallest risks colliding with the
+              scale readout when the peak sits near either edge. */}
+          <div className="relative flex items-end gap-[3px] h-36 mt-4" onMouseLeave={() => setHover(null)}>
             {plotted.map((p, i) => {
+              // Sequential shading by magnitude (one hue, more-is-darker) instead of a
+              // flat fill — the shortest non-zero bar and the peak bar are now visibly
+              // different, which also gives every bar real colour weight instead of a
+              // uniform 78%-alpha wash that read as pale on this palette.
               const pct = max === 0 ? 0 : (p.value / max) * 100;
+              const intensity = max === 0 ? 100 : 55 + (p.value / max) * 45;
               const isHover = hover === i;
-              const isPeak = i === peakIndex && max > 0;
               return (
                 <div
                   key={p.date}
@@ -182,32 +191,27 @@ export default function TrendChart({
                   role="img"
                   aria-label={`${longDay(p.date)}: ${formatValue(p.value)}`}
                 >
-                  {/* Zero days keep a visible baseline stub: "nothing happened"
-                      should read as a day on the axis, not a missing day. */}
+                  {/* Zero days keep a visibly-toned baseline stub — "nothing happened"
+                      must read as a real day on the axis, not a rendering glitch, so
+                      this can't be the same near-invisible hairline as the border. */}
                   <div
-                    className="w-full rounded-t-[4px] transition-colors"
+                    className="w-full min-w-[3px] rounded-t-[5px] transition-[height,box-shadow] duration-150"
                     style={{
-                      height: p.value === 0 ? 2 : `max(3px, ${pct}%)`,
+                      height: p.value === 0 ? 6 : `max(4px, ${pct}%)`,
                       background:
                         p.value === 0
-                          ? "var(--border-default)"
-                          : isHover
-                          ? "var(--accent)"
-                          : "color-mix(in srgb, var(--accent) 78%, transparent)",
+                          ? "color-mix(in srgb, var(--text-muted) 30%, transparent)"
+                          : `color-mix(in srgb, var(--lex-maroon) ${Math.round(intensity)}%, var(--bg-surface))`,
+                      boxShadow: isHover && p.value > 0 ? "0 0 0 2px var(--ring-accent)" : "none",
                     }}
                   />
-                  {isPeak && !isHover && (
-                    <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 -translate-y-full text-[9px] font-semibold text-[var(--text-secondary)] tabular-nums pointer-events-none">
-                      {formatValue(p.value)}
-                    </span>
-                  )}
                 </div>
               );
             })}
           </div>
 
           {/* Axis: three ticks, not thirty. */}
-          <div className="mt-2 flex justify-between text-[10px] text-[var(--text-muted)] tabular-nums">
+          <div className="mt-2 flex justify-between text-[10px] font-semibold text-[var(--text-muted)] tabular-nums">
             <span>{shortDay(plotted[0]?.date)}</span>
             <span>{shortDay(plotted[Math.floor(plotted.length / 2)]?.date)}</span>
             <span>Today</span>

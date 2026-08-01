@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase/client";
 
 /**
  * Does the signed-in user pass the /dashboard/admin/stats gate
@@ -11,39 +12,42 @@ import { useEffect, useState } from "react";
  * gated by the other would bounce people. This asks the server for the same
  * verdict the page itself computes.
  *
- * Cached per page load at module scope: the topbar mounts on every dashboard
- * route and the answer cannot change within a session without a re-login.
+ * Re-checks on SIGNED_IN/SIGNED_OUT/USER_UPDATED, mirroring useIsSuperAdmin(). An
+ * earlier version cached the result forever at module scope on the theory that
+ * "the answer cannot change within a session without a re-login" — true, but it
+ * never listened for that re-login: if the very first check ran before the
+ * session was fully established (a real super-admin account landing on the page
+ * right after sign-in) and cached `false`, the nav link stayed hidden for that
+ * tab until a hard refresh, no matter how the account was actually provisioned.
  */
-let cached: boolean | null = null;
-let inflight: Promise<boolean> | null = null;
-
-function fetchAccess(): Promise<boolean> {
-  if (cached !== null) return Promise.resolve(cached);
-  if (!inflight) {
-    inflight = fetch("/api/admin/access", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { isSuperAdmin: false }))
-      .then((d: { isSuperAdmin?: boolean }) => {
-        cached = Boolean(d.isSuperAdmin);
-        return cached;
-      })
-      .catch(() => false)
-      .finally(() => {
-        inflight = null;
-      });
-  }
-  return inflight;
-}
-
 export function useAdminAccess(): boolean {
-  const [allowed, setAllowed] = useState(cached ?? false);
+  const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    fetchAccess().then((v) => {
-      if (mounted) setAllowed(v);
+    const sb = supabase();
+
+    async function check() {
+      try {
+        const r = await fetch("/api/admin/access", { cache: "no-store" });
+        const d = r.ok ? await r.json() : { isSuperAdmin: false };
+        if (mounted) setAllowed(Boolean(d.isSuperAdmin));
+      } catch {
+        if (mounted) setAllowed(false);
+      }
+    }
+
+    check();
+
+    const { data: sub } = sb.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+        check();
+      }
     });
+
     return () => {
       mounted = false;
+      sub.subscription.unsubscribe();
     };
   }, []);
 

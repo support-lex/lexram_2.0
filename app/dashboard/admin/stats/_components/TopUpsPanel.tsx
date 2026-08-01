@@ -13,7 +13,7 @@
 
 import { useMemo, useState } from "react";
 import type { TopUpRow } from "../_lib/overview";
-import { inRange, rangeLabel, type RangeKey } from "./range";
+import { inRange, rangeAdverbial, rangeLabel, type RangeKey } from "./range";
 import {
   Badge,
   FilterBar,
@@ -41,6 +41,7 @@ export default function TopUpsPanel({ rows, range }: { rows: TopUpRow[]; range: 
   const [limit, setLimit] = useState(PAGE);
 
   const label = rangeLabel(range).toLowerCase();
+  const adv = rangeAdverbial(range);
 
   const dated = useMemo(
     () => (scope === "all" ? rows : rows.filter((r) => inRange(effectiveDate(r), range))),
@@ -132,7 +133,7 @@ export default function TopUpsPanel({ rows, range }: { rows: TopUpRow[]; range: 
             {r.status}
           </Badge>,
         ])}
-        empty={`No top-ups in the ${label}. Switch to All time to see the full ledger.`}
+        empty={`No top-ups ${adv}. Switch to All time to see the full ledger.`}
       />
 
       <TableFooter

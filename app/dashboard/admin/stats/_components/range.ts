@@ -9,9 +9,13 @@
 
 import type { DailyPoint } from "../_lib/overview";
 
-export type RangeKey = "7d" | "30d" | "90d" | "12m" | "all";
+export type RangeKey = "today" | "7d" | "30d" | "90d" | "12m" | "all";
 
 export const RANGES: Array<{ key: RangeKey; label: string; days: number | null }> = [
+  // days: 1 → rangeStartKey subtracts (1-1)=0 days, landing exactly on today's IST date.
+  // The delta then compares today against yesterday, which is the plain-language reading
+  // of "today" a non-technical viewer expects — not "today vs the same weekday last week".
+  { key: "today", label: "Today", days: 1 },
   { key: "7d", label: "7 days", days: 7 },
   { key: "30d", label: "30 days", days: 30 },
   { key: "90d", label: "90 days", days: 90 },
@@ -25,6 +29,21 @@ export function rangeDays(key: RangeKey): number | null {
 
 export function rangeLabel(key: RangeKey): string {
   return RANGES.find((r) => r.key === key)?.label ?? key;
+}
+
+/**
+ * A ready-to-use adverbial clause for sentence contexts — "captured
+ * ${rangeAdverbial(range)}" — as opposed to rangeLabel(), which is a bare noun phrase
+ * for compact chips ("Per day · 30 days"). Every sentence template on this dashboard
+ * used to wrap the label in its own "in the"/"within the"/"the last" prefix, which
+ * reads fine as "in the 7 days" but breaks as "in the today" — this returns the whole
+ * clause, prefix included, so no caller adds its own.
+ */
+export function rangeAdverbial(key: RangeKey): string {
+  if (key === "today") return "today";
+  if (key === "all") return "across all time";
+  const days = rangeDays(key);
+  return `in the last ${days === 365 ? "12 months" : `${days} days`}`;
 }
 
 /** The oldest "YYYY-MM-DD" (IST) still inside the range; "" for all-time. */

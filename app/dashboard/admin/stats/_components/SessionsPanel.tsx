@@ -12,7 +12,7 @@
 
 import { useMemo, useState } from "react";
 import type { SessionRow } from "../_lib/overview";
-import { inRange, rangeLabel, type RangeKey } from "./range";
+import { inRange, rangeAdverbial, rangeLabel, type RangeKey } from "./range";
 import { FilterBar, PillFilter, SearchInput, Table, fmtDateTime, fmtInt } from "./ui";
 import SessionTranscriptDialog from "./SessionTranscriptDialog";
 
@@ -22,6 +22,7 @@ export default function SessionsPanel({ rows, range }: { rows: SessionRow[]; ran
   const [openId, setOpenId] = useState<string | null>(null);
 
   const label = rangeLabel(range).toLowerCase();
+  const adv = rangeAdverbial(range);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -59,7 +60,7 @@ export default function SessionsPanel({ rows, range }: { rows: SessionRow[]; ran
           s.userLabel,
           fmtDateTime(s.lastActive),
         ])}
-        empty={`No sessions in the ${label}.`}
+        empty={`No sessions ${adv}.`}
         onRowClick={(i) => setOpenId(filtered[i].id)}
       />
 

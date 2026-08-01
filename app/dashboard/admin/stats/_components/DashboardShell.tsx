@@ -38,7 +38,7 @@ import TrendChart from "./TrendChart";
 import UsersPanel from "./UsersPanel";
 import TopUpsPanel from "./TopUpsPanel";
 import SessionsPanel from "./SessionsPanel";
-import { RANGES, type RangeKey, deltaPct, inRange, rangeLabel, sliceSeries, sum } from "./range";
+import { RANGES, type RangeKey, deltaPct, inRange, rangeAdverbial, rangeLabel, sliceSeries, sum } from "./range";
 import {
   Card,
   IconChip,
@@ -85,6 +85,9 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
   }, [series, range]);
 
   const label = rangeLabel(range).toLowerCase();
+  // A ready clause for sentences — "captured {adv}" — never wrapped in another
+  // "in the"/"within the" by the caller, or "today" reads as "in the today".
+  const adv = rangeAdverbial(range);
   const inWindow = (iso: string | null | undefined) => inRange(iso, range);
 
   const newUsers = sum(m.signups);
@@ -201,7 +204,7 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
                 icon={<Activity className="w-3.5 h-3.5" />}
                 label="Active users"
                 value={fmtInt(activeUsers)}
-                sub={`last sign-in within the ${label}`}
+                sub={`last sign-in ${adv}`}
               />
               <Kpi
                 icon={<IndianRupee className="w-3.5 h-3.5" />}
@@ -241,7 +244,7 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
                   format="int"
                   unit="signup"
                   valueLabel="Signups"
-                  emptyHint={`No signups in the last ${label}.`}
+                  emptyHint={`No signups ${adv}.`}
                 />
               </Card>
               <Card title="Revenue" hint={`Per day · ${label}`} icon={<IndianRupee className="w-4 h-4" />}>
@@ -249,7 +252,7 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
                   points={m.revenue}
                   format="inr"
                   valueLabel="Revenue"
-                  emptyHint={`No payments captured in the last ${label}.`}
+                  emptyHint={`No payments captured ${adv}.`}
                 />
               </Card>
             </div>
@@ -257,7 +260,7 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
             {/* Health strip: the three ratios worth watching, and nothing else. */}
             <Card
               title="Health"
-              hint={`Conversion follows the ${label}; the account ratios are lifetime`}
+              hint={range === "today" ? "Conversion is for today; the account ratios are lifetime" : `Conversion follows the ${label}; the account ratios are lifetime`}
               icon={<ShieldCheck className="w-4 h-4" />}
               padded
             >
@@ -265,7 +268,7 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
                 <Meter
                   label="Checkout conversion"
                   pct={conversion}
-                  caption={`${fmtInt(paidCount)} of ${fmtInt(orderCount)} orders paid in the ${label}`}
+                  caption={`${fmtInt(paidCount)} of ${fmtInt(orderCount)} orders paid ${adv}`}
                 />
                 <Meter
                   label="Phone verified"
@@ -299,7 +302,7 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
                 icon={<UserPlus className="w-3.5 h-3.5" />}
                 label="New signups"
                 value={fmtInt(newUsers)}
-                sub={`in the ${label}`}
+                sub={adv}
                 delta={deltaPct(series.signups, range)}
                 emphasis
               />
@@ -307,7 +310,7 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
                 icon={<Activity className="w-3.5 h-3.5" />}
                 label="Active users"
                 value={fmtInt(activeUsers)}
-                sub={`last sign-in within the ${label}`}
+                sub={`last sign-in ${adv}`}
               />
               <Kpi icon={<Users className="w-3.5 h-3.5" />} label="Total registered" value={fmtInt(users.total)} sub={`${fmtInt(users.verified)} verified`} />
               <Kpi icon={<Clock className="w-3.5 h-3.5" />} label="Never signed in" value={fmtInt(users.neverSignedIn)} sub="Registered but dormant" />
@@ -319,7 +322,7 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
                 format="int"
                 unit="signup"
                 valueLabel="Signups"
-                emptyHint={`No signups in the last ${label}.`}
+                emptyHint={`No signups ${adv}.`}
               />
             </Card>
 
@@ -337,7 +340,7 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
                 icon={<IndianRupee className="w-3.5 h-3.5" />}
                 label="Revenue"
                 value={fmtINR(revenue)}
-                sub={`in the ${label}`}
+                sub={adv}
                 delta={deltaPct(series.revenue, range)}
                 emphasis
               />
@@ -351,7 +354,7 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
                 points={m.revenue}
                 format="inr"
                 valueLabel="Revenue"
-                emptyHint={`No payments captured in the last ${label}.`}
+                emptyHint={`No payments captured ${adv}.`}
               />
             </Card>
 
@@ -369,18 +372,18 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
         {tab === "credits" && (
           <div className="space-y-4">
             <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Kpi icon={<Coins className="w-3.5 h-3.5" />} label="Credits spent" value={fmtInt(spent)} sub={`in the ${label}`} delta={deltaPct(series.creditsSpent, range)} emphasis />
-              <Kpi icon={<Coins className="w-3.5 h-3.5" />} label="Credits granted" value={fmtInt(granted)} sub={`in the ${label}`} delta={deltaPct(series.creditsGranted, range)} />
+              <Kpi icon={<Coins className="w-3.5 h-3.5" />} label="Credits spent" value={fmtInt(spent)} sub={adv} delta={deltaPct(series.creditsSpent, range)} emphasis />
+              <Kpi icon={<Coins className="w-3.5 h-3.5" />} label="Credits granted" value={fmtInt(granted)} sub={adv} delta={deltaPct(series.creditsGranted, range)} />
               <Kpi icon={<Wallet className="w-3.5 h-3.5" />} label="Outstanding" value={fmtInt(credits.outstanding)} sub={`across ${fmtInt(credits.walletCount)} wallets`} />
               <Kpi icon={<Activity className="w-3.5 h-3.5" />} label="Net this period" value={fmtInt(granted - spent)} sub={granted >= spent ? "Balance growing" : "Balance drawing down"} />
             </section>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card title="Credits consumed" hint={`Per day · ${label}`} icon={<TrendingDown className="w-4 h-4" />}>
-                <TrendChart points={m.creditsSpent} format="int" unit="credit" valueLabel="Spent" emptyHint={`No credits consumed in the last ${label}.`} />
+                <TrendChart points={m.creditsSpent} format="int" unit="credit" valueLabel="Spent" emptyHint={`No credits consumed ${adv}.`} />
               </Card>
               <Card title="Credits granted" hint={`Per day · ${label}`} icon={<Coins className="w-4 h-4" />}>
-                <TrendChart points={m.creditsGranted} format="int" unit="credit" valueLabel="Granted" emptyHint={`No credits granted in the last ${label}.`} />
+                <TrendChart points={m.creditsGranted} format="int" unit="credit" valueLabel="Granted" emptyHint={`No credits granted ${adv}.`} />
               </Card>
             </div>
 
@@ -405,8 +408,8 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
         {tab === "usage" && (
           <div className="space-y-4">
             <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Kpi icon={<MessageSquare className="w-3.5 h-3.5" />} label="Sessions" value={fmtInt(sessionCount)} sub={`in the ${label}`} delta={deltaPct(series.sessions, range)} emphasis />
-              <Kpi icon={<Cpu className="w-3.5 h-3.5" />} label="Tokens" value={fmtCompact(tokenCount)} sub={`in the ${label}`} delta={deltaPct(series.tokens, range)} />
+              <Kpi icon={<MessageSquare className="w-3.5 h-3.5" />} label="Sessions" value={fmtInt(sessionCount)} sub={adv} delta={deltaPct(series.sessions, range)} emphasis />
+              <Kpi icon={<Cpu className="w-3.5 h-3.5" />} label="Tokens" value={fmtCompact(tokenCount)} sub={adv} delta={deltaPct(series.tokens, range)} />
               <Kpi
                 icon={<ShieldCheck className="w-3.5 h-3.5" />}
                 label="Eval pass rate"
@@ -419,7 +422,7 @@ export default function DashboardShell({ data }: { data: AdminOverview }) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2">
                 <Card title="Tokens consumed" hint={`Per day · ${label}`} icon={<Cpu className="w-4 h-4" />}>
-                  <TrendChart points={m.tokens} format="compact" unit="token" valueLabel="Tokens" emptyHint={`No model calls in the last ${label}.`} />
+                  <TrendChart points={m.tokens} format="compact" unit="token" valueLabel="Tokens" emptyHint={`No model calls ${adv}.`} />
                 </Card>
               </div>
               <div className="space-y-4">

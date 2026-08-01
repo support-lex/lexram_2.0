@@ -210,11 +210,19 @@ export default function TrendChart({
             })}
           </div>
 
-          {/* Axis: three ticks, not thirty. */}
+          {/* Axis: three ticks, not thirty — except a single-day chart (the "Today"
+              range), where first/middle/"Today" would all repeat the same date. One
+              centered label reads as "this one day", not as a redundant range. */}
           <div className="mt-2 flex justify-between text-[10px] font-semibold text-[var(--text-muted)] tabular-nums">
-            <span>{shortDay(plotted[0]?.date)}</span>
-            <span>{shortDay(plotted[Math.floor(plotted.length / 2)]?.date)}</span>
-            <span>Today</span>
+            {plotted.length <= 1 ? (
+              <span className="w-full text-center">{plotted[0] ? longDay(plotted[0].date) : ""}</span>
+            ) : (
+              <>
+                <span>{shortDay(plotted[0]?.date)}</span>
+                <span>{shortDay(plotted[Math.floor(plotted.length / 2)]?.date)}</span>
+                <span>Today</span>
+              </>
+            )}
           </div>
 
           {allZero && (

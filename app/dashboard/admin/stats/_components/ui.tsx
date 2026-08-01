@@ -574,20 +574,3 @@ export function statusTone(status: string): "good" | "warning" | "critical" | "n
   return "neutral";
 }
 
-/**
- * A user identity cell: the best available label on top, remaining contact
- * details below. Most accounts here are phone-only signups with no name and no
- * email, so the secondary line must exclude whatever was promoted to primary —
- * otherwise the same phone number renders twice.
- */
-export function UserCell({ name, email, phone }: { name: string; email?: string; phone?: string }) {
-  const hasName = Boolean(name && name !== "—");
-  const primary = hasName ? name : email || phone || "—";
-  const secondary = [email, phone].filter((v) => v && v !== primary).join(" · ");
-  return (
-    <div className="min-w-0">
-      <div className="font-medium text-[var(--text-primary)] truncate">{primary}</div>
-      {secondary && <div className="text-[11px] text-[var(--text-muted)] truncate">{secondary}</div>}
-    </div>
-  );
-}

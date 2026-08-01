@@ -2,10 +2,17 @@
 
 // Searchable / segmentable user directory.
 //
-// Two filters compose here and it matters which does what: the GLOBAL range (from the page
-// header) scopes the time-based segments — "joined" and "active" mean *within the selected
-// window* — while "All" deliberately ignores it, because the directory is also how you look
-// someone up, and a lookup shouldn't silently hide a user who joined before the window.
+// Verification is the PRIMARY split here — a dedicated two-way toggle (Verified /
+// Unverified), not one more pill among many — because it's the first question an
+// operator asks of this table ("who actually completed signup?"), and most accounts in
+// this product are phone-only OTP signups where that line matters more than any other
+// segment. The remaining filters (Joined/Active/Topped up/Never signed in) are scoped
+// filters that apply WITHIN whichever side is selected, not across both.
+//
+// The GLOBAL range (from the page header) scopes the time-based segments — "joined" and
+// "active" mean *within the selected window* — while "All" deliberately ignores it,
+// because the directory is also how you look someone up, and a lookup shouldn't silently
+// hide a user who joined before the window.
 //
 // The full list is handed over in one server payload (a few hundred rows) and filtered in
 // the browser, so typing is instant. Past a few thousand users this should move to a
@@ -20,43 +27,52 @@ import {
   FilterBar,
   PillFilter,
   SearchInput,
+  Segmented,
   Table,
   TableFooter,
-  UserCell,
   fmtDateTime,
   fmtInt,
   fmtRelative,
 } from "./ui";
 
 type SortKey = "joined" | "lastSeen" | "balance" | "spent";
-type Segment = "all" | "new" | "active" | "paying" | "dormant" | "unverified";
+type Segment = "all" | "new" | "active" | "paying" | "dormant";
+type VerifiedView = "verified" | "unverified";
 
 const PAGE = 25;
 
 export default function UsersPanel({ rows, range }: { rows: UserRow[]; range: RangeKey }) {
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<VerifiedView>("verified");
   const [segment, setSegment] = useState<Segment>("all");
   const [sort, setSort] = useState<SortKey>("joined");
   const [limit, setLimit] = useState(PAGE);
 
   const label = rangeLabel(range).toLowerCase();
 
+  const verifiedCount = useMemo(() => rows.filter((u) => u.verified).length, [rows]);
+  const unverifiedCount = rows.length - verifiedCount;
+
+  const inView = useMemo(
+    () => rows.filter((u) => (view === "verified" ? u.verified : !u.verified)),
+    [rows, view]
+  );
+
   const segments = useMemo(() => {
-    const count = (fn: (u: UserRow) => boolean) => rows.filter(fn).length;
+    const count = (fn: (u: UserRow) => boolean) => inView.filter(fn).length;
     return [
-      { key: "all" as const, label: "All", count: rows.length },
+      { key: "all" as const, label: "All", count: inView.length },
       { key: "new" as const, label: `Joined · ${label}`, count: count((u) => inRange(u.joined, range)) },
       { key: "active" as const, label: `Active · ${label}`, count: count((u) => inRange(u.lastSeen, range)) },
       // "Topped up" means bought credits — above the 50-credit free signup grant everyone gets.
       { key: "paying" as const, label: "Topped up", count: count((u) => u.toppedUp > 50) },
       { key: "dormant" as const, label: "Never signed in", count: count((u) => !u.lastSeen) },
-      { key: "unverified" as const, label: "Unverified", count: count((u) => !u.verified) },
     ];
-  }, [rows, range, label]);
+  }, [inView, range, label]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const bySegment = rows.filter((u) => {
+    const bySegment = inView.filter((u) => {
       switch (segment) {
         case "new":
           return inRange(u.joined, range);
@@ -66,8 +82,6 @@ export default function UsersPanel({ rows, range }: { rows: UserRow[]; range: Ra
           return u.toppedUp > 50;
         case "dormant":
           return !u.lastSeen;
-        case "unverified":
-          return !u.verified;
         default:
           return true;
       }
@@ -91,12 +105,31 @@ export default function UsersPanel({ rows, range }: { rows: UserRow[]; range: Ra
           return (b.joined ?? "").localeCompare(a.joined ?? "");
       }
     });
-  }, [rows, query, segment, sort, range]);
+  }, [inView, query, segment, sort, range]);
 
   const visible = filtered.slice(0, limit);
 
   return (
     <div>
+      {/* Primary split: Verified vs. Unverified. Switching resets the secondary
+          segment back to "All" — a "Topped up" filter carried over from the other
+          side would silently under-count here. */}
+      <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[var(--border-default)] bg-[var(--bg-primary)]/15">
+        <Segmented
+          options={[
+            { key: "verified" as const, label: `Verified (${fmtInt(verifiedCount)})` },
+            { key: "unverified" as const, label: `Unverified (${fmtInt(unverifiedCount)})` },
+          ]}
+          value={view}
+          onChange={(v) => {
+            setView(v);
+            setSegment("all");
+            setLimit(PAGE);
+          }}
+          ariaLabel="Verification status"
+        />
+      </div>
+
       <FilterBar>
         <SearchInput
           value={query}
@@ -133,10 +166,18 @@ export default function UsersPanel({ rows, range }: { rows: UserRow[]; range: Ra
       </FilterBar>
 
       <Table
-        headers={["User", "Country", "Balance", "Spent", "Topped up", "Last seen", "Joined", "Status"]}
-        align={["left", "left", "right", "right", "right", "left", "left", "left"]}
+        headers={["Name", "Email", "Phone", "Country", "Balance", "Spent", "Topped up", "Last seen", "Joined", ""]}
+        align={["left", "left", "left", "left", "right", "right", "right", "left", "left", "left"]}
         rows={visible.map((u) => [
-          <UserCell key="u" name={u.name} email={u.email} phone={u.phone} />,
+          <span key="n" className={u.name && u.name !== "—" ? "font-medium text-[var(--text-primary)]" : "text-[var(--text-muted)]"}>
+            {u.name && u.name !== "—" ? u.name : "—"}
+          </span>,
+          <span key="e" className={u.email ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}>
+            {u.email || "—"}
+          </span>,
+          <span key="p" className={u.phone ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}>
+            {u.phone || "—"}
+          </span>,
           u.country || "—",
           u.balance == null ? <span className="text-[var(--text-muted)]">no wallet</span> : fmtInt(u.balance),
           u.spent ? fmtInt(u.spent) : "—",
@@ -145,12 +186,9 @@ export default function UsersPanel({ rows, range }: { rows: UserRow[]; range: Ra
             {fmtRelative(u.lastSeen)}
           </span>,
           fmtDateTime(u.joined),
-          <span key="st" className="inline-flex gap-1">
-            {u.superAdmin && <Badge tone="accent">super admin</Badge>}
-            <Badge tone={u.verified ? "good" : "warning"}>{u.verified ? "verified" : "unverified"}</Badge>
-          </span>,
+          u.superAdmin ? <Badge tone="accent">super admin</Badge> : "",
         ])}
-        empty="No users match this filter."
+        empty={`No ${view} users match this filter.`}
       />
 
       <TableFooter

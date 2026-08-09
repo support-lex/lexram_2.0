@@ -217,20 +217,30 @@ export const chatSessionRepository = {
       ]);
       const userId = userData?.user?.id;
       if (userId) {
-        const { error } = await supabase()
-          .from('chat_sessions')
-          .upsert(
-            {
-              id,
-              user_id: userId,
-              title: lexramSession.title ?? input.title,
-              messages: input.messages,
-              matter_id: input.matter_id ?? null,
-            },
-            { onConflict: 'id' }
-          );
-        if (error) {
-          console.warn('[chatSessionRepository.create] supabase mirror failed', error);
+        // Bounded for the same reason as getUser() above: postgrest-js issues a
+        // plain fetch() with no timeout, so a stalled socket here would hang
+        // ensureSession() and strand the chat on "Working…" even though the
+        // session itself was created fine. Timing out just skips the mirror.
+        const mirror = await Promise.race([
+          supabase()
+            .from('chat_sessions')
+            .upsert(
+              {
+                id,
+                user_id: userId,
+                title: lexramSession.title ?? input.title,
+                messages: input.messages,
+                matter_id: input.matter_id ?? null,
+              },
+              { onConflict: 'id' }
+            )
+            .then((r) => ({ error: r.error as unknown })),
+          new Promise<{ error: unknown }>((resolve) =>
+            setTimeout(() => resolve({ error: 'timeout' }), 5000),
+          ),
+        ]);
+        if (mirror.error) {
+          console.warn('[chatSessionRepository.create] supabase mirror failed', mirror.error);
         }
       }
 

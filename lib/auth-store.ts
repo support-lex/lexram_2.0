@@ -51,6 +51,9 @@ let readyResolved = false;
 let wakeRefreshPromise: Promise<void> | null = null;
 let hiddenAt: number | null = null;
 const STALE_AFTER_MS = 5 * 60 * 1000; // 5 minutes idle = force refresh on wake
+// Hard ceiling on how long any caller will wait for the post-wake refresh.
+// See the visibilitychange handler for why this must never be unbounded.
+const WAKE_REFRESH_TIMEOUT_MS = 4000;
 let resolveReady!: () => void;
 const readyPromise = new Promise<void>((resolve) => {
   resolveReady = resolve;
@@ -130,7 +133,18 @@ function init() {
     if (absenceMs > STALE_AFTER_MS) {
       // Long absence — token likely expired. Force a refresh and gate any
       // outgoing request on the result via wakeRefreshPromise.
-      wakeRefreshPromise = sb.auth
+      //
+      // The refresh MUST be time-bounded. After a laptop sleep the underlying
+      // socket is frequently dead-but-not-closed, and browser fetch() has no
+      // default timeout — so refreshSession() can hang indefinitely instead of
+      // rejecting. An unbounded promise here is a permanent deadlock: the
+      // .finally() that clears this variable never runs, so EVERY subsequent
+      // getAccessToken() parks on a dead promise until the page is reloaded.
+      // Since getAccessToken() is awaited before any request-level timeout is
+      // armed, the chat sat on "Working…" forever with no network call made.
+      // Racing a timer guarantees this settles; a stale token is recoverable
+      // (the 401 handler in queryStream refreshes and retries), a hang is not.
+      const refresh = sb.auth
         .refreshSession()
         .then(({ data }) => {
           if (data.session) {
@@ -141,10 +155,16 @@ function init() {
           // Refresh failed (e.g. refresh token also expired) — fall back to
           // getSession() so onAuthStateChange can redirect to sign-in if needed.
           sb.auth.getSession().catch(() => {}); // fire-and-forget, keep return type void
-        })
-        .finally(() => {
-          wakeRefreshPromise = null;
         });
+
+      wakeRefreshPromise = Promise.race([
+        refresh,
+        new Promise<void>((resolve) =>
+          setTimeout(resolve, WAKE_REFRESH_TIMEOUT_MS),
+        ),
+      ]).finally(() => {
+        wakeRefreshPromise = null;
+      });
     } else {
       // Short absence — proactive getSession() is enough; no need to gate.
       sb.auth.getSession().catch(() => {});
@@ -223,7 +243,21 @@ export async function getAccessToken(): Promise<string | null> {
   // If the tab just woke from a long sleep, wait for the forced refresh to
   // complete before returning a token — prevents stale tokens causing the
   // "Working... forever" hang on the first post-idle query.
-  if (wakeRefreshPromise) await wakeRefreshPromise;
+  //
+  // Bounded a second time on purpose. wakeRefreshPromise is already raced
+  // against a timer where it's assigned, but this await sits AHEAD of every
+  // request-level timeout in the app (the SSE connect timer and the session
+  // lifecycle timer are both armed only after a token is in hand). An
+  // unbounded await here is therefore unrecoverable rather than merely slow,
+  // so it gets its own ceiling regardless of what produced the promise.
+  if (wakeRefreshPromise) {
+    await Promise.race([
+      wakeRefreshPromise,
+      new Promise<void>((resolve) =>
+        setTimeout(resolve, WAKE_REFRESH_TIMEOUT_MS),
+      ),
+    ]);
+  }
   // Prefer the freshest token; getSession() auto-refreshes if near expiry.
   //
   // BUT getSession() serialises behind Supabase's cross-tab navigator Web Lock

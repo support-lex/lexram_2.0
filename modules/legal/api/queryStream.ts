@@ -124,20 +124,33 @@ export async function streamLexRamQuery(
   clearTimeout(connectTimer);
 
   // On 401: silently refresh the token and retry once before giving up.
+  //
+  // Both steps below are time-bounded. connectTimer was cleared above, so from
+  // here on nothing else in this function can cancel a stalled request — an
+  // unbounded await in the recovery path parks the turn on "Working…" exactly
+  // like the failure it is trying to recover from. refreshSession() in
+  // particular can hang on a dead post-sleep socket rather than reject.
   if (res.status === 401) {
     try {
-      const freshToken = await refreshAuthToken();
+      const REFRESH_TIMEOUT_MS = 8000;
+      const freshToken = await Promise.race([
+        refreshAuthToken(),
+        new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), REFRESH_TIMEOUT_MS),
+        ),
+      ]);
       if (freshToken) {
         headers.Authorization = `Bearer ${freshToken}`;
-        const retryRes = await fetch(
-          `${LEXRAM_BASE}/sessions/${encodeURIComponent(sessionId)}/query/stream`,
-          { method: "POST", headers, body: jsonAsciiSafe({ query, mode, ...(options.templateStructure ? { template_structure: JSON.stringify(options.templateStructure) } : {}) }), signal: connectController.signal }
-        );
-        if (retryRes.ok) {
-          // Swap in the successful retry response and continue
-          res = retryRes;
-        } else {
-          res = retryRes; // fall through to error handling below with the retry status
+        // Re-arm a connect timeout for the retry on the SAME controller, so the
+        // caller's Stop stays wired to whichever response we end up streaming.
+        const retryTimer = setTimeout(() => connectController.abort(), CONNECT_TIMEOUT_MS);
+        try {
+          res = await fetch(
+            `${LEXRAM_BASE}/sessions/${encodeURIComponent(sessionId)}/query/stream`,
+            { method: "POST", headers, body: jsonAsciiSafe({ query, mode, ...(options.templateStructure ? { template_structure: JSON.stringify(options.templateStructure) } : {}) }), signal: connectController.signal }
+          );
+        } finally {
+          clearTimeout(retryTimer);
         }
       }
     } catch { /* refresh or retry failed — fall through */ }
@@ -261,8 +274,16 @@ export async function streamLexRamQuery(
     // Close the connection explicitly. If the backend keeps the SSE stream
     // open after `done`, cancel() releases it so the fetch settles and the
     // caller's finally{} (which clears isSearching) actually runs.
+    //
+    // Bounded: on a dead socket cancel() can itself hang, and because this sits
+    // in the finally{} it would re-block the function *after* the idle watchdog
+    // already fired — turning a recoverable timeout back into "Working…"
+    // forever. We only need the release to be attempted, not awaited to the end.
     try {
-      await reader.cancel();
+      await Promise.race([
+        reader.cancel(),
+        new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+      ]);
     } catch {
       /* noop */
     }

@@ -204,8 +204,18 @@ export const chatSessionRepository = {
       if (!id) throw new Error('LexRam returned no session id');
 
       // Mirror in Supabase so messages can be persisted later.
-      const { data: userData } = await supabase().auth.getUser();
-      const userId = userData.user?.id;
+      //
+      // Bounded: getUser() takes Supabase's cross-tab auth lock and can hang on
+      // a dead post-sleep socket. This runs on the ensureSession() critical path
+      // *after* the LexRam session already exists, so a hang here strands the
+      // chat on "Working…" for a turn that had otherwise succeeded. The mirror
+      // is best-effort (its own failure is already only a console.warn below),
+      // so on timeout we skip it rather than block the send.
+      const userData = await Promise.race([
+        supabase().auth.getUser().then((r) => r.data),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+      ]);
+      const userId = userData?.user?.id;
       if (userId) {
         const { error } = await supabase()
           .from('chat_sessions')

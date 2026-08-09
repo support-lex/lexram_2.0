@@ -51,7 +51,7 @@ export default function BackendHealthBadge({
     status === "online"
       ? "bg-emerald-500 animate-pulse"
       : "bg-red-500";
-  const label = status === "online" ? "Backend online" : "Backend offline";
+  const label = status === "online" ? "Lexram Online" : "Lexram Offline";
   const textCls =
     status === "online"
       ? "text-emerald-700 dark:text-emerald-400"

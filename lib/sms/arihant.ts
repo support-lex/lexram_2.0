@@ -6,12 +6,14 @@
 // drift and the gateway rejects the submission (or the telco drops it silently).
 //
 // Env (see .env):
-//   ARIHANT_SMS_URL          optional, defaults to the production endpoint
-//   ARIHANT_SMS_USERNAME     e.g. lexramai.trans  (".trans" = transactional)
-//   ARIHANT_SMS_PASSWORD     panel → My Profile → 🔒 (NOT the web login password)
-//   ARIHANT_SMS_SENDER       6 alpha chars, DLT-approved header (LEXRAM)
-//   ARIHANT_DLT_ENTITY_ID    DLT Principal Entity Id
+//   ARIHANT_API_URL          optional, defaults to the production endpoint
+//   ARIHANT_USERNAME         e.g. lexramai.trans  (".trans" = transactional)
+//   ARIHANT_PASSWORD         panel → My Profile → 🔒 (NOT the web login password)
+//   ARIHANT_SENDER_ID        6 alpha chars, DLT-approved header (LEXRAM)
+//   ARIHANT_ENTITY_ID        DLT Principal Entity Id
 //   ARIHANT_DLT_CONTENT_ID   DLT Content Id for the OTP template
+//   ARIHANT_OTP_TEMPLATE     approved template; {code} is replaced with the OTP
+//   ARIHANT_UNICODE          "true" for regional scripts, "false" for English
 
 import 'server-only';
 
@@ -26,11 +28,14 @@ export interface SmsResult {
 }
 
 /**
- * The DLT-approved OTP template. `{var}` is the only variable part — do not
- * reword, re-space or re-punctuate this string.
+ * The DLT-approved OTP template. `{code}` is the only variable part — do not
+ * reword, re-space or re-punctuate the rest, or the telco drops the message.
  */
 export function otpMessage(code: string): string {
-  return `LEXRAM: Your Login OTP is ${code} . This OTP is valid for 10 minutes. Please don't share this with anyone.`;
+  const template =
+    process.env.ARIHANT_OTP_TEMPLATE ||
+    "LEXRAM: Your Login OTP is {code} . This OTP is valid for 10 minutes. Please don't share this with anyone.";
+  return template.replace('{code}', code);
 }
 
 /** Gateway wants the country code with no "+" and no separators. */
@@ -40,19 +45,19 @@ function toGatewayMsisdn(phone: string): string {
 
 export function isSmsConfigured(): boolean {
   return Boolean(
-    process.env.ARIHANT_SMS_USERNAME &&
-    process.env.ARIHANT_SMS_PASSWORD &&
-    process.env.ARIHANT_DLT_ENTITY_ID &&
+    process.env.ARIHANT_USERNAME &&
+    process.env.ARIHANT_PASSWORD &&
+    process.env.ARIHANT_ENTITY_ID &&
     process.env.ARIHANT_DLT_CONTENT_ID
   );
 }
 
 export async function sendOtpSms(phone: string, code: string): Promise<SmsResult> {
-  const endpoint = process.env.ARIHANT_SMS_URL || DEFAULT_ENDPOINT;
-  const username = process.env.ARIHANT_SMS_USERNAME;
-  const password = process.env.ARIHANT_SMS_PASSWORD;
-  const sender   = process.env.ARIHANT_SMS_SENDER || 'LEXRAM';
-  const entityId = process.env.ARIHANT_DLT_ENTITY_ID;
+  const endpoint = process.env.ARIHANT_API_URL || DEFAULT_ENDPOINT;
+  const username = process.env.ARIHANT_USERNAME;
+  const password = process.env.ARIHANT_PASSWORD;
+  const sender   = process.env.ARIHANT_SENDER_ID || 'LEXRAM';
+  const entityId = process.env.ARIHANT_ENTITY_ID;
   const contentId = process.env.ARIHANT_DLT_CONTENT_ID;
 
   if (!username || !password || !entityId || !contentId) {
@@ -66,7 +71,7 @@ export async function sendOtpSms(phone: string, code: string): Promise<SmsResult
   const params = new URLSearchParams({
     username,
     password,
-    unicode: 'false',              // English only — the template is ASCII
+    unicode: process.env.ARIHANT_UNICODE || 'false',
     from: sender,
     to: msisdn,
     text: otpMessage(code),

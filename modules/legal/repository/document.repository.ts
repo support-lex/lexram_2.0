@@ -4,7 +4,7 @@
 // container for documents; sessions are chat threads that *reference* the
 // active case. Uploading/listing/deleting all happen by case_id.
 
-import { lexramRequest } from "../api/lexram.api";
+import { lexramRequest, getAuthToken, LEXRAM_BASE } from "../api/lexram.api";
 
 export type DocumentStatus =
   | "processing"
@@ -84,6 +84,46 @@ export const documentRepository = {
       `/cases/${encodeURIComponent(caseId)}/documents`,
       { method: "POST", formData: form }
     );
+  },
+
+  async uploadWithProgress(
+    caseId: string,
+    file: File,
+    onProgress: (pct: number) => void,
+  ): Promise<CaseDocument | null> {
+    if (!caseId) throw new Error("Select a case before uploading");
+    const token = await getAuthToken();
+    const form = new FormData();
+    form.append("file", file);
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${LEXRAM_BASE}/cases/${encodeURIComponent(caseId)}/documents`);
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { resolve(null); }
+        } else {
+          let detail = `HTTP ${xhr.status}`;
+          try {
+            const body = JSON.parse(xhr.responseText);
+            detail = body?.detail ?? body?.message ?? detail;
+            if (Array.isArray(detail)) detail = (detail as any[]).map((d) => d.msg ?? d).join("; ");
+          } catch { /* ignore */ }
+          reject(new Error(`[${xhr.status}] ${detail}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Upload failed"));
+      xhr.onabort = () => reject(new Error("Upload cancelled"));
+      xhr.send(form);
+    });
   },
 
   async remove(caseId: string, docId: string): Promise<void> {

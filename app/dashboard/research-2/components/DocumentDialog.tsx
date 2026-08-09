@@ -183,6 +183,7 @@ export default function DocumentDialog({
   const [docs, setDocs] = useState<SessionDocument[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<{ name: string; pct: number }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -314,25 +315,39 @@ export default function DocumentDialog({
 
       setUploading(true);
       setError(null);
-      let successCount = 0;
-      for (const file of fileArray) {
-        try {
-          await documentRepository.upload(targetCaseId, file);
-          successCount += 1;
-        } catch (err) {
-          setError(`${file.name}: ${(err as Error).message}`);
-        }
-      }
+      setUploadingFiles(fileArray.map((f) => ({ name: f.name, pct: 0 })));
+
+      const results = await Promise.allSettled(
+        fileArray.map((file, idx) =>
+          documentRepository.uploadWithProgress(targetCaseId!, file, (pct) => {
+            setUploadingFiles((prev) => {
+              const next = [...prev];
+              if (next[idx]) next[idx] = { ...next[idx], pct };
+              return next;
+            });
+          }),
+        ),
+      );
+
+      setUploadingFiles([]);
       setUploading(false);
+
+      const successCount = results.filter((r) => r.status === "fulfilled").length;
+      const failures = results
+        .map((r, i) =>
+          r.status === "rejected"
+            ? `${fileArray[i].name}: ${(r.reason as Error).message}`
+            : null,
+        )
+        .filter(Boolean) as string[];
+
+      if (failures.length > 0) setError(failures.join("\n"));
       if (successCount > 0) {
         toast.success(
           successCount === 1 ? "Document uploaded" : `${successCount} documents uploaded`,
           { description: "Indexing — they'll be ready in a moment." },
         );
         refresh();
-        // Notify the parent so it can re-fetch any sibling list (e.g. the
-        // CasesPanel's doc list) that would otherwise be stale until the
-        // user switches cases or reloads.
         onUploaded?.();
       }
     },
@@ -491,6 +506,30 @@ export default function DocumentDialog({
               }}
             />
           </div>
+
+          {/* ── Per-file upload progress ────────────────────────────────── */}
+          {uploadingFiles.length > 0 && (
+            <div className="space-y-2">
+              {uploadingFiles.map((f, i) => (
+                <div key={i} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-[13px] font-medium text-slate-700 truncate flex-1">
+                      {f.name}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400 flex-shrink-0">
+                      {f.pct < 100 ? `${f.pct}%` : "Uploading…"}
+                    </span>
+                  </div>
+                  <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-slate-800 rounded-full transition-all duration-200"
+                      style={{ width: `${f.pct}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* ── Recent uploads ─────────────────────────────────────────── */}
           <div>

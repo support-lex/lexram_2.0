@@ -8,7 +8,7 @@ import type { DraftTemplate } from "./TemplatesPanel";
 const EXAMPLE_QUESTIONS: Record<"ask" | "docChat" | "draft", string[]> = {
   ask: [
     "Can a co-accused claim parity of bail with an accused who was released?",
-    "Has the Supreme Court passed any recent interim stay on demolition orders?",
+    "Which BNS provision replaces Section 420 IPC, and how do the ingredients differ?",
     "What does Section 138 of the Negotiable Instruments Act require to prove dishonour?",
     "Is anticipatory bail maintainable after chargesheet is filed — what do High Courts say?",
   ],

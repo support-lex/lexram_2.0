@@ -51,6 +51,11 @@ function getSourceUrl(src: ChunkSource): string | undefined {
 function getSourceTitle(src: ChunkSource): string {
   if (src.title) return src.title;
   if (src.act_name) return src.act_name;
+  // SC daily orders used to ship the name under `case_title`, which no branch
+  // here read — every order rendered as "Untitled". The backend now sends
+  // `title`, but sources already cached in sessionStorage still carry the old
+  // key, so keep this fallback rather than leaving those sessions broken.
+  if (src.case_title) return src.case_title;
   if (src.citation) return src.citation;
   return "Untitled";
 }

@@ -8,6 +8,12 @@ export type ChunkSource = {
   title?: string;
   /** For statutes: the parent act name */
   act_name?: string;
+  /**
+   * Legacy key for SC daily orders. The backend now sends the order name as
+   * `title`; this remains only so sources cached in sessionStorage before that
+   * change still render a name instead of "Untitled".
+   */
+  case_title?: string;
   citation?: string;
   court?: string;
   date?: string;

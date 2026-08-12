@@ -249,7 +249,14 @@ function buildHTML(payment: Payment, userEmail: string, userName: string): strin
 
     <div class="header">
       <div>
-        <img class="logo-img" src="https://lexram.ai/lexram-logo.png" alt="${esc(COMPANY.brand)}" />
+        <!-- Hosted rather than inlined: a base64 copy would add ~64KB to the
+             bundle for every user, and only a fraction ever open an invoice.
+             If it cannot load (offline, or opened from file://), hide it
+             entirely — a broken-image icon on a tax invoice looks worse than
+             no logo, and the company name below carries the identification. -->
+        <img class="logo-img" src="https://lexram.ai/lexram-logo.png"
+             alt="${esc(COMPANY.brand)}"
+             onerror="this.style.display='none'" />
         <div class="company-name">${esc(COMPANY.name)}</div>
         <div class="company-info">
           ${esc(COMPANY.address)}<br>

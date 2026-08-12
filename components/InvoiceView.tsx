@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Download, Scale, CheckCircle2, Clock, XCircle, Printer } from 'lucide-react';
 import { openInvoicePDF } from '@/lib/invoice-pdf';
+import { computeTax } from '@/lib/billing-config';
 
 export interface Payment {
   id: string;
@@ -106,11 +107,13 @@ function StatusBadge({ status }: { status?: string }) {
 export default function InvoiceView({ payment, userEmail, userName, onClose }: InvoiceViewProps) {
   const amountINR = payment?.amount_inr ?? payment?.amount ?? 0;
   const credits = payment?.credits ?? 0;
-  // Amount charged is GST-inclusive (that's what Cashfree actually collected),
-  // so the taxable value is backed out of it rather than added on top.
-  const taxableValue = amountINR / 1.18;
-  const cgst = taxableValue * 0.09;
-  const sgst = taxableValue * 0.09;
+  // Shared with the printable invoice. This previously computed its own
+  // GST-inclusive, always-CGST+SGST split, which meant an inter-state customer
+  // would see CGST+SGST on screen and IGST in the downloaded file.
+  const tax = computeTax(payment ?? {});
+  const taxableValue = tax.taxableValue;
+  const cgst = tax.cgst;
+  const sgst = tax.sgst;
 
   const handleDownload = useCallback(() => {
     if (!payment) return;
@@ -270,18 +273,30 @@ export default function InvoiceView({ payment, userEmail, userName, onClose }: I
                         <span>Taxable Value</span>
                         <span className="tabular-nums">{fmtINR(taxableValue)}</span>
                       </div>
-                      <div className="flex justify-between text-xs text-neutral-500">
-                        <span>CGST @9%</span>
-                        <span className="tabular-nums">{fmtINR(cgst)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-neutral-500">
-                        <span>SGST @9%</span>
-                        <span className="tabular-nums">{fmtINR(sgst)}</span>
-                      </div>
+                      {/* Inter-state supply is IGST @18%; intra-state splits
+                          into CGST + SGST @9% each. Must match the downloaded
+                          invoice — same computeTax() drives both. */}
+                      {tax.isInterState ? (
+                        <div className="flex justify-between text-xs text-neutral-500">
+                          <span>IGST @18%</span>
+                          <span className="tabular-nums">{fmtINR(tax.igst)}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-xs text-neutral-500">
+                            <span>CGST @9%</span>
+                            <span className="tabular-nums">{fmtINR(cgst)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-neutral-500">
+                            <span>SGST @9%</span>
+                            <span className="tabular-nums">{fmtINR(sgst)}</span>
+                          </div>
+                        </>
+                      )}
                       <div className="h-px bg-neutral-200 my-1" />
                       <div className="flex justify-between text-sm font-bold text-neutral-900">
                         <span>Total</span>
-                        <span className="tabular-nums">{fmtINR(amountINR)}</span>
+                        <span className="tabular-nums">{fmtINR(tax.total)}</span>
                       </div>
                     </div>
                   </div>

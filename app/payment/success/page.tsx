@@ -7,14 +7,18 @@ import { CheckCircle2, Loader2, Scale, ArrowRight, Download, Printer } from 'luc
 import { supabase } from '@/lib/supabase/client';
 import { openInvoicePDF } from '@/lib/invoice-pdf';
 import type { Payment } from '@/components/InvoiceView';
+import { SUPPLIER, computeTax } from '@/lib/billing-config';
 
+// Supplier identity comes from billing-config so the receipt, the invoice and
+// the modal cannot disagree. `city` is kept as a separate line here because
+// this layout prints the address across two lines.
 const COMPANY = {
-  name: 'Ramasubramanian AI Software Pvt. Ltd.',
-  email: 'hello@lexram.ai',
-  phone: '+91 87544 46066',
+  name: SUPPLIER.name,
+  email: SUPPLIER.email,
+  phone: SUPPLIER.phone,
   address: 'B 225, 12th Avenue, Ashok Nagar',
   city: 'Chennai, Tamil Nadu — 600083',
-  website: 'lexram.ai',
+  website: SUPPLIER.website,
 };
 
 function fmtINR(n: number) {
@@ -66,6 +70,8 @@ function SuccessPageContent() {
   const fallbackAmount  = Number(params.get('amount')  ?? 0);
 
   const [payment,   setPayment]   = useState<Payment | null>(null);
+  // Same tax computation as the invoice and the modal — see lib/billing-config.
+  const successTax = computeTax(payment ?? {});
   const [userEmail, setUserEmail] = useState('');
   const [userName,  setUserName]  = useState('');
   const [phase,     setPhase]     = useState<'loading' | 'found' | 'timeout'>('loading');
@@ -263,20 +269,38 @@ function SuccessPageContent() {
                     </div>
                   </div>
 
-                  {/* Totals */}
+                  {/* Totals — same computeTax() as the invoice and the modal.
+                      This previously hardcoded "GST (0%)  ₹0", which was wrong
+                      even before the pricing change: the amount charged was
+                      already GST-inclusive, so it told the customer there was
+                      no tax immediately after they had paid it. */}
                   <div className="flex justify-end mb-8">
                     <div className="w-60 space-y-2">
                       <div className="flex justify-between text-xs text-neutral-400">
-                        <span>Subtotal</span>
-                        <span className="tabular-nums">{fmtINR(payment.amount_inr ?? payment.amount ?? fallbackAmount)}</span>
+                        <span>Taxable Value</span>
+                        <span className="tabular-nums">{fmtINR(successTax.taxableValue)}</span>
                       </div>
-                      <div className="flex justify-between text-xs text-neutral-400">
-                        <span>GST (0%)</span><span>₹0</span>
-                      </div>
+                      {successTax.isInterState ? (
+                        <div className="flex justify-between text-xs text-neutral-400">
+                          <span>IGST @18%</span>
+                          <span className="tabular-nums">{fmtINR(successTax.igst)}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-xs text-neutral-400">
+                            <span>CGST @9%</span>
+                            <span className="tabular-nums">{fmtINR(successTax.cgst)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-neutral-400">
+                            <span>SGST @9%</span>
+                            <span className="tabular-nums">{fmtINR(successTax.sgst)}</span>
+                          </div>
+                        </>
+                      )}
                       <div className="h-px bg-neutral-200" />
                       <div className="flex justify-between text-sm font-bold text-neutral-900">
                         <span>Total Paid</span>
-                        <span className="tabular-nums">{fmtINR(payment.amount_inr ?? payment.amount ?? fallbackAmount)}</span>
+                        <span className="tabular-nums">{fmtINR(successTax.total)}</span>
                       </div>
                     </div>
                   </div>

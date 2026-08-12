@@ -1,30 +1,5 @@
 import type { Payment } from '@/components/InvoiceView';
-
-const COMPANY = {
-  name: 'Ramasubramanian AI Software Pvt. Ltd.',
-  brand: 'LexRam',
-  email: 'hello@lexram.ai',
-  phone: '+91 87544 46066',
-  address: 'B 225, 12th Avenue, Ashok Nagar, Chennai, Tamil Nadu — 600083',
-  website: 'lexram.ai',
-  gstin: '33AAPCR6244K1ZY',
-  stateName: 'Tamil Nadu',
-  stateCode: '33',
-};
-
-/**
- * SAC (Services Accounting Code) for the supply.
- *
- * 998434 = "On-line software" under Group 99843 (on-line content).
- * Alternatives sometimes used for SaaS subscriptions are 997331 (licensing
- * services for the right to use software) and 998314 (IT design and
- * development). The correct code depends on how the supply is characterised,
- * so CONFIRM THIS WITH YOUR CA before relying on it — an invoice carrying the
- * wrong SAC is a filing problem, not a cosmetic one.
- */
-const SAC_CODE = '998434';
-
-import { GST_RATE, STATE_NAMES } from '@/lib/billing-config';
+import { SUPPLIER as COMPANY, SAC_CODE, computeTax } from '@/lib/billing-config';
 
 function fmtINR(n: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -55,71 +30,6 @@ function invNum(p: Payment) {
     return `INV-${(parts[parts.length - 1] ?? p.id.slice(0, 8)).toUpperCase().slice(0, 8)}`;
   }
   return `INV-${p.id.slice(0, 8).toUpperCase()}`;
-}
-
-interface TaxBreakdown {
-  taxableValue: number;
-  cgst: number;
-  sgst: number;
-  igst: number;
-  total: number;
-  isInterState: boolean;
-  placeOfSupplyCode: string;
-  placeOfSupplyName: string;
-  /** True when the figures were derived here rather than read from the payment row. */
-  isLegacy: boolean;
-}
-
-/**
- * Tax figures for the invoice.
- *
- * Reads the snapshot stored on the payment row when present — that is the
- * authoritative record of what was actually charged and filed. Only falls back
- * to computing when those columns are absent, i.e. for payments taken before
- * the snapshot existed.
- *
- * The fallback deliberately reproduces the OLD GST-inclusive maths (tax backed
- * out of the amount, always CGST+SGST). Those customers really did pay a
- * GST-inclusive amount to a Tamil Nadu supplier, so reprinting their invoice
- * must show what they paid — not what the current pricing model would charge.
- */
-function computeTax(payment: Payment): TaxBreakdown {
-  const amount = payment.amount_inr ?? payment.amount ?? 0;
-
-  const hasSnapshot =
-    payment.taxable_value != null &&
-    (payment.cgst_amount != null || payment.igst_amount != null);
-
-  if (hasSnapshot) {
-    const code = payment.place_of_supply_code ?? COMPANY.stateCode;
-    const igst = payment.igst_amount ?? 0;
-    return {
-      taxableValue: payment.taxable_value ?? 0,
-      cgst: payment.cgst_amount ?? 0,
-      sgst: payment.sgst_amount ?? 0,
-      igst,
-      total: payment.total_amount ?? amount,
-      isInterState: igst > 0,
-      placeOfSupplyCode: code,
-      placeOfSupplyName:
-        payment.place_of_supply ?? STATE_NAMES[code] ?? COMPANY.stateName,
-      isLegacy: false,
-    };
-  }
-
-  // ── Legacy: pre-snapshot payments were charged GST-inclusive, intra-state ──
-  const taxableValue = amount / (1 + GST_RATE);
-  return {
-    taxableValue,
-    cgst: taxableValue * (GST_RATE / 2),
-    sgst: taxableValue * (GST_RATE / 2),
-    igst: 0,
-    total: amount,
-    isInterState: false,
-    placeOfSupplyCode: COMPANY.stateCode,
-    placeOfSupplyName: COMPANY.stateName,
-    isLegacy: true,
-  };
 }
 
 function buildHTML(payment: Payment, userEmail: string, userName: string): string {

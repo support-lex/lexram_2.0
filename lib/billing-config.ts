@@ -111,6 +111,107 @@ export function stateCodeFromGSTIN(gstin: string): string | null {
   return STATE_NAMES[code] ? code : null;
 }
 
+/** Supplier identity. Appears on every invoice — Rule 46(a). */
+export const SUPPLIER = {
+  name: 'Ramasubramanian AI Software Pvt. Ltd.',
+  brand: 'LexRam',
+  email: 'hello@lexram.ai',
+  phone: '+91 87544 46066',
+  address: 'B 225, 12th Avenue, Ashok Nagar, Chennai, Tamil Nadu — 600083',
+  website: 'lexram.ai',
+  gstin: '33AAPCR6244K1ZY',
+  stateName: 'Tamil Nadu',
+  stateCode: SUPPLIER_STATE_CODE,
+} as const;
+
+/**
+ * SAC (Services Accounting Code) for the supply.
+ *
+ * 998434 = "On-line software". Alternatives used for SaaS subscriptions are
+ * 997331 (licensing services for the right to use software) and 998314 (IT
+ * design and development). The right code depends on how the supply is
+ * characterised — CONFIRM WITH YOUR CA. A wrong SAC is a filing problem, not
+ * a cosmetic one.
+ */
+export const SAC_CODE = '998434';
+
+export interface TaxBreakdown {
+  taxableValue: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  total: number;
+  isInterState: boolean;
+  placeOfSupplyCode: string;
+  placeOfSupplyName: string;
+  /** True when derived here rather than read from the payment row. */
+  isLegacy: boolean;
+}
+
+/** The fields an invoice needs off a payment row. Structural, so both the */
+/** printable template and the on-screen modal can pass their own shape. */
+export interface TaxSource {
+  amount_inr?: number;
+  amount?: number;
+  taxable_value?: number;
+  cgst_amount?: number;
+  sgst_amount?: number;
+  igst_amount?: number;
+  total_amount?: number;
+  place_of_supply?: string;
+  place_of_supply_code?: string;
+}
+
+/**
+ * Tax figures for an invoice.
+ *
+ * Reads the snapshot stored on the payment row when present — that is the
+ * authoritative record of what was charged and filed. Falls back to computing
+ * only for payments taken before the snapshot existed, and that fallback
+ * deliberately reproduces the OLD GST-inclusive maths: those customers really
+ * did pay a GST-inclusive amount to a Tamil Nadu supplier, so reprinting must
+ * show what they paid, not what current pricing would charge.
+ *
+ * Shared by the printable invoice and the on-screen modal. Keeping one
+ * implementation is the point — two would drift, and a tax document that says
+ * different things on screen and in the file is worse than either alone.
+ */
+export function computeTax(p: TaxSource): TaxBreakdown {
+  const amount = p.amount_inr ?? p.amount ?? 0;
+
+  const hasSnapshot =
+    p.taxable_value != null && (p.cgst_amount != null || p.igst_amount != null);
+
+  if (hasSnapshot) {
+    const code = p.place_of_supply_code ?? SUPPLIER_STATE_CODE;
+    const igst = p.igst_amount ?? 0;
+    return {
+      taxableValue: p.taxable_value ?? 0,
+      cgst: p.cgst_amount ?? 0,
+      sgst: p.sgst_amount ?? 0,
+      igst,
+      total: p.total_amount ?? amount,
+      isInterState: igst > 0,
+      placeOfSupplyCode: code,
+      placeOfSupplyName: p.place_of_supply ?? STATE_NAMES[code] ?? SUPPLIER.stateName,
+      isLegacy: false,
+    };
+  }
+
+  const taxableValue = amount / (1 + GST_RATE);
+  return {
+    taxableValue,
+    cgst: taxableValue * (GST_RATE / 2),
+    sgst: taxableValue * (GST_RATE / 2),
+    igst: 0,
+    total: amount,
+    isInterState: false,
+    placeOfSupplyCode: SUPPLIER_STATE_CODE,
+    placeOfSupplyName: SUPPLIER.stateName,
+    isLegacy: true,
+  };
+}
+
 /** Billing details captured at first payment and reused thereafter. */
 export interface BillingDetails {
   address: string;

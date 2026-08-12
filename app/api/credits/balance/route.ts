@@ -3,7 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CREDITS_API = process.env.CREDITS_API_URL || 'http://157.245.106.223:8124';
+// Payments and credits are served by lexram-payments (:8126), which nginx
+// exposes at /credits and /payments on api.lexram.ai. The old fallback pointed
+// at :8124 (langgraph-v4), which still carries a stale copy of these routes.
+const CREDITS_API = process.env.CREDITS_API_URL || 'https://api.lexram.ai';
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('Authorization');

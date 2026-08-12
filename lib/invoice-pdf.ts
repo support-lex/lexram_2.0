@@ -24,21 +24,7 @@ const COMPANY = {
  */
 const SAC_CODE = '998434';
 
-const GST_RATE = 0.18;
-
-/** GST state codes → names, for place-of-supply display. */
-const STATE_NAMES: Record<string, string> = {
-  '01': 'Jammu and Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab',
-  '04': 'Chandigarh', '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi',
-  '08': 'Rajasthan', '09': 'Uttar Pradesh', '10': 'Bihar', '11': 'Sikkim',
-  '12': 'Arunachal Pradesh', '13': 'Nagaland', '14': 'Manipur', '15': 'Mizoram',
-  '16': 'Tripura', '17': 'Meghalaya', '18': 'Assam', '19': 'West Bengal',
-  '20': 'Jharkhand', '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh',
-  '24': 'Gujarat', '26': 'Dadra and Nagar Haveli and Daman and Diu',
-  '27': 'Maharashtra', '29': 'Karnataka', '30': 'Goa', '31': 'Lakshadweep',
-  '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry', '35': 'Andaman and Nicobar Islands',
-  '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh', '97': 'Other Territory',
-};
+import { GST_RATE, STATE_NAMES } from '@/lib/billing-config';
 
 function fmtINR(n: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -149,6 +135,19 @@ function buildHTML(payment: Payment, userEmail: string, userName: string): strin
     if (s === 'PENDING') return 'Pending';
     return payment.status ?? 'Paid';
   })();
+
+  // Recipient address. Rule 46 requires the recipient's address on a tax
+  // invoice; it is captured at first payment and snapshotted onto the row, so
+  // an invoice always shows the address as it stood when that payment was made
+  // rather than wherever the customer has since moved to.
+  const addressLines = [
+    payment.customer_address,
+    [payment.customer_city, payment.customer_pincode].filter(Boolean).join(' — '),
+    t.placeOfSupplyName,
+  ]
+    .filter(v => v && String(v).trim())
+    .map(v => `<div class="billed-line">${esc(v)}</div>`)
+    .join('');
 
   const taxRows = t.isInterState
     ? `<div class="totals-row"><span>IGST @18%</span><span>${fmtINR(t.igst)}</span></div>`
@@ -274,6 +273,7 @@ function buildHTML(payment: Payment, userEmail: string, userName: string): strin
       <div class="party">
         <div class="section-label">Billed To</div>
         ${userName ? `<div class="billed-name">${esc(userName)}</div>` : ''}
+        ${addressLines}
         <div class="billed-line">${esc(userEmail)}</div>
         ${payment.user_phone ? `<div class="billed-line">+91 ${esc(payment.user_phone)}</div>` : ''}
         ${payment.customer_gstin ? `<div class="billed-gstin">GSTIN: ${esc(payment.customer_gstin)}</div>` : ''}

@@ -1,34 +1,43 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Zap, Loader2, Sparkles, ChevronRight } from 'lucide-react';
 import { useCredits } from '@/hooks/use-credits';
 import { creditsApi } from '@/services/credits';
 import { supabase } from '@/lib/supabase/client';
 import { withTimeout } from '@/lib/with-timeout';
+import {
+  MIN_TOPUP_INR,
+  GST_CHARGED_ON_TOP,
+  CREDITS_PER_RUPEE,
+  breakdown,
+  STATE_OPTIONS,
+  EMPTY_BILLING,
+  validateBilling,
+  stateCodeFromGSTIN,
+  type BillingDetails,
+} from '@/lib/billing-config';
 
 interface PaywallModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-// Quick-select shortcuts (still useful for fast checkout)
+// Quick-select shortcuts. All at or above MIN_TOPUP_INR — offering a pack the
+// user cannot actually buy is worse than offering fewer.
 const QUICK_PACKS = [
-  { amount_inr: 200,  label: '₹200',   badge: null },
   { amount_inr: 500,  label: '₹500',   badge: 'Popular' },
   { amount_inr: 1000, label: '₹1,000', badge: null },
+  { amount_inr: 2500, label: '₹2,500', badge: 'Best value' },
 ] as const;
-
-const MIN_AMOUNT = 1;
-const CREDITS_PER_RUPEE = 0.5; // ₹2 = 1 credit
 
 function calcCredits(amount: number): number {
   return Math.floor(amount * CREDITS_PER_RUPEE);
 }
 
 function fmtINR(amount: number): string {
-  return `₹${amount.toLocaleString('en-IN')}`;
+  return `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 }
 
 export default function PaywallModal({ open, onClose }: PaywallModalProps) {
@@ -40,14 +49,45 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [billing, setBilling] = useState<BillingDetails>(EMPTY_BILLING);
+
+  // Billing details are captured once, at the first payment, and reused after.
+  // Stored on user_metadata rather than a new table — the same place
+  // ProfileCompletionModal already writes, so no migration is needed.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase().auth.getUser();
+        if (cancelled) return;
+        const m = (data.user?.user_metadata ?? {}) as Record<string, string>;
+        setBilling({
+          address:   m.billing_address ?? '',
+          city:      m.billing_city ?? '',
+          stateCode: m.billing_state_code ?? '',
+          pincode:   m.billing_pincode ?? '',
+          gstin:     m.billing_gstin ?? '',
+        });
+        if (m.phone) setPhone(String(m.phone).replace(/\D/g, '').slice(-10));
+      } catch { /* prefill is best-effort — the user can still type it */ }
+    })();
+    return () => { cancelled = true; };
+  }, [open]);
 
   const numericAmount = useMemo(() => {
     const n = parseInt(rawAmount, 10);
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [rawAmount]);
 
-  const credits = useMemo(() => calcCredits(numericAmount), [numericAmount]);
-  const isValidAmount = numericAmount >= MIN_AMOUNT;
+  const bd = useMemo(() => breakdown(numericAmount), [numericAmount]);
+  const confirmedBd = useMemo(() => breakdown(confirmedAmount), [confirmedAmount]);
+  const credits = bd.credits;
+  const isValidAmount = numericAmount >= MIN_TOPUP_INR;
+  const amountTooLow = numericAmount > 0 && numericAmount < MIN_TOPUP_INR;
+
+  const billingError = useMemo(() => validateBilling(billing), [billing]);
+  const canPay = phone.length === 10 && !billingError && !loading;
 
   const handleClose = useCallback(() => {
     setRawAmount('');
@@ -65,12 +105,38 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
     setError(null);
   };
 
+  /** Selecting a GSTIN's state automatically keeps the two consistent. */
+  const handleGstinChange = (raw: string) => {
+    const gstin = raw.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 15);
+    setBilling(prev => {
+      const derived = stateCodeFromGSTIN(gstin);
+      return { ...prev, gstin, stateCode: derived ?? prev.stateCode };
+    });
+  };
+
   const handlePay = useCallback(async () => {
     if (!confirmedAmount || phone.length < 10) return;
+    const invalid = validateBilling(billing);
+    if (invalid) { setError(invalid); return; }
+
     setLoading(true);
     setError(null);
 
     try {
+      // Persist billing details before charging so the invoice can be issued
+      // even if the user never returns to this modal. Best-effort: a metadata
+      // write failing must not block a payment the user has already committed
+      // to — the details are also sent with the order below.
+      supabase().auth.updateUser({
+        data: {
+          billing_address:    billing.address.trim(),
+          billing_city:       billing.city.trim(),
+          billing_state_code: billing.stateCode,
+          billing_pincode:    billing.pincode.trim(),
+          billing_gstin:      billing.gstin.trim().toUpperCase(),
+        },
+      }).catch(() => {});
+
       // Always call getSession() (not getUser()) so an expired token is
       // refreshed before we hit the payment API. Race against 10 s in case
       // the network is still waking up — surface a clear error instead of
@@ -133,7 +199,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
     } finally {
       setLoading(false);
     }
-  }, [confirmedAmount, phone, refresh, handleClose]);
+  }, [confirmedAmount, phone, billing, refresh, handleClose]);
 
   return (
     <AnimatePresence>
@@ -213,7 +279,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                         <input
                           type="number"
                           inputMode="numeric"
-                          min={MIN_AMOUNT}
+                          min={MIN_TOPUP_INR}
                           value={rawAmount}
                           onChange={e => setRawAmount(e.target.value.replace(/[^0-9]/g, ''))}
                           placeholder="0"
@@ -240,24 +306,51 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                       </div>
                     </div>
 
-                    {/* Live breakdown line */}
-                    <AnimatePresence>
-                      {isValidAmount && (
+                    {/* Live breakdown / minimum-amount hint */}
+                    <AnimatePresence mode="wait">
+                      {amountTooLow ? (
                         <motion.div
+                          key="too-low"
                           initial={{ opacity: 0, y: -6 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -6 }}
-                          className="flex items-center justify-between mb-5 px-1"
+                          className="mb-5 px-1"
                         >
-                          <span className="text-xs text-neutral-400">
-                            {fmtINR(numericAmount)} at ₹2 / credit
-                          </span>
-                          <span className="text-xs font-medium text-[var(--accent)]">
-                            = {credits.toLocaleString()} credits
+                          <span className="text-xs text-red-500">
+                            Minimum top-up is {fmtINR(MIN_TOPUP_INR)}
+                            {GST_CHARGED_ON_TOP ? ' (excluding GST)' : ''}
                           </span>
                         </motion.div>
+                      ) : isValidAmount ? (
+                        <motion.div
+                          key="breakdown"
+                          initial={{ opacity: 0, y: -6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -6 }}
+                          className="mb-5 px-1 space-y-1"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-neutral-400">
+                              {fmtINR(numericAmount)} at ₹2 / credit
+                            </span>
+                            <span className="text-xs font-medium text-[var(--accent)]">
+                              = {credits.toLocaleString()} credits
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-neutral-400">
+                              {GST_CHARGED_ON_TOP
+                                ? `+ GST @18% ${fmtINR(bd.gst)}`
+                                : 'Inclusive of GST @18%'}
+                            </span>
+                            <span className="text-[11px] font-semibold text-neutral-600">
+                              Total {fmtINR(bd.total)}
+                            </span>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <div key="spacer" className="mb-5" />
                       )}
-                      {!isValidAmount && <div key="spacer" className="mb-5" />}
                     </AnimatePresence>
 
                     {/* ── Quick-select shortcuts ── */}
@@ -319,9 +412,9 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                       className="w-full py-3.5 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed bg-neutral-900 text-white hover:bg-neutral-800 disabled:hover:bg-neutral-900"
                     >
                       {isValidAmount ? (
-                        <>Continue with {fmtINR(numericAmount)} <ChevronRight className="w-4 h-4" /></>
+                        <>Continue with {fmtINR(bd.total)} <ChevronRight className="w-4 h-4" /></>
                       ) : (
-                        <>Enter an amount to continue</>
+                        <>Enter at least {fmtINR(MIN_TOPUP_INR)} to continue</>
                       )}
                     </motion.button>
                   </motion.div>
@@ -339,7 +432,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs text-neutral-400 mb-0.5">You&apos;re paying</p>
-                          <p className="font-serif text-3xl font-light text-neutral-900">{fmtINR(confirmedAmount)}</p>
+                          <p className="font-serif text-3xl font-light text-neutral-900">{fmtINR(confirmedBd.total)}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-xs text-neutral-400 mb-0.5">You receive</p>
@@ -353,10 +446,22 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                         </div>
                       </div>
 
-                      {/* Rate line */}
-                      <div className="mt-3 pt-3 border-t border-black/6 flex items-center justify-between">
-                        <span className="text-[11px] text-neutral-400">Rate</span>
-                        <span className="text-[11px] text-neutral-500">₹2 per credit</span>
+                      {/* Tax breakdown — the user sees exactly what the gateway will charge */}
+                      <div className="mt-3 pt-3 border-t border-black/6 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-neutral-400">
+                            {GST_CHARGED_ON_TOP ? 'Taxable value' : 'Taxable value (incl.)'}
+                          </span>
+                          <span className="text-[11px] text-neutral-500">{fmtINR(confirmedBd.subtotal)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-neutral-400">GST @18%</span>
+                          <span className="text-[11px] text-neutral-500">{fmtINR(confirmedBd.gst)}</span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1.5 border-t border-black/6">
+                          <span className="text-[11px] font-semibold text-neutral-600">Total payable</span>
+                          <span className="text-[11px] font-semibold text-neutral-900">{fmtINR(confirmedBd.total)}</span>
+                        </div>
                       </div>
                     </div>
 
@@ -400,6 +505,70 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                       <p className="mt-1.5 text-[11px] text-neutral-400">Required by Cashfree payment gateway</p>
                     </div>
 
+                    {/* ── Billing details ── captured once, reused for every later invoice */}
+                    <div className="mb-5">
+                      <label className="block text-[11px] font-medium uppercase tracking-widest text-neutral-400 mb-2">
+                        Billing address
+                      </label>
+
+                      <input
+                        type="text"
+                        value={billing.address}
+                        onChange={e => setBilling(p => ({ ...p, address: e.target.value }))}
+                        placeholder="Flat / building, street, area"
+                        className="w-full mb-2 px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--accent)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none transition-colors"
+                      />
+
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={billing.city}
+                          onChange={e => setBilling(p => ({ ...p, city: e.target.value }))}
+                          placeholder="City"
+                          className="px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--accent)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none transition-colors"
+                        />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={billing.pincode}
+                          onChange={e => setBilling(p => ({ ...p, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                          placeholder="PIN code"
+                          className="px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--accent)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none transition-colors"
+                        />
+                      </div>
+
+                      <select
+                        value={billing.stateCode}
+                        onChange={e => setBilling(p => ({ ...p, stateCode: e.target.value }))}
+                        className={`w-full mb-2 px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--accent)]/40 bg-white text-sm focus:outline-none transition-colors ${
+                          billing.stateCode ? 'text-neutral-900' : 'text-neutral-400'
+                        }`}
+                      >
+                        <option value="">Select state…</option>
+                        {STATE_OPTIONS.map(([code, name]) => (
+                          <option key={code} value={code}>{name}</option>
+                        ))}
+                      </select>
+                      <p className="mb-3 text-[11px] text-neutral-400">
+                        Determines whether CGST + SGST or IGST applies on your invoice.
+                      </p>
+
+                      <input
+                        type="text"
+                        value={billing.gstin}
+                        onChange={e => handleGstinChange(e.target.value)}
+                        placeholder="GSTIN (optional)"
+                        className="w-full px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--accent)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none font-mono tracking-wide transition-colors"
+                      />
+                      <p className="mt-1.5 text-[11px] text-neutral-400">
+                        Add your GSTIN to claim input tax credit. Leave blank if you don&apos;t have one.
+                      </p>
+
+                      {billingError && billing.address.trim() !== '' && (
+                        <p className="mt-2 text-[11px] text-red-500">{billingError}</p>
+                      )}
+                    </div>
+
                     {error && (
                       <motion.p
                         initial={{ opacity: 0, y: -4 }}
@@ -419,12 +588,12 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                       </button>
                       <button
                         onClick={handlePay}
-                        disabled={loading || phone.length < 10}
+                        disabled={!canPay}
                         className="flex-[0.6] py-3.5 rounded-2xl text-sm font-semibold bg-neutral-900 text-white hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                       >
                         {loading
                           ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</>
-                          : <>Pay {fmtINR(confirmedAmount)}</>
+                          : <>Pay {fmtINR(confirmedBd.total)}</>
                         }
                       </button>
                     </div>

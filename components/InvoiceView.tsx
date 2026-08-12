@@ -42,6 +42,10 @@ export interface Payment {
   /** Present only for registered (B2B) recipients. */
   customer_gstin?: string;
   customer_state?: string;
+  /** Recipient address, snapshotted at payment time — required by Rule 46. */
+  customer_address?: string;
+  customer_city?: string;
+  customer_pincode?: string;
 }
 
 interface InvoiceViewProps {

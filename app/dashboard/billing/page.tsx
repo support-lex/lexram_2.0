@@ -49,11 +49,38 @@ function StatusPill({ status }: { status?: string }) {
 }
 
 function invoiceLabel(payment: Payment) {
+  // Prefer the sequential number assigned at payment time. The derivation below
+  // is the legacy fallback for rows predating it — it is a slice of the gateway
+  // order id, so it is neither consecutive nor unique per financial year.
+  if (payment.invoice_number) return payment.invoice_number;
   if (payment.order_id) {
     const parts = payment.order_id.split('_');
     return `INV-${parts[parts.length - 1]?.toUpperCase().slice(0, 8) ?? payment.id.slice(0, 8).toUpperCase()}`;
   }
   return `INV-${payment.id.slice(0, 8).toUpperCase()}`;
+}
+
+/** "August 2026" — the heading a run of invoices sits under. */
+function monthKey(d?: string): string {
+  if (!d) return 'Undated';
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return 'Undated';
+  return dt.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+}
+
+/**
+ * Group payments into month buckets, preserving the order they arrive in
+ * (the API already sorts newest first, so months and rows both stay in order).
+ */
+function groupByMonth(payments: Payment[]): Array<{ label: string; items: Payment[] }> {
+  const out: Array<{ label: string; items: Payment[] }> = [];
+  for (const p of payments) {
+    const label = monthKey(p.paid_at ?? p.created_at);
+    const last = out[out.length - 1];
+    if (last && last.label === label) last.items.push(p);
+    else out.push({ label, items: [p] });
+  }
+  return out;
 }
 
 export default function BillingPage() {
@@ -260,16 +287,28 @@ export default function BillingPage() {
             </div>
           )}
 
-          {/* Rows */}
+          {/* Rows, grouped under a month heading */}
           <AnimatePresence>
-            {!loading && !error && payments.map((p, i) => {
+            {!loading && !error && groupByMonth(payments).flatMap((group, gi) => [
+              <div
+                key={`h-${group.label}`}
+                className="px-5 py-2 bg-[var(--surface-hover)]/50 border-b border-[var(--border-default)] flex items-center justify-between"
+              >
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                  {group.label}
+                </span>
+                <span className="text-[10px] text-[var(--text-muted)]">
+                  {group.items.length} {group.items.length === 1 ? 'invoice' : 'invoices'}
+                </span>
+              </div>,
+              ...group.items.map((p, i) => {
               const amount = p.amount_inr ?? p.amount ?? 0;
               return (
                 <motion.div
                   key={p.id}
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.04 }}
+                  transition={{ delay: Math.min(gi * 0.04 + i * 0.03, 0.4) }}
                   className="grid grid-cols-12 px-5 py-4 border-b border-[var(--border-default)] last:border-0 items-center hover:bg-[var(--surface-hover)]/40 transition-colors group"
                 >
                   <div className="col-span-3">
@@ -296,16 +335,21 @@ export default function BillingPage() {
                     <StatusPill status={p.status} />
                   </div>
                   <div className="col-span-1 flex justify-end">
+                    {/* Always visible. This was opacity-0 until hover, which
+                        means it did not exist at all on touch devices — there
+                        is no hover state, so the only way to reach an invoice
+                        on a phone was to guess where to tap. */}
                     <button
                       onClick={() => setSelectedPayment(p)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[11px] font-medium text-[var(--accent)] hover:underline"
+                      aria-label={`View invoice ${invoiceLabel(p)}`}
+                      className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent)] hover:underline"
                     >
                       Invoice <ChevronRight className="w-3 h-3" />
                     </button>
                   </div>
                 </motion.div>
               );
-            })}
+            })])}
           </AnimatePresence>
         </div>
 

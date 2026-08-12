@@ -21,7 +21,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, BadgeCheckIcon, BellIcon, SettingsIcon, LogOutIcon } from "lucide-react"
+import { ChevronsUpDownIcon, BadgeCheckIcon, BellIcon, SettingsIcon, LogOutIcon, CreditCardIcon } from "lucide-react"
 import { logoutUsecase } from "@/modules/auth/usecase/auth.usecase"
 
 export function NavUser({
@@ -80,11 +80,18 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+              <DropdownMenuItem render={<Link href="/dashboard/billing" />}>
+                <CreditCardIcon className="size-4 mr-2" />
+                Billing &amp; Invoices
+              </DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
                 <SettingsIcon className="size-4 mr-2" />
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuItem render={<Link href="/dashboard/settings/profile" />}>
+              {/* Was /dashboard/settings/profile, which does not exist — the
+                  only route under settings/ is its own page.tsx, so that item
+                  404'd. Pointed at the page that actually renders. */}
+              <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
                 <BadgeCheckIcon className="size-4 mr-2" />
                 Profile
               </DropdownMenuItem>

@@ -11,6 +11,8 @@ import { supabase } from '@/lib/supabase/client';
 import InvoiceView, { type Payment } from '@/components/InvoiceView';
 import PaywallModal from '@/components/PaywallModal';
 import { isPaywallEnabled } from '@/lib/billing';
+import { useCredits } from '@/hooks/use-credits';
+import { STATE_NAMES } from '@/lib/billing-config';
 
 function fmtINR(n: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -63,6 +65,9 @@ export default function BillingPage() {
   const [userName, setUserName] = useState('');
   const [showTopUp, setShowTopUp] = useState(false);
   const [paywallEnabled, setPaywallEnabled] = useState(true);
+  const [billingAddress, setBillingAddress] = useState<string[]>([]);
+  const [billingGstin, setBillingGstin] = useState('');
+  const { balance } = useCredits();
   useEffect(() => { setPaywallEnabled(isPaywallEnabled()); }, []);
 
   const load = useCallback(async () => {
@@ -75,6 +80,15 @@ export default function BillingPage() {
       const first = meta.first_name ?? '';
       const last = meta.last_name ?? '';
       setUserName(`${first} ${last}`.trim() || (user?.email ?? ''));
+
+      // Billing details captured at first payment — shown here so the user can
+      // see what will appear on their next invoice before they buy again.
+      setBillingAddress([
+        meta.billing_address,
+        [meta.billing_city, meta.billing_pincode].filter(Boolean).join(' — '),
+        STATE_NAMES[meta.billing_state_code as string] ?? '',
+      ].filter(v => v && String(v).trim()));
+      setBillingGstin(meta.billing_gstin ?? '');
 
       const res = await fetch('/api/payments');
       if (!res.ok) throw new Error('Failed to load payments');
@@ -126,6 +140,48 @@ export default function BillingPage() {
             )}
           </div>
         </div>
+
+        {/* Current balance + billing details — the "where do I stand" row.
+            Shown even with no payments yet, unlike the totals below. */}
+        {!loading && (
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-4 h-4 text-[var(--text-muted)]" />
+                <span className="text-xs text-[var(--text-muted)] font-medium">Current Balance</span>
+              </div>
+              <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">
+                {balance != null ? `${balance.toLocaleString('en-IN')} credits` : '—'}
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                Credits never expire · ₹2 per credit
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="w-4 h-4 text-[var(--text-muted)]" />
+                <span className="text-xs text-[var(--text-muted)] font-medium">Billing Details</span>
+              </div>
+              {billingAddress.length > 0 ? (
+                <>
+                  {billingAddress.map((line, i) => (
+                    <p key={i} className="text-[13px] text-[var(--text-primary)] leading-relaxed">{line}</p>
+                  ))}
+                  {billingGstin && (
+                    <p className="text-[12px] font-mono text-[var(--text-secondary)] mt-1.5">
+                      GSTIN: {billingGstin}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-[13px] text-[var(--text-muted)]">
+                  Captured at your first payment — these appear on your invoices.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Summary cards */}
         {!loading && payments.length > 0 && (

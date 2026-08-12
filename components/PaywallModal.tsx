@@ -154,6 +154,21 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
           confirmedAmount,
           session.user.email ?? '',
           phone,
+          // Sent with the order, not just saved to the profile. The backend
+          // needs customer_state_code at order-creation time to pick CGST+SGST
+          // vs IGST and to write the tax snapshot — it cannot recover either
+          // from the webhook afterwards.
+          {
+            customer_name: [
+              session.user.user_metadata?.first_name,
+              session.user.user_metadata?.last_name,
+            ].filter(Boolean).join(' ').trim() || undefined,
+            customer_address:    billing.address.trim(),
+            customer_city:       billing.city.trim(),
+            customer_state_code: billing.stateCode,
+            customer_pincode:    billing.pincode.trim(),
+            customer_gstin:      billing.gstin.trim().toUpperCase() || undefined,
+          },
         ),
         20_000,
         'Request timed out. Please check your connection and try again.',

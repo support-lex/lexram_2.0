@@ -20,6 +20,28 @@ export interface Payment {
   cashfree_order_id?: string;
   created_at?: string;
   paid_at?: string;
+
+  // ── GST snapshot, written at payment time ──────────────────────────────────
+  // These record what was actually charged and filed. The invoice reads them
+  // rather than recomputing, so a later change to pricing, tax rate or template
+  // cannot silently alter an already-issued invoice. Absent on payments taken
+  // before the snapshot existed — those fall back to the legacy GST-inclusive
+  // calculation in lib/invoice-pdf.ts.
+  /** Sequential, unique per financial year — Rule 46(b). */
+  invoice_number?: string;
+  taxable_value?: number;
+  cgst_amount?: number;
+  sgst_amount?: number;
+  igst_amount?: number;
+  /** Gross charged, i.e. taxable_value + tax. */
+  total_amount?: number;
+  /** State name of the recipient, e.g. "Karnataka". */
+  place_of_supply?: string;
+  /** Two-digit GST state code, e.g. "29". */
+  place_of_supply_code?: string;
+  /** Present only for registered (B2B) recipients. */
+  customer_gstin?: string;
+  customer_state?: string;
 }
 
 interface InvoiceViewProps {

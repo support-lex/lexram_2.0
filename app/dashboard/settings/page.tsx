@@ -22,7 +22,9 @@ const themes = [
   { id: 'emerald', name: 'Emerald', desc: 'Bold green authority', sidebar: '#14291E', bg: '#FAFDF7', accent: '#059669', surface: '#FFFFFF' },
 ];
 
-const VALID_TABS = ['profile', 'organisation', 'notifications', 'security', 'billing', 'preferences'];
+// Must match the ids passed to setActiveTab() below — an id missing here is
+// silently ignored when it arrives as a hash.
+const VALID_TABS = ['profile', 'firm', 'notifications', 'security', 'billing', 'preferences'];
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');

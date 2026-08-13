@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase/client';
+import { getAccessToken } from '@/lib/auth-store';
 
 export interface CreditBalance {
   user_id: string;
@@ -42,8 +42,12 @@ export interface OrderBillingDetails {
 }
 
 async function getAuthHeader(): Promise<Record<string, string>> {
-  const { data } = await supabase().auth.getSession();
-  const token = data.session?.access_token;
+  // Via getAccessToken(), not a raw getSession(). getSession() serialises behind
+  // Supabase's cross-tab Web Lock and can stall rather than reject; this call
+  // had no timeout at all, so a stalled lock would hang every credits request
+  // indefinitely. getAccessToken() races it against a short timeout and falls
+  // back to the last good cached token, which is still valid to authenticate.
+  const token = await getAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

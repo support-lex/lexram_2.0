@@ -13,6 +13,7 @@ import PaywallModal from '@/components/PaywallModal';
 import { isPaywallEnabled } from '@/lib/billing';
 import { useCredits } from '@/hooks/use-credits';
 import { STATE_NAMES, paymentCredits } from '@/lib/billing-config';
+import { authStore } from '@/lib/auth-store';
 
 function fmtINR(n: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -107,7 +108,16 @@ export default function BillingPage() {
     setLoading(true);
     setError(null);
     try {
-      const { data: { user } } = await supabase().auth.getUser();
+      // Bounded: getUser() takes Supabase's cross-tab Web Lock and can stall
+      // rather than reject. Unbounded, a stalled lock would leave this stuck
+      // before the finally{} that clears `loading` — a permanent spinner. The
+      // user's name and email are only cosmetic here, so proceeding without
+      // them beats never rendering the invoice list.
+      const userRes = await Promise.race([
+        supabase().auth.getUser().then(r => r.data.user),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 3000)),
+      ]);
+      const user = userRes ?? authStore.getSnapshot().user;
       setUserEmail(user?.email ?? '');
       const meta = user?.user_metadata ?? {};
       const first = meta.first_name ?? '';

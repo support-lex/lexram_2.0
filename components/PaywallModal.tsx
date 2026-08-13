@@ -6,6 +6,7 @@ import { X, Zap, Loader2, Sparkles, ChevronRight } from 'lucide-react';
 import { useCredits } from '@/hooks/use-credits';
 import { creditsApi } from '@/services/credits';
 import { supabase } from '@/lib/supabase/client';
+import { getAccessToken, authStore } from '@/lib/auth-store';
 import { withTimeout } from '@/lib/with-timeout';
 import {
   MIN_TOPUP_INR,
@@ -137,22 +138,26 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
         },
       }).catch(() => {});
 
-      // Always call getSession() (not getUser()) so an expired token is
-      // refreshed before we hit the payment API. Race against 10 s in case
-      // the network is still waking up — surface a clear error instead of
-      // hanging on "Processing…" indefinitely.
-      const session = await Promise.race([
-        supabase().auth.getSession().then(r => r.data.session),
-        new Promise<null>(resolve => setTimeout(() => resolve(null), 10_000)),
-      ]);
-      if (!session) {
-        throw new Error('Session expired or timed out. Please refresh the page and try again.');
+      // Via getAccessToken(), not a raw getSession().
+      //
+      // getSession() serialises behind Supabase's cross-tab Web Lock and can
+      // stall rather than reject. The previous code raced it against 10s and
+      // then THREW, so a stalled lock produced "Session expired or timed out"
+      // and the payment was abandoned before any request was made — the user
+      // saw a session error while their session was perfectly valid.
+      //
+      // getAccessToken() races a short timeout and falls back to the last good
+      // cached token, so a slow lock costs a moment rather than the payment.
+      const token = await getAccessToken();
+      const user = authStore.getSnapshot().user;
+      if (!token || !user) {
+        throw new Error('Your session has expired. Please sign in again and retry.');
       }
 
       const order = await withTimeout(
         creditsApi.createOrder(
           confirmedAmount,
-          session.user.email ?? '',
+          user.email ?? '',
           phone,
           // Sent with the order, not just saved to the profile. The backend
           // needs customer_state_code at order-creation time to pick CGST+SGST
@@ -160,8 +165,8 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
           // from the webhook afterwards.
           {
             customer_name: [
-              session.user.user_metadata?.first_name,
-              session.user.user_metadata?.last_name,
+              user.user_metadata?.first_name,
+              user.user_metadata?.last_name,
             ].filter(Boolean).join(' ').trim() || undefined,
             customer_address:    billing.address.trim(),
             customer_city:       billing.city.trim(),

@@ -243,11 +243,23 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
             className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none"
           >
             <div
-              className="relative w-full max-w-md rounded-3xl bg-[var(--bg-sidebar)] shadow-2xl pointer-events-auto overflow-hidden"
+              /* Explicitly light, not bg-[var(--bg-sidebar)].
+               *
+               * --bg-sidebar is #1A0E10 (near-black) at :root and #fdf8f8
+               * (near-white) under [data-theme="futuristic"]. research-2 wraps
+               * itself in that theme locally, so the modal rendered light when
+               * opened from a research page and near-black everywhere else —
+               * on the billing page its text, all hardcoded neutral-900,
+               * disappeared into the background.
+               *
+               * Every colour inside this modal is a fixed neutral, so it is a
+               * light surface by design; it should not inherit a token whose
+               * value flips per theme. */
+              className="relative w-full max-w-md rounded-3xl bg-[#fdf8f8] shadow-2xl pointer-events-auto overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
               {/* Accent top bar */}
-              <div className="h-1 w-full bg-gradient-to-r from-[var(--accent)]/40 via-[var(--accent)] to-[var(--accent)]/40" />
+              <div className="h-1 w-full bg-gradient-to-r from-[var(--brand-cta)]/40 via-[var(--brand-cta)] to-[var(--brand-cta)]/40" />
 
               <button
                 onClick={handleClose}
@@ -268,8 +280,8 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                   >
                     {/* Header */}
                     <div className="flex items-start gap-3 mb-7">
-                      <div className="shrink-0 w-10 h-10 rounded-2xl bg-[var(--accent)]/12 flex items-center justify-center">
-                        <Zap className="w-5 h-5 text-[var(--accent)]" />
+                      <div className="shrink-0 w-10 h-10 rounded-2xl bg-[var(--brand-cta)]/12 flex items-center justify-center">
+                        <Zap className="w-5 h-5 text-[var(--brand-cta)]" />
                       </div>
                       <div>
                         <h2 className="font-serif text-xl font-light tracking-tight text-neutral-900 leading-tight">
@@ -290,8 +302,8 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                       <div
                         className={`flex items-center rounded-2xl border-2 bg-white overflow-hidden transition-all duration-200 ${
                           isValidAmount
-                            ? 'border-[var(--accent)]/60 shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_10%,transparent)]'
-                            : 'border-black/10 focus-within:border-[var(--accent)]/40'
+                            ? 'border-[var(--brand-cta)]/60 shadow-[0_0_0_4px_color-mix(in_srgb,var(--brand-cta)_10%,transparent)]'
+                            : 'border-black/10 focus-within:border-[var(--brand-cta)]/40'
                         }`}
                       >
                         <span className="pl-4 pr-1 text-2xl font-light text-neutral-400 select-none">₹</span>
@@ -316,7 +328,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                               animate={{ opacity: 1, scale: 1, x: 0 }}
                               exit={{ opacity: 0, scale: 0.75, x: 8 }}
                               transition={{ type: 'spring', damping: 18, stiffness: 300 }}
-                              className="shrink-0 mr-3 flex items-center gap-1 bg-[var(--accent)]/12 text-[var(--accent)] rounded-xl px-2.5 py-1.5"
+                              className="shrink-0 mr-3 flex items-center gap-1 bg-[var(--brand-cta)]/12 text-[var(--brand-cta)] rounded-xl px-2.5 py-1.5"
                             >
                               <Sparkles className="w-3 h-3" />
                               <span className="text-xs font-semibold tabular-nums">{credits.toLocaleString()} cr</span>
@@ -353,7 +365,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                             <span className="text-xs text-neutral-400">
                               {fmtINR(numericAmount)} at ₹2 / credit
                             </span>
-                            <span className="text-xs font-medium text-[var(--accent)]">
+                            <span className="text-xs font-medium text-[var(--brand-cta)]">
                               = {credits.toLocaleString()} credits
                             </span>
                           </div>
@@ -389,16 +401,16 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                               whileTap={{ scale: 0.96 }}
                               className={`relative rounded-2xl py-3 px-3 flex flex-col items-start text-left transition-all duration-150 border-2 ${
                                 isActive
-                                  ? 'border-[var(--accent)] bg-[var(--accent)]/6'
+                                  ? 'border-[var(--brand-cta)] bg-[var(--brand-cta)]/6'
                                   : 'border-black/8 bg-black/[0.03] hover:bg-black/[0.06] hover:border-black/15'
                               }`}
                             >
                               {pack.badge && (
-                                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[var(--accent)] text-neutral-900 text-[9px] font-bold uppercase tracking-widest py-0.5 px-2 rounded-full whitespace-nowrap">
+                                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[var(--brand-cta)] text-neutral-900 text-[9px] font-bold uppercase tracking-widest py-0.5 px-2 rounded-full whitespace-nowrap">
                                   {pack.badge}
                                 </div>
                               )}
-                              <span className={`font-serif text-base font-light transition-colors ${isActive ? 'text-[var(--accent)]' : 'text-neutral-800'}`}>
+                              <span className={`font-serif text-base font-light transition-colors ${isActive ? 'text-[var(--brand-cta)]' : 'text-neutral-800'}`}>
                                 {pack.label}
                               </span>
                               <span className="text-[11px] text-neutral-400 mt-0.5">
@@ -410,7 +422,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                                     initial={{ scale: 0 }}
                                     animate={{ scale: 1 }}
                                     exit={{ scale: 0 }}
-                                    className="absolute top-2 right-2 w-4 h-4 rounded-full bg-[var(--accent)] flex items-center justify-center"
+                                    className="absolute top-2 right-2 w-4 h-4 rounded-full bg-[var(--brand-cta)] flex items-center justify-center"
                                   >
                                     <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none">
                                       <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -457,8 +469,8 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                         <div className="text-right">
                           <p className="text-xs text-neutral-400 mb-0.5">You receive</p>
                           <div className="flex items-center gap-1.5 justify-end">
-                            <Sparkles className="w-4 h-4 text-[var(--accent)]" />
-                            <span className="font-serif text-2xl font-light text-[var(--accent)]">
+                            <Sparkles className="w-4 h-4 text-[var(--brand-cta)]" />
+                            <span className="font-serif text-2xl font-light text-[var(--brand-cta)]">
                               {calcCredits(confirmedAmount).toLocaleString()}
                             </span>
                             <span className="text-sm text-neutral-500">credits</span>
@@ -493,8 +505,8 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                       <div
                         className={`flex items-center rounded-2xl border-2 bg-white overflow-hidden transition-all duration-200 ${
                           phone.length === 10
-                            ? 'border-[var(--accent)]/60'
-                            : 'border-black/10 focus-within:border-[var(--accent)]/40'
+                            ? 'border-[var(--brand-cta)]/60'
+                            : 'border-black/10 focus-within:border-[var(--brand-cta)]/40'
                         }`}
                       >
                         <span className="pl-4 pr-2 text-sm text-neutral-400 select-none">+91</span>
@@ -513,7 +525,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                               initial={{ opacity: 0, scale: 0.6 }}
                               animate={{ opacity: 1, scale: 1 }}
                               exit={{ opacity: 0, scale: 0.6 }}
-                              className="mr-3 w-5 h-5 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0"
+                              className="mr-3 w-5 h-5 rounded-full bg-[var(--brand-cta)] flex items-center justify-center shrink-0"
                             >
                               <svg className="w-3 h-3 text-white" viewBox="0 0 10 10" fill="none">
                                 <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -536,7 +548,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                         value={billing.address}
                         onChange={e => setBilling(p => ({ ...p, address: e.target.value }))}
                         placeholder="Flat / building, street, area"
-                        className="w-full mb-2 px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--accent)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none transition-colors"
+                        className="w-full mb-2 px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--brand-cta)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none transition-colors"
                       />
 
                       <div className="grid grid-cols-2 gap-2 mb-2">
@@ -545,7 +557,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                           value={billing.city}
                           onChange={e => setBilling(p => ({ ...p, city: e.target.value }))}
                           placeholder="City"
-                          className="px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--accent)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none transition-colors"
+                          className="px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--brand-cta)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none transition-colors"
                         />
                         <input
                           type="text"
@@ -553,14 +565,14 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                           value={billing.pincode}
                           onChange={e => setBilling(p => ({ ...p, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
                           placeholder="PIN code"
-                          className="px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--accent)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none transition-colors"
+                          className="px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--brand-cta)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none transition-colors"
                         />
                       </div>
 
                       <select
                         value={billing.stateCode}
                         onChange={e => setBilling(p => ({ ...p, stateCode: e.target.value }))}
-                        className={`w-full mb-2 px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--accent)]/40 bg-white text-sm focus:outline-none transition-colors ${
+                        className={`w-full mb-2 px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--brand-cta)]/40 bg-white text-sm focus:outline-none transition-colors ${
                           billing.stateCode ? 'text-neutral-900' : 'text-neutral-400'
                         }`}
                       >
@@ -578,7 +590,7 @@ export default function PaywallModal({ open, onClose }: PaywallModalProps) {
                         value={billing.gstin}
                         onChange={e => handleGstinChange(e.target.value)}
                         placeholder="GSTIN (optional)"
-                        className="w-full px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--accent)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none font-mono tracking-wide transition-colors"
+                        className="w-full px-4 py-3 rounded-2xl border-2 border-black/10 focus:border-[var(--brand-cta)]/40 bg-white text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none font-mono tracking-wide transition-colors"
                       />
                       <p className="mt-1.5 text-[11px] text-neutral-400">
                         Add your GSTIN to claim input tax credit. Leave blank if you don&apos;t have one.

@@ -28,6 +28,7 @@ import {
   X,
   BadgeCheckIcon,
   BellIcon,
+  ReceiptIcon,
   LogOutIcon,
   Sparkles,
   ShieldCheck,
@@ -410,6 +411,18 @@ export function AppTopBar() {
                     <BellIcon className="size-4" strokeWidth={1.75} />
                   </span>
                   <span className="font-medium">Notifications</span>
+                </DropdownMenuItem>
+                {/* Billing was only reachable from a card on /dashboard, so from
+                    anywhere else in the app there was no way to find an invoice.
+                    The account menu is where people look for it. */}
+                <DropdownMenuItem
+                  render={<Link href="/dashboard/billing" />}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] text-gray-700 focus:bg-[#7a1f2b]/8 focus:text-[#7a1f2b] data-[highlighted]:bg-[#7a1f2b]/8 data-[highlighted]:text-[#7a1f2b] transition-colors cursor-pointer"
+                >
+                  <span className="grid place-items-center size-8 rounded-lg bg-[#7a1f2b]/8 text-[#7a1f2b]">
+                    <ReceiptIcon className="size-4" strokeWidth={1.75} />
+                  </span>
+                  <span className="font-medium">Billing &amp; Invoices</span>
                 </DropdownMenuItem>
               </DropdownMenuGroup>
 

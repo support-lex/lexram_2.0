@@ -394,8 +394,11 @@ export function AppTopBar() {
 
               {/* Menu items */}
               <DropdownMenuGroup className="p-1.5">
+                {/* /dashboard/settings/profile does not exist — settings is a
+                    single page with tabs, so that route 404'd. The tab is
+                    selected from the hash. */}
                 <DropdownMenuItem
-                  render={<Link href="/dashboard/settings/profile" />}
+                  render={<Link href="/dashboard/settings#profile" />}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] text-gray-700 focus:bg-[#7a1f2b]/8 focus:text-[#7a1f2b] data-[highlighted]:bg-[#7a1f2b]/8 data-[highlighted]:text-[#7a1f2b] transition-colors cursor-pointer"
                 >
                   <span className="grid place-items-center size-8 rounded-lg bg-[#7a1f2b]/8 text-[#7a1f2b]">

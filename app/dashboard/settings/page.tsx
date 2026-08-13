@@ -449,7 +449,7 @@ export default function SettingsPage() {
               </div>
               <Link
                 href="/dashboard/billing"
-                className="flex items-center justify-center gap-2 w-full text-center bg-[var(--accent)] text-[var(--accent-text)] py-3 rounded-xl font-bold hover:bg-[var(--accent-hover)] transition-colors"
+                className="flex items-center justify-center gap-2 w-full text-center bg-[var(--brand-cta)] text-[var(--brand-cta-text)] py-3 rounded-xl font-bold hover:bg-[var(--brand-cta-hover)] transition-colors"
               >
                 <Receipt className="w-4 h-4" /> View invoices & top up
               </Link>

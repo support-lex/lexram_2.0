@@ -2678,3 +2678,53 @@ html.lenis body { height: auto; }
 html.lenis, html.lenis body { height: auto; }
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
 .lenis.lenis-stopped { overflow: hidden; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   16. BRAND CTA TOKENS  — must stay last in this file
+   ═══════════════════════════════════════════════════════════════════════════
+
+   --accent is claimed by two design systems. The brand palette sets it to the
+   LexRam rust/gold (sections 2 and 3), and the shadcn/ui block in section 15
+   sets it to oklch(0.97 0 0) — a near-white "subtle hover background", which is
+   what that token means in shadcn.
+
+   :root and [data-theme="…"] have identical specificity, so the later rule wins
+   outright: every brand --accent is overridden by shadcn's near-white, app-wide
+   and in every theme. Anything painted bg-[var(--accent)] with light text is
+   therefore invisible, which is how the "Top Up Credits" button ended up white
+   on white.
+
+   Reordering the blocks is not the fix — shadcn's menus and inputs genuinely
+   want their --accent to be a pale hover colour. So primary CTAs use their own
+   token instead, defined here where nothing can clobber it. */
+
+:root,
+[data-theme="classic"] {
+  --brand-cta:        #7a1f2b;
+  --brand-cta-hover:  #5f1721;
+  --brand-cta-text:   #ffffff;
+}
+
+[data-theme="midnight"] {
+  --brand-cta:        #C9A84C;
+  --brand-cta-hover:  #b3933f;
+  --brand-cta-text:   #0C111D;
+}
+
+[data-theme="sapphire"] {
+  --brand-cta:        #3B82F6;
+  --brand-cta-hover:  #2f6fd6;
+  --brand-cta-text:   #ffffff;
+}
+
+[data-theme="emerald"] {
+  --brand-cta:        #059669;
+  --brand-cta-hover:  #047a55;
+  --brand-cta-text:   #ffffff;
+}
+
+[data-theme="futuristic"] {
+  --brand-cta:        #7a1f2b;
+  --brand-cta-hover:  #5f1721;
+  --brand-cta-text:   #ffffff;
+}

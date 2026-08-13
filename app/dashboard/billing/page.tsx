@@ -184,7 +184,7 @@ export default function BillingPage() {
             {paywallEnabled && (
               <button
                 onClick={() => setShowTopUp(true)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--brand-cta)] text-[var(--brand-cta-text)] text-sm font-semibold hover:bg-[var(--brand-cta-hover)] transition-colors shadow-sm"
               >
                 <Zap className="w-4 h-4" /> Top Up Credits
               </button>
@@ -327,7 +327,7 @@ export default function BillingPage() {
               {paywallEnabled && (
                 <button
                   onClick={() => setShowTopUp(true)}
-                  className="mt-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold"
+                  className="mt-2 px-4 py-2 rounded-xl bg-[var(--brand-cta)] text-[var(--brand-cta-text)] text-xs font-semibold hover:bg-[var(--brand-cta-hover)] transition-colors"
                 >
                   Buy Credits
                 </button>

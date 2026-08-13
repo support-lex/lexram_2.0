@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Download, Scale, CheckCircle2, Clock, XCircle, Printer, Loader2 } from 'lucide-react';
 import { creditsApi } from '@/services/credits';
-import { computeTax } from '@/lib/billing-config';
+import { computeTax, paymentCredits } from '@/lib/billing-config';
 
 export interface Payment {
   id: string;
@@ -12,7 +12,13 @@ export interface Payment {
   user_id?: string;
   amount_inr?: number;
   amount?: number;
+  /**
+   * The database column is `credits_granted`. `credits` exists only on the
+   * create-order response. Read both via paymentCredits() rather than either
+   * directly — reading `credits` off a DB row silently yields 0.
+   */
   credits?: number;
+  credits_granted?: number;
   status?: string;
   currency?: string;
   user_email?: string;
@@ -106,7 +112,7 @@ function StatusBadge({ status }: { status?: string }) {
 
 export default function InvoiceView({ payment, userEmail, userName, onClose }: InvoiceViewProps) {
   const amountINR = payment?.amount_inr ?? payment?.amount ?? 0;
-  const credits = payment?.credits ?? 0;
+  const credits = paymentCredits(payment ?? {});
   // Shared with the printable invoice. This previously computed its own
   // GST-inclusive, always-CGST+SGST split, which meant an inter-state customer
   // would see CGST+SGST on screen and IGST in the downloaded file.

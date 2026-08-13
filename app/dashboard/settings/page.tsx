@@ -140,6 +140,10 @@ export default function SettingsPage() {
   };
 
   return (
+    // Own scroll container: the dashboard layout's <main> is overflow-hidden so
+    // the chat views can manage their own scrolling, which clips any page that
+    // relies on the document scrolling instead.
+    <div className="h-full overflow-y-auto">
     <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       <div>
         <h1 className="font-sans text-2xl font-sans font-bold text-[var(--text-primary)]">Settings</h1>
@@ -456,6 +460,7 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

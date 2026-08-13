@@ -12,7 +12,7 @@ import InvoiceView, { type Payment } from '@/components/InvoiceView';
 import PaywallModal from '@/components/PaywallModal';
 import { isPaywallEnabled } from '@/lib/billing';
 import { useCredits } from '@/hooks/use-credits';
-import { STATE_NAMES } from '@/lib/billing-config';
+import { STATE_NAMES, paymentCredits } from '@/lib/billing-config';
 
 function fmtINR(n: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -136,10 +136,14 @@ export default function BillingPage() {
 
   const totalCredits = payments
     .filter(p => ['PAID', 'SUCCESS', 'COMPLETED'].includes((p.status ?? '').toUpperCase()))
-    .reduce((sum, p) => sum + (p.credits ?? 0), 0);
+    .reduce((sum, p) => sum + paymentCredits(p), 0);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
+    // h-full + overflow-y-auto, not min-h-screen. The dashboard layout wraps
+    // pages in `<main class="flex-1 min-h-0 overflow-hidden">` so that the chat
+    // views can manage their own scrolling; a min-h-screen child inside that is
+    // simply clipped, which left this page unscrollable below the fold.
+    <div className="h-full overflow-y-auto bg-[var(--bg-primary)]">
       <div className="max-w-4xl mx-auto px-6 py-8">
 
         {/* Header */}
@@ -329,7 +333,7 @@ export default function BillingPage() {
                   </div>
                   <div className="col-span-2 text-xs text-[var(--text-secondary)] tabular-nums flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-[var(--accent)]" />
-                    {(p.credits ?? 0).toLocaleString('en-IN')}
+                    {paymentCredits(p).toLocaleString('en-IN')}
                   </div>
                   <div className="col-span-2">
                     <StatusPill status={p.status} />

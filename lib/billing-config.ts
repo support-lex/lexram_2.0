@@ -212,6 +212,23 @@ export function computeTax(p: TaxSource): TaxBreakdown {
   };
 }
 
+/**
+ * Credits granted by a payment.
+ *
+ * The database column is `credits_granted`; there is no `credits` column. Code
+ * that read `payment.credits` therefore always got undefined and displayed 0 —
+ * which is why the billing page showed "0" against every row and a
+ * "Credits Purchased" total of 0 for an account that had bought 275.
+ *
+ * `credits` is still accepted because the create-order response uses that name.
+ */
+export function paymentCredits(p: {
+  credits_granted?: number | null;
+  credits?: number | null;
+}): number {
+  return Number(p?.credits_granted ?? p?.credits ?? 0) || 0;
+}
+
 /** Billing details captured at first payment and reused thereafter. */
 export interface BillingDetails {
   address: string;

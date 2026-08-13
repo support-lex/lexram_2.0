@@ -7,7 +7,7 @@ import { CheckCircle2, Loader2, Scale, ArrowRight, Download, Printer } from 'luc
 import { supabase } from '@/lib/supabase/client';
 import { creditsApi } from '@/services/credits';
 import type { Payment } from '@/components/InvoiceView';
-import { SUPPLIER, computeTax } from '@/lib/billing-config';
+import { SUPPLIER, computeTax, paymentCredits } from '@/lib/billing-config';
 
 // Supplier identity comes from billing-config so the receipt, the invoice and
 // the modal cannot disagree. `city` is kept as a separate line here because
@@ -287,7 +287,7 @@ function SuccessPageContent() {
                         <p className="text-xs text-neutral-400 mt-0.5">Valid for all research &amp; drafting · Never expire</p>
                       </div>
                       <div className="col-span-2 text-center text-sm font-medium text-neutral-700 tabular-nums">
-                        {(payment.credits ?? fallbackCredits).toLocaleString('en-IN')}
+                        {(paymentCredits(payment) || fallbackCredits).toLocaleString('en-IN')}
                       </div>
                       <div className="col-span-2 text-center text-sm text-neutral-400">₹2 / cr</div>
                       <div className="col-span-2 text-right text-sm font-bold text-neutral-900 tabular-nums">

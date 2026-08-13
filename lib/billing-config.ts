@@ -16,16 +16,16 @@ export const CREDITS_PER_RUPEE = 0.5;
 /**
  * Whether GST is added ON TOP of the amount the user enters.
  *
- * MUST remain false until lexram-payments charges `amount × 1.18` and grants
- * credits on the pre-GST amount. The modal quotes whatever this says, so
- * flipping it early would show the user a total the gateway does not actually
- * charge — and would grant the wrong number of credits, since the backend
- * currently derives credits from the full amount it receives.
+ * Must match GST_CHARGED_ON_TOP in the payments service (.env on the server).
+ * The modal quotes whatever this says, so if the two disagree the customer is
+ * shown one figure and charged another.
  *
- * When the backend lands: flip to true here, and nothing else in the UI needs
- * to change.
+ * Cut over on 13 Aug 2026: the backend was switched on first, so that any gap
+ * between the two errs towards charging what the invoice states rather than
+ * under-collecting. To roll back, unset it in the service .env *before*
+ * setting this to false.
  */
-export const GST_CHARGED_ON_TOP = false;
+export const GST_CHARGED_ON_TOP = true;
 
 export interface AmountBreakdown {
   /** What the user entered — the taxable value when GST is added on top. */

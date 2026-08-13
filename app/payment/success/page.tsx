@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, Loader2, Scale, ArrowRight, Download, Printer } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { openInvoicePDF } from '@/lib/invoice-pdf';
+import { creditsApi } from '@/services/credits';
 import type { Payment } from '@/components/InvoiceView';
 import { SUPPLIER, computeTax } from '@/lib/billing-config';
 
@@ -126,16 +126,34 @@ function SuccessPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
-  /* ── PDF/print handlers — no ref needed ───────────────────── */
-  const handleDownload = useCallback(() => {
-    if (!payment) return;
-    openInvoicePDF(payment, userEmail, userName);
-  }, [payment, userEmail, userName]);
+  /* ── Invoice download ──────────────────────────────────────
+     Fetches the stored PDF's signed URL rather than building one in the
+     browser. The invoice is rendered and stored server-side on payment success
+     and never regenerated, so this hands over the exact document issued.
+     Right after payment the webhook may not have landed yet, in which case the
+     backend renders on demand from the payment row's tax snapshot. */
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const handlePrint = useCallback(() => {
-    if (!payment) return;
-    openInvoicePDF(payment, userEmail, userName);
-  }, [payment, userEmail, userName]);
+  const handleDownload = useCallback(async () => {
+    const oid = payment?.order_id ?? orderId;
+    if (!oid || downloading) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const { url } = await creditsApi.getInvoiceUrl(oid);
+      if (!url) throw new Error('No download link returned');
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setDownloadError(
+        err instanceof Error ? err.message : 'Invoice is still being prepared. Please try again shortly.',
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }, [payment?.order_id, orderId, downloading]);
+
+  const handlePrint = handleDownload;
 
   return (
     <>
@@ -178,19 +196,28 @@ function SuccessPageContent() {
 
               {/* Action bar */}
               <div className="no-print flex items-center justify-between mb-4">
-                <p className="text-xs text-neutral-400 font-mono">{invoiceNum(payment)}</p>
+                <div className="min-w-0">
+                  <p className="text-xs text-neutral-400 font-mono">{invoiceNum(payment)}</p>
+                  {downloadError && (
+                    <p className="text-[11px] text-red-500 mt-0.5">{downloadError}</p>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handlePrint}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors shadow-sm"
+                    disabled={downloading}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Printer className="w-3.5 h-3.5" /> Print
                   </button>
                   <button
                     onClick={handleDownload}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-colors shadow-sm"
+                    disabled={downloading}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <Download className="w-3.5 h-3.5" /> Download PDF
+                    {downloading
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Preparing…</>
+                      : <><Download className="w-3.5 h-3.5" /> Download PDF</>}
                   </button>
                 </div>
               </div>

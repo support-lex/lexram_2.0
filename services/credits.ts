@@ -72,6 +72,18 @@ export const creditsApi = {
   },
 
   /**
+   * Short-lived signed URL for a paid order's stored invoice PDF.
+   *
+   * The PDF is rendered and stored by the backend on payment success and is
+   * never regenerated once written — it is the document the customer received.
+   * If the webhook could not produce it, the backend renders it on this call
+   * from the tax snapshot on the payment row.
+   */
+  getInvoiceUrl(orderId: string): Promise<{ url: string; invoice_number?: string; expires_in?: number }> {
+    return apiFetch(`/api/payments/${encodeURIComponent(orderId)}/invoice`);
+  },
+
+  /**
    * `amount_inr` is the PRE-GST amount. The backend charges amount + GST and
    * grants credits on the pre-GST value.
    */

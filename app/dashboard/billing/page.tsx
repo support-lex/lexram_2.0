@@ -85,6 +85,12 @@ function groupByMonth(payments: Payment[]): Array<{ label: string; items: Paymen
 
 export default function BillingPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
+  // Non-paid rows are hidden by default. A checkout that was abandoned leaves a
+  // 'pending' row behind for good — nothing expires them — and a customer
+  // seeing six of those can reasonably think they owe money. They are still
+  // reachable, because a payment that was taken but never confirmed would
+  // otherwise be invisible.
+  const [showAllStatuses, setShowAllStatuses] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
@@ -130,13 +136,17 @@ export default function BillingPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const totalSpent = payments
-    .filter(p => ['PAID', 'SUCCESS', 'COMPLETED'].includes((p.status ?? '').toUpperCase()))
-    .reduce((sum, p) => sum + (p.amount_inr ?? p.amount ?? 0), 0);
+  const isPaid = (p: Payment) =>
+    ['PAID', 'SUCCESS', 'COMPLETED'].includes((p.status ?? '').toUpperCase());
 
-  const totalCredits = payments
-    .filter(p => ['PAID', 'SUCCESS', 'COMPLETED'].includes((p.status ?? '').toUpperCase()))
-    .reduce((sum, p) => sum + paymentCredits(p), 0);
+  const paidPayments = payments.filter(isPaid);
+  const hiddenCount = payments.length - paidPayments.length;
+  const visiblePayments = showAllStatuses ? payments : paidPayments;
+
+  // Totals always reflect paid rows only, regardless of the filter — an
+  // abandoned checkout is not money spent.
+  const totalSpent = paidPayments.reduce((sum, p) => sum + (p.amount_inr ?? p.amount ?? 0), 0);
+  const totalCredits = paidPayments.reduce((sum, p) => sum + paymentCredits(p), 0);
 
   return (
     // h-full + overflow-y-auto, not min-h-screen. The dashboard layout wraps
@@ -220,7 +230,10 @@ export default function BillingPage() {
             {[
               { label: 'Total Spent', value: fmtINR(totalSpent), icon: Receipt },
               { label: 'Credits Purchased', value: totalCredits.toLocaleString('en-IN'), icon: Sparkles },
-              { label: 'Transactions', value: String(payments.length), icon: FileText },
+              // Paid count, matching the two cards beside it. Counting every row
+              // here put "Transactions 8" next to a Total Spent derived from 2,
+              // which reads as though six payments went missing.
+              { label: 'Payments', value: String(paidPayments.length), icon: FileText },
             ].map(({ label, value, icon: Icon }) => (
               <div
                 key={label}
@@ -233,6 +246,23 @@ export default function BillingPage() {
                 <p className="text-xl font-bold text-[var(--text-primary)] tabular-nums">{value}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Filter — only shown when there is actually something hidden */}
+        {!loading && !error && hiddenCount > 0 && (
+          <div className="flex items-center justify-between mb-3 px-1">
+            <p className="text-xs text-[var(--text-muted)]">
+              {showAllStatuses
+                ? `Showing all ${payments.length} transactions, including ${hiddenCount} not completed`
+                : `${hiddenCount} incomplete ${hiddenCount === 1 ? 'checkout is' : 'checkouts are'} hidden`}
+            </p>
+            <button
+              onClick={() => setShowAllStatuses(v => !v)}
+              className="text-xs font-semibold text-[var(--accent)] hover:underline"
+            >
+              {showAllStatuses ? 'Show paid only' : 'Show all'}
+            </button>
           </div>
         )}
 
@@ -271,14 +301,18 @@ export default function BillingPage() {
             </div>
           )}
 
-          {!loading && !error && payments.length === 0 && (
+          {!loading && !error && visiblePayments.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
               <div className="w-12 h-12 rounded-2xl bg-[var(--surface-hover)] flex items-center justify-center">
                 <Receipt className="w-5 h-5 text-[var(--text-muted)]" />
               </div>
-              <p className="text-sm font-medium text-[var(--text-primary)]">No payments yet</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">
+                {hiddenCount > 0 ? 'No completed payments yet' : 'No payments yet'}
+              </p>
               <p className="text-xs text-[var(--text-muted)] max-w-xs">
-                Your purchase history will appear here once you top up credits.
+                {hiddenCount > 0
+                  ? `Your purchase history will appear here once a payment completes. ${hiddenCount} incomplete ${hiddenCount === 1 ? 'checkout is' : 'checkouts are'} hidden.`
+                  : 'Your purchase history will appear here once you top up credits.'}
               </p>
               {paywallEnabled && (
                 <button
@@ -293,7 +327,7 @@ export default function BillingPage() {
 
           {/* Rows, grouped under a month heading */}
           <AnimatePresence>
-            {!loading && !error && groupByMonth(payments).flatMap((group, gi) => [
+            {!loading && !error && groupByMonth(visiblePayments).flatMap((group, gi) => [
               <div
                 key={`h-${group.label}`}
                 className="px-5 py-2 bg-[var(--surface-hover)]/50 border-b border-[var(--border-default)] flex items-center justify-between"

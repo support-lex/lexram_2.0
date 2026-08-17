@@ -1,0 +1,20 @@
+[
+  {
+    "origin": [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "https://lex-doc-analyzer.vercel.app",
+      "https://lexram-2-0-ui.vercel.app",
+      "https://lexram.ai",
+      "https://www.lexram.ai"
+    ],
+    "method": ["PUT", "GET", "POST", "HEAD", "OPTIONS"],
+    "responseHeader": [
+      "Content-Type",
+      "Content-MD5",
+      "x-goog-resumable",
+      "x-goog-meta-*"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

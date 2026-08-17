@@ -1,0 +1,156 @@
+// Repository for /cases/{case_id}/documents on the LexRam backend.
+//
+// Backend v2 moved documents off sessions onto cases: a case is the durable
+// container for documents; sessions are chat threads that *reference* the
+// active case. Uploading/listing/deleting all happen by case_id.
+
+import { lexramRequest, getAuthToken, LEXRAM_BASE } from "../api/lexram.api";
+
+export type DocumentStatus =
+  | "processing"
+  | "ready"
+  | "low_quality"
+  | "failed"
+  | "infected"
+  | string;
+
+/**
+ * The backend's document shape isn't pinned by the OpenAPI schema (the
+ * response is `application/json` with no $ref), so we model the fields the
+ * UI actually reads and tolerate the rest as `[k: string]: unknown`.
+ */
+export interface CaseDocument {
+  id?: string;
+  doc_id?: string;
+  case_id?: string;
+  filename?: string;
+  name?: string;
+  size?: number;
+  bytes?: number;
+  file_size?: number;
+  mime_type?: string;
+  content_type?: string;
+  status?: DocumentStatus;
+  created_at?: string;
+  uploaded_at?: string;
+  // ── Viewer + metadata fields (post-processing pipeline output) ──
+  // signed_url: temporary Supabase Storage URL (expires in ~1 hour).
+  // Always re-fetch via GET /cases/{cid}/documents/{did} before use.
+  signed_url?: string | null;
+  doc_type?: string;
+  doc_name?: string;
+  summary?: string;
+  key_entities?: string[];
+  token_count?: number;
+  quality_score?: number;
+  indexed?: boolean;
+  error_message?: string;
+  [k: string]: unknown;
+}
+
+// Backwards-compat alias; the field names in `CaseDocument` already tolerate
+// the old session-scoped shape, so existing callers that imported
+// `SessionDocument` continue to type-check.
+export type SessionDocument = CaseDocument;
+
+export const documentRepository = {
+  async list(caseId: string): Promise<CaseDocument[]> {
+    if (!caseId) return [];
+    const res = await lexramRequest<CaseDocument[] | { documents?: CaseDocument[] }>(
+      `/cases/${encodeURIComponent(caseId)}/documents`
+    );
+    if (Array.isArray(res)) return res;
+    if (res && Array.isArray(res.documents)) return res.documents;
+    return [];
+  },
+
+  async get(caseId: string, docId: string): Promise<CaseDocument | null> {
+    if (!caseId || !docId) return null;
+    try {
+      return await lexramRequest<CaseDocument>(
+        `/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(docId)}`
+      );
+    } catch (err) {
+      console.warn("[documentRepository.get]", err);
+      return null;
+    }
+  },
+
+  async upload(caseId: string, file: File): Promise<CaseDocument | null> {
+    if (!caseId) throw new Error("Select a case before uploading");
+    const form = new FormData();
+    form.append("file", file);
+    return lexramRequest<CaseDocument>(
+      `/cases/${encodeURIComponent(caseId)}/documents`,
+      { method: "POST", formData: form }
+    );
+  },
+
+  async uploadWithProgress(
+    caseId: string,
+    file: File,
+    onProgress: (pct: number) => void,
+  ): Promise<CaseDocument | null> {
+    if (!caseId) throw new Error("Select a case before uploading");
+    const token = await getAuthToken();
+    const form = new FormData();
+    form.append("file", file);
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${LEXRAM_BASE}/cases/${encodeURIComponent(caseId)}/documents`);
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { resolve(null); }
+        } else {
+          let detail = `HTTP ${xhr.status}`;
+          try {
+            const body = JSON.parse(xhr.responseText);
+            detail = body?.detail ?? body?.message ?? detail;
+            if (Array.isArray(detail)) detail = (detail as any[]).map((d) => d.msg ?? d).join("; ");
+          } catch { /* ignore */ }
+          reject(new Error(`[${xhr.status}] ${detail}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Upload failed"));
+      xhr.onabort = () => reject(new Error("Upload cancelled"));
+      xhr.send(form);
+    });
+  },
+
+  async remove(caseId: string, docId: string): Promise<void> {
+    await lexramRequest(
+      `/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(docId)}`,
+      { method: "DELETE" }
+    );
+  },
+};
+
+// ─── Helpers used by the UI ───────────────────────────────────────────────────
+
+export function docId(d: CaseDocument): string {
+  return String(d.id ?? d.doc_id ?? "");
+}
+
+export function docName(d: CaseDocument): string {
+  return String(d.filename ?? d.name ?? "Untitled document");
+}
+
+export function docSize(d: CaseDocument): number {
+  return Number(d.size ?? d.bytes ?? 0);
+}
+
+export function formatBytes(n: number): string {
+  if (!n || n <= 0) return "—";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}

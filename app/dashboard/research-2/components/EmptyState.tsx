@@ -1,0 +1,311 @@
+﻿"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Scale, Paperclip, ArrowRight, Mic, MicOff, LayoutTemplate, ArrowUpRight } from "lucide-react";
+import { useVoiceTyping } from "@/hooks/use-voice-typing";
+import type { DraftTemplate } from "./TemplatesPanel";
+
+const EXAMPLE_QUESTIONS: Record<"ask" | "docChat" | "draft", string[]> = {
+  ask: [
+    "Can a co-accused claim parity of bail with an accused who was released?",
+    "Which BNS provision replaces Section 420 IPC, and how do the ingredients differ?",
+    "What does Section 138 of the Negotiable Instruments Act require to prove dishonour?",
+    "Is anticipatory bail maintainable after chargesheet is filed — what do High Courts say?",
+  ],
+  docChat: [
+    "Summarise the key arguments and findings in this judgment",
+    "What are the main obligations and conditions in this document?",
+    "Identify any unusual or one-sided clauses in this agreement",
+    "What reliefs were granted and on what grounds?",
+  ],
+  draft: [
+    "Draft a bail application for an accused charged under Section 302 IPC",
+    "Write a legal notice for recovery of unpaid dues from a contractor",
+    "Draft a writ petition challenging an arbitrary termination of service",
+    "Prepare a reply to a Section 138 NI Act complaint",
+  ],
+};
+
+interface EmptyStateProps {
+  onPickQuickStart: (query: string) => void;
+  onUpload: () => void;
+  onPickDraft: (query: string) => void;
+  onStartDraft: () => void;
+  // Hero input controls (page hides the bottom ChatInput when empty)
+  query: string;
+  setQuery: (v: string) => void;
+  onSubmit: () => void;
+  isGenerating: boolean;
+  isAuthenticated?: boolean;
+  onSignUp?: () => void;
+  /** Draft mode toggle — same backend as ChatInput's queryMode === "draft". */
+  isDraftMode?: boolean;
+  onToggleDraftMode?: () => void;
+  selectedTemplate?: DraftTemplate | null;
+  onOpenTemplates?: () => void;
+}
+
+export default function EmptyState({
+  onPickQuickStart,
+  onUpload,
+  query,
+  setQuery,
+  onSubmit,
+  isGenerating,
+  isAuthenticated,
+  onSignUp,
+  isDraftMode = false,
+  onToggleDraftMode,
+  selectedTemplate,
+  onOpenTemplates,
+}: EmptyStateProps) {
+  // ── Mode tab state ─────────────────────────────────────────────────────
+  type InputTab = "ask" | "docChat" | "draft";
+  const [inputTab, setInputTab] = useState<InputTab>(
+    () => (isDraftMode ? "draft" : "ask")
+  );
+
+  useEffect(() => {
+    if (isDraftMode && inputTab !== "draft") setInputTab("draft");
+    else if (!isDraftMode && inputTab === "draft") setInputTab("ask");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDraftMode]);
+
+  const handleTabChange = (tab: InputTab) => {
+    setInputTab(tab);
+    const shouldBeDraft = tab === "draft";
+    if (shouldBeDraft !== isDraftMode) onToggleDraftMode?.();
+  };
+
+  // ── Hero input behaviour ───────────────────────────────────────────────
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const resize = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+  };
+  useEffect(() => {
+    resize(textareaRef.current);
+  }, [query]);
+
+  // Voice typing — same backend the ChatInput uses, so dictation behaves
+  // identically in the new-thread hero and the post-thread input bar.
+  const { isListening, supported: speechSupported, toggle: toggleVoiceTyping } =
+    useVoiceTyping({ query, setQuery, textareaRef });
+
+  const submit = () => {
+    if (!query.trim() || isGenerating) return;
+    onSubmit();
+  };
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar relative">
+      {/* Soft maroon → white radial glow background */}
+      <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 60% at 70% 0%, rgba(122,31,43,0.08) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 20% 100%, rgba(122,31,43,0.04) 0%, transparent 60%), linear-gradient(180deg, #ffffff 0%, #fdf8f8 100%)",
+        }}
+      />
+
+      <div data-tour="research-empty-state" className="relative min-h-full flex flex-col items-center justify-center px-3 sm:px-6 py-6 sm:py-10 gap-5 sm:gap-6">
+        {/* ── Scales icon — maroon→rust gradient, matches the logo ──── */}
+        <div
+          className="lex-animate-float relative grid place-items-center size-14 rounded-2xl text-[var(--lex-cream)] shadow-[var(--lex-shadow-elevated)]"
+          style={{
+            background:
+              "linear-gradient(135deg, var(--lex-maroon) 0%, var(--lex-rust) 100%)",
+          }}
+        >
+          <Scale className="relative size-6" strokeWidth={1.75} />
+        </div>
+
+        {/* ── Hero heading — static italic "research" in rust accent ── */}
+        <div className="text-center max-w-2xl lex-animate-fade-up px-2">
+          <h1 className="text-[26px] sm:text-[46px] font-serif font-semibold leading-[1.15] text-[var(--lex-ink)] tracking-tight">
+            What can I help you{" "}
+            <span className="italic text-[var(--lex-rust)]">research</span>
+            <span className="text-[var(--lex-ink)]">?</span>
+          </h1>
+          <p className="mt-2 sm:mt-3 text-[13px] sm:text-[15px] text-[var(--text-muted)] max-w-xl mx-auto leading-relaxed">
+            Ask in plain English. LexRam parses the question, surfaces grounded authority,
+            and drafts your memo with verifiable citations.
+          </p>
+        </div>
+
+        {/* ── Hero input — rounded card with rust focus ring ────── */}
+        <div data-tour="research-hero-input" className="w-full max-w-2xl lex-animate-scale-in">
+          {/* Mode tabs */}
+          <div className="flex items-center gap-1 mb-2 px-1">
+            {(["ask", "docChat", "draft"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => handleTabChange(tab)}
+                className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                  inputTab === tab
+                    ? "bg-[var(--lex-rust)] text-[var(--lex-cream)] shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--lex-maroon)] hover:bg-[var(--lex-cream-deep)]"
+                }`}
+              >
+                {tab === "ask" ? "Ask" : tab === "docChat" ? "DocChat" : "Draft"}
+                {tab === "draft" && (
+                  <span className={`text-[8px] font-bold tracking-wider px-1 py-0.5 rounded ${
+                    inputTab === "draft" ? "bg-white/25 text-white" : "bg-amber-100 text-amber-600"
+                  }`}>
+                    BETA
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Template chip — draft mode only */}
+          {inputTab === "draft" && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <button
+                type="button"
+                onClick={onOpenTemplates}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors border ${
+                  selectedTemplate
+                    ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                    : "border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]"
+                }`}
+              >
+                <LayoutTemplate className="w-3 h-3" />
+                {selectedTemplate ? selectedTemplate.name : "Use a template"}
+              </button>
+              {selectedTemplate && (
+                <span className="text-[10px] text-[var(--text-muted)] italic">format locked to template</span>
+              )}
+            </div>
+          )}
+
+          {/* Example questions grid */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {EXAMPLE_QUESTIONS[inputTab].map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => {
+                  setQuery(q);
+                  setTimeout(() => onSubmit(), 50);
+                }}
+                className="group/eq text-left rounded-xl border border-[var(--border-default)] bg-white px-4 py-3 text-[13px] text-[var(--text-secondary)] leading-snug hover:border-[var(--lex-rust)] hover:text-[var(--text-primary)] hover:shadow-[var(--lex-shadow-soft)] transition-all duration-150 flex items-start justify-between gap-2"
+              >
+                <span>{q}</span>
+                <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-[var(--text-muted)] group-hover/eq:text-[var(--lex-rust)] transition-colors" />
+              </button>
+            ))}
+          </div>
+
+          <div
+            data-no-focus-ring
+            className="lexram-input-shell group/input relative rounded-2xl bg-white border border-[var(--border-default)] px-5 py-3 shadow-[var(--lex-shadow-elevated)] focus-within:border-[var(--lex-rust)] focus-within:shadow-[0_0_0_4px_rgba(185,72,38,0.15),var(--lex-shadow-elevated)] transition-all duration-300"
+          >
+            <textarea
+              ref={textareaRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (!isAuthenticated && onSignUp) {
+                    onSignUp();
+                    return;
+                  }
+                  submit();
+                }
+              }}
+              rows={1}
+              placeholder={
+                inputTab === "docChat"
+                  ? "Ask about a judgment, statute, or uploaded document…"
+                  : inputTab === "draft"
+                  ? "Describe the document you want to draft…"
+                  : "Ask anything about Indian law…"
+              }
+              className="w-full block bg-transparent border-0 outline-none resize-none appearance-none shadow-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-none text-[15px] text-[#1a1010] placeholder:text-[#aa9ea0] leading-[1.55] m-0 p-0"
+              style={{
+                boxShadow: "none",
+                background: "transparent",
+                outline: "none",
+                outlineOffset: "0",
+                WebkitAppearance: "none",
+                MozAppearance: "none",
+                WebkitTapHighlightColor: "transparent",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.outline = "none";
+                e.currentTarget.style.outlineOffset = "0";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            />
+
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                data-tour="research-attach"
+                onClick={onUpload}
+                title="Attach a document"
+                className="inline-flex items-center gap-1.5 -ml-1 px-2 py-1.5 rounded-lg text-[13px] font-medium text-[#6b5a5d] hover:bg-[#7a1f2b]/8 hover:text-[#7a1f2b] transition-colors"
+              >
+                <Paperclip className="size-4" strokeWidth={2} />
+                Attach
+              </button>
+
+              <div className="flex items-center gap-2">
+                {speechSupported && (
+                  <button
+                    type="button"
+                    onClick={toggleVoiceTyping}
+                    aria-label={isListening ? "Stop voice typing" : "Voice typing"}
+                    title={isListening ? "Stop voice typing" : "Voice typing"}
+                    className={`grid place-items-center size-9 rounded-full transition-all flex-shrink-0 ${
+                      isListening
+                        ? "bg-red-500 text-white animate-pulse shadow-[0_0_0_4px_rgba(239,68,68,0.15)]"
+                        : "bg-[var(--lex-cream-deep)] text-[var(--lex-maroon)] hover:bg-[var(--lex-maroon)] hover:text-[var(--lex-cream)]"
+                    }`}
+                  >
+                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isAuthenticated && onSignUp) {
+                    onSignUp();
+                    return;
+                  }
+                  submit();
+                }}
+                disabled={isGenerating}
+                aria-label="Ask LexRam"
+                className={`group/send inline-flex items-center gap-2 pl-3 pr-2.5 sm:pl-5 sm:pr-3.5 h-10 rounded-full text-[14px] font-semibold text-[var(--lex-cream)] transition-all duration-200 ${
+                  query.trim()
+                    ? "shadow-[var(--lex-shadow-elevated)] hover:opacity-95 hover:-translate-y-0.5"
+                    : "opacity-90 shadow-[var(--lex-shadow-soft)]"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--lex-maroon) 0%, var(--lex-rust) 100%)",
+                }}
+              >
+                <span className="hidden sm:inline">Ask LexRam</span>
+                <span className="grid place-items-center size-6 rounded-full bg-white/15 transition-transform duration-200 group-hover/send:translate-x-0.5">
+                  <ArrowRight className="size-3.5" strokeWidth={2.5} />
+                </span>
+              </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  );
+}

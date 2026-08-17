@@ -1,0 +1,167 @@
+﻿// Repository for /sessions on the LexRam Legal Research backend.
+// All calls go through the Next.js rewrite (`/legal-api/*`) so the HTTPS
+// frontend can reach the HTTP origin without mixed-content blocking.
+//
+// The backend's response shape isn't pinned in the OpenAPI schema, so we
+// model the fields the UI reads and tolerate the rest as `[k: string]: unknown`.
+
+import { lexramRequest } from "../api/lexram.api";
+import type { QueryMode } from "../api/queryStream";
+
+// Cap on session create/rename so a cold-starting or hung LexRam backend can't
+// leave ensureSession() awaiting forever (the research chat then spins on
+// "working…" indefinitely on the first message). On timeout the request throws,
+// the create path falls back to the Supabase-only mirror, and the chat surfaces
+// an error instead of hanging. Generous enough to ride out a normal cold start.
+const SESSION_LIFECYCLE_TIMEOUT_MS = 15000;
+
+export interface QueryResponseEnvelope {
+  session_id?: string;
+  query_type?: string;
+  answer?: string;
+  judgments_output?: string;
+  acts_output?: string;
+  [k: string]: unknown;
+}
+
+export interface LexRamSession {
+  /** id is the same value the docs call thread_id. */
+  id?: string;
+  thread_id?: string;
+  title?: string;
+  created_at?: string;
+  updated_at?: string;
+  [k: string]: unknown;
+}
+
+function extractList(raw: unknown): LexRamSession[] {
+  if (Array.isArray(raw)) return raw as LexRamSession[];
+  if (raw && typeof raw === "object") {
+    const r = raw as Record<string, unknown>;
+    if (Array.isArray(r.sessions)) return r.sessions as LexRamSession[];
+    if (Array.isArray(r.data)) return r.data as LexRamSession[];
+    if (Array.isArray(r.items)) return r.items as LexRamSession[];
+  }
+  return [];
+}
+
+async function lexramRename(id: string, title: string): Promise<void> {
+  await lexramRequest(`/sessions/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: { title },
+    timeoutMs: SESSION_LIFECYCLE_TIMEOUT_MS,
+  });
+}
+
+export const lexramSessionRepository = {
+  /** GET /sessions — list all sessions for the logged-in user. */
+  async list(): Promise<LexRamSession[]> {
+    const raw = await lexramRequest<unknown>("/sessions");
+    return extractList(raw);
+  },
+
+  /**
+   * GET /sessions/{id}/history — the backend's authoritative conversation
+   * record: `{ session_id, messages: [{ role, content }] }`. Used to recover a
+   * thread (including drafted petitions) when the Supabase message mirror is
+   * empty/missing — the LexRam backend keeps the full history regardless.
+   */
+  async history(
+    id: string
+  ): Promise<{ role: string; content: string }[]> {
+    const raw = await lexramRequest<unknown>(
+      `/sessions/${encodeURIComponent(id)}/history`
+    );
+    const msgs = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === "object" && Array.isArray((raw as Record<string, unknown>).messages)
+      ? ((raw as Record<string, unknown>).messages as unknown[])
+      : [];
+    return msgs
+      .filter(
+        (m): m is { role: unknown; content: unknown } =>
+          !!m && typeof m === "object" && "content" in m
+      )
+      .map((m) => ({
+        role: String((m as { role?: unknown }).role ?? ""),
+        content: String((m as { content?: unknown }).content ?? ""),
+      }));
+  },
+
+  /**
+   * POST /sessions — create a new session, then immediately PATCH the title.
+   *
+   * Why the immediate PATCH:
+   *   The LexRam backend ignores the title passed to POST in some builds and
+   *   always stores "New Chat". A follow-up PATCH /sessions/{id} guarantees
+   *   the title we asked for actually lands on the row before the caller
+   *   ever sees it. The PATCH failure is non-fatal — we still return the
+   *   created session even if rename errors out.
+   *
+   * When `opts.case_id` is provided, it's included in the POST body so the
+   * backend links the session to that case at creation time — saving the
+   * follow-up PATCH /sessions/{id}/case that's otherwise needed for reassign.
+   */
+  async create(
+    title: string = "New Chat",
+    opts: { case_id?: string | null } = {}
+  ): Promise<LexRamSession> {
+    const body: { title: string; case_id?: string } = { title };
+    if (opts.case_id) body.case_id = opts.case_id;
+    const created = await lexramRequest<LexRamSession>("/sessions", {
+      method: "POST",
+      body,
+      timeoutMs: SESSION_LIFECYCLE_TIMEOUT_MS,
+    });
+
+    const id = lexramSessionId(created);
+    if (id && title) {
+      try {
+        await lexramRename(id, title);
+        // Reflect the renamed title locally so the caller doesn't have to
+        // re-fetch the row to see the latest state.
+        return { ...created, title };
+      } catch (err) {
+        console.warn(
+          "[lexramSessionRepository.create] follow-up PATCH failed (non-fatal)",
+          err
+        );
+      }
+    }
+    return created;
+  },
+
+  /** PATCH /sessions/{id} — rename. */
+  async rename(id: string, title: string): Promise<void> {
+    return lexramRename(id, title);
+  },
+
+  /** DELETE /sessions/{id} — hard delete + clear LangGraph checkpoints. */
+  async remove(id: string): Promise<void> {
+    await lexramRequest(`/sessions/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+
+  /**
+   * POST /sessions/{id}/query — non-streaming query.
+   *
+   * Used as a fallback when SSE isn't viable (corporate proxies that buffer
+   * responses, mobile WebView quirks). Same body as the stream endpoint —
+   * returns the final envelope in one shot once the pipeline completes.
+   */
+  async query(
+    id: string,
+    query: string,
+    mode: QueryMode = "instant"
+  ): Promise<QueryResponseEnvelope> {
+    return lexramRequest<QueryResponseEnvelope>(
+      `/sessions/${encodeURIComponent(id)}/query`,
+      { method: "POST", body: { query, mode } }
+    );
+  },
+};
+
+export function lexramSessionId(s: LexRamSession): string {
+  return String(s.id ?? s.thread_id ?? "");
+}

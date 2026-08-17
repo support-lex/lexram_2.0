@@ -1,18 +1,24 @@
-// Phone OTP issue/verify core. SERVER USE ONLY.
+// OTP issue/verify core. SERVER USE ONLY.
 //
-// Replaces Supabase's built-in (Twilio-backed) phone OTP: we mint the code,
-// store only its hash in public.phone_otp_codes, deliver it through Arihant
-// Global, and confirm the phone on auth.users ourselves via the admin API.
+// Replaces Supabase's built-in OTP on BOTH channels: we mint the code, store
+// only its hash in public.phone_otp_codes, deliver it ourselves (Arihant Global
+// for SMS, our own SMTP for email) and confirm the contact on auth.users via
+// the admin API.
+//
+// Email joined this path because Supabase's mailer only delivers to project
+// team members without custom SMTP, which surfaced to users as "Error sending
+// magic link email".
 //
 // Guarantees:
 //   • raw codes/tickets are never persisted or logged
 //   • 10-minute expiry, 5 verify attempts, single use
-//   • 30s resend cooldown and 5 sends/hour per phone
+//   • 30s resend cooldown and 5 sends/hour per contact
 
 import 'server-only';
 import { createHash, randomInt, randomBytes, timingSafeEqual } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { sendOtpSms } from '@/lib/sms/arihant';
+import { sendOtpEmail } from './otp-email';
 
 export const OTP_LENGTH = 6;
 export const OTP_TTL_MINUTES = 10;
@@ -22,6 +28,7 @@ const MAX_VERIFY_ATTEMPTS = 5;
 const TICKET_TTL_MINUTES = 15;
 
 export type OtpPurpose = 'signup' | 'reset';
+export type OtpChannel = 'sms' | 'email';
 
 export interface AuthUserRow {
   id: string;
@@ -29,6 +36,59 @@ export interface AuthUserRow {
   phone: string | null;
   email: string | null;
   phone_confirmed_at: string | null;
+}
+
+// ─── Contacts ────────────────────────────────────────────────────────────────
+// A code belongs to exactly one contact: a phone (digits) or an email
+// (lowercased). Everything below — the row, the rate limit, the hash — is keyed
+// on that, so an SMS code can never be redeemed as an email code.
+
+export interface Contact {
+  channel: OtpChannel;
+  /** Digits only. Set iff channel === 'sms'. */
+  phone?: string;
+  /** Lowercased and trimmed. Set iff channel === 'email'. */
+  email?: string;
+}
+
+export function phoneContact(raw: string): Contact {
+  return { channel: 'sms', phone: phoneDigits(raw) };
+}
+
+export function emailContact(raw: string): Contact {
+  return { channel: 'email', email: (raw || '').trim().toLowerCase() };
+}
+
+/** Classify whatever the user typed. Returns null if it is neither. */
+export function contactFromIdentifier(raw: string): Contact | null {
+  const id = (raw || '').trim();
+  if (!id) return null;
+  if (isValidEmail(id)) return emailContact(id);
+  const digits = phoneDigits(id);
+  return isValidPhone(digits) ? phoneContact(digits) : null;
+}
+
+/** The value the hash and the rate limit are keyed on. */
+function contactKey(c: Contact): string {
+  return c.channel === 'email' ? c.email ?? '' : c.phone ?? '';
+}
+
+function isUsableContact(c: Contact): boolean {
+  return c.channel === 'email' ? isValidEmail(c.email ?? '') : isValidPhone(c.phone ?? '');
+}
+
+/**
+ * The contact column a query should filter on. Returned as a plain string
+ * rather than wrapping the builder — a generic wrapper around PostgREST's
+ * chained types trips TS2589 (excessively deep instantiation).
+ */
+function contactColumn(c: Contact): 'email' | 'phone' {
+  return c.channel === 'email' ? 'email' : 'phone';
+}
+
+/** Masked destination, safe to hand to an unauthenticated UI. */
+export function maskContact(c: Contact): string {
+  return c.channel === 'email' ? maskEmail(c.email ?? '') : maskPhone(c.phone ?? '');
 }
 
 // ─── Phone helpers ───────────────────────────────────────────────────────────
@@ -56,6 +116,17 @@ export function maskPhone(raw: string): string {
   const d = phoneDigits(raw);
   if (d.length < 6) return '••••';
   return `+${d.slice(0, 2)}${'•'.repeat(Math.max(0, d.length - 6))}${d.slice(-4)}`;
+}
+
+/** "someone@lexram.ai" → "so••••@lexram.ai". */
+export function maskEmail(raw: string): string {
+  const email = (raw || '').trim();
+  const at = email.lastIndexOf('@');
+  if (at < 1) return '••••';
+  const local = email.slice(0, at);
+  const domain = email.slice(at);
+  if (local.length <= 2) return `${local[0]}•••${domain}`;
+  return `${local.slice(0, 2)}${'•'.repeat(Math.min(6, local.length - 2))}${domain}`;
 }
 
 // ─── Hashing ─────────────────────────────────────────────────────────────────
@@ -107,20 +178,22 @@ export interface IssueResult {
 }
 
 /**
- * Generate a code for `phone`, persist its hash and send the SMS. The row is
- * rolled back if the gateway rejects the submission, so a failed send never
- * invalidates a previously working code.
+ * Generate a code for `contact`, persist its hash and deliver it on the
+ * matching channel. The row is rolled back if delivery fails, so a failed send
+ * never invalidates a previously working code.
  */
 export async function issueAndSendOtp(
-  phone: string,
+  contact: Contact,
   purpose: OtpPurpose,
   ip?: string | null
 ): Promise<IssueResult> {
-  const digits = phoneDigits(phone);
-  if (!isValidPhone(digits)) return { ok: false, error: 'Invalid phone number.' };
+  if (!isUsableContact(contact)) {
+    return { ok: false, error: 'Invalid email address or phone number.' };
+  }
 
   const sb = supabaseAdmin();
   const now = Date.now();
+  const key = contactKey(contact);
 
   // Housekeeping: drop rows that expired more than a day ago.
   await sb
@@ -128,12 +201,12 @@ export async function issueAndSendOtp(
     .delete()
     .lt('expires_at', new Date(now - 24 * 60 * 60 * 1000).toISOString());
 
-  // Rate limits — cooldown + hourly cap, per phone.
+  // Rate limits — cooldown + hourly cap, per contact.
   const hourAgo = new Date(now - 60 * 60 * 1000).toISOString();
   const { data: recent } = await sb
     .from('phone_otp_codes')
     .select('created_at')
-    .eq('phone', digits)
+    .eq(contactColumn(contact), key)
     .gte('created_at', hourAgo)
     .order('created_at', { ascending: false });
 
@@ -160,9 +233,14 @@ export async function issueAndSendOtp(
   const { data: inserted, error: insertErr } = await sb
     .from('phone_otp_codes')
     .insert({
-      phone: digits,
+      // Only the column in play is sent: an SMS insert then still works against
+      // a database where 20260817_email_otp.sql hasn't been applied yet, so the
+      // deploy order of code vs migration can't break the phone flow.
+      ...(contact.channel === 'email'
+        ? { email: contact.email }
+        : { phone: contact.phone }),
       purpose,
-      code_hash: hash(digits, purpose, code),
+      code_hash: hash(key, purpose, code),
       expires_at: new Date(now + OTP_TTL_MINUTES * 60 * 1000).toISOString(),
       ip: ip ?? null,
     })
@@ -174,10 +252,14 @@ export async function issueAndSendOtp(
     return { ok: false, error: 'Could not start verification. Please try again.' };
   }
 
-  const sms = await sendOtpSms(digits, code);
-  if (!sms.ok) {
+  const sent =
+    contact.channel === 'email'
+      ? await sendOtpEmail(contact.email ?? '', code, purpose, OTP_TTL_MINUTES)
+      : await sendOtpSms(contact.phone ?? '', code);
+
+  if (!sent.ok) {
     await sb.from('phone_otp_codes').delete().eq('id', inserted.id);
-    return { ok: false, error: sms.error ?? 'Could not send the verification code.' };
+    return { ok: false, error: sent.error ?? 'Could not send the verification code.' };
   }
 
   return { ok: true };
@@ -190,20 +272,19 @@ export interface ConsumeResult {
   error?: string;
 }
 
-/** Check a submitted code against the newest live code for phone+purpose. */
+/** Check a submitted code against the newest live code for contact+purpose. */
 export async function consumeOtp(
-  phone: string,
+  contact: Contact,
   purpose: OtpPurpose,
   code: string
 ): Promise<ConsumeResult> {
-  const digits = phoneDigits(phone);
   if (!/^\d{6}$/.test(code)) return { ok: false, error: 'OTP must be 6 digits.' };
 
   const sb = supabaseAdmin();
   const { data: row, error } = await sb
     .from('phone_otp_codes')
     .select('id, code_hash, attempts, expires_at, consumed_at')
-    .eq('phone', digits)
+    .eq(contactColumn(contact), contactKey(contact))
     .eq('purpose', purpose)
     .is('consumed_at', null)
     .order('created_at', { ascending: false })
@@ -221,7 +302,7 @@ export async function consumeOtp(
     return { ok: false, error: 'Too many incorrect attempts. Please request a new code.' };
   }
 
-  if (!hashesEqual(row.code_hash as string, hash(digits, purpose, code))) {
+  if (!hashesEqual(row.code_hash as string, hash(contactKey(contact), purpose, code))) {
     await sb
       .from('phone_otp_codes')
       .update({ attempts: (row.attempts as number) + 1 })
@@ -245,17 +326,17 @@ export async function consumeOtp(
 
 // ─── Password-reset ticket ───────────────────────────────────────────────────
 // A verified 'reset' OTP does NOT create a session. Instead it mints a
-// single-use ticket that only authorises setting a new password for that phone.
+// single-use ticket that only authorises setting a new password for that
+// contact.
 
-export async function issueResetTicket(phone: string): Promise<string | null> {
-  const digits = phoneDigits(phone);
+export async function issueResetTicket(contact: Contact): Promise<string | null> {
   const ticket = randomBytes(32).toString('hex');
 
   const sb = supabaseAdmin();
   const { data: row } = await sb
     .from('phone_otp_codes')
     .select('id')
-    .eq('phone', digits)
+    .eq(contactColumn(contact), contactKey(contact))
     .eq('purpose', 'reset')
     .not('consumed_at', 'is', null)
     .order('consumed_at', { ascending: false })
@@ -266,7 +347,7 @@ export async function issueResetTicket(phone: string): Promise<string | null> {
   const { error } = await sb
     .from('phone_otp_codes')
     .update({
-      ticket_hash: hash(digits, 'ticket', ticket),
+      ticket_hash: hash(contactKey(contact), 'ticket', ticket),
       ticket_expires_at: new Date(Date.now() + TICKET_TTL_MINUTES * 60 * 1000).toISOString(),
     })
     .eq('id', row.id);
@@ -277,17 +358,19 @@ export async function issueResetTicket(phone: string): Promise<string | null> {
   return ticket;
 }
 
-export async function consumeResetTicket(phone: string, ticket: string): Promise<ConsumeResult> {
-  const digits = phoneDigits(phone);
+export async function consumeResetTicket(
+  contact: Contact,
+  ticket: string
+): Promise<ConsumeResult> {
   if (!ticket) return { ok: false, error: 'Verification expired. Please start again.' };
 
   const sb = supabaseAdmin();
   const { data: row } = await sb
     .from('phone_otp_codes')
     .select('id, ticket_expires_at')
-    .eq('phone', digits)
+    .eq(contactColumn(contact), contactKey(contact))
     .eq('purpose', 'reset')
-    .eq('ticket_hash', hash(digits, 'ticket', ticket))
+    .eq('ticket_hash', hash(contactKey(contact), 'ticket', ticket))
     .maybeSingle();
 
   if (!row) return { ok: false, error: 'Verification expired. Please start again.' };

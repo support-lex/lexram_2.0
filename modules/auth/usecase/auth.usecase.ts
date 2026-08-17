@@ -1,17 +1,19 @@
-// Auth use-cases. Sessions are Supabase; SMS OTP is ours.
+// Auth use-cases. Sessions are Supabase; OTP is ours, on both channels.
 //
-// Phone OTP does NOT go through Supabase Auth (which would send via its
-// configured SMS provider). We mint, send and verify codes ourselves through
-// app/api/auth/* → Arihant Global. Supabase only stores the user and issues the
-// session once the phone is confirmed.
+// No OTP goes through Supabase Auth — neither its SMS provider nor its mailer.
+// We mint, send and verify codes ourselves through app/api/auth/* (Arihant
+// Global for SMS, our own SMTP for email). Supabase only stores the user and
+// issues the session. Email joined this path because Supabase's built-in mailer
+// only delivers to project team members, which real users saw as "Error sending
+// magic link email".
 //
 // Flows:
 //   • Signup → POST /api/auth/signup (creates unconfirmed user + sends SMS OTP)
 //              → verify OTP → phone confirmed → sign in with phone + password
 //   • Login  → email or phone + password. An unconfirmed phone bounces the user
 //              into the same SMS OTP screen.
-//   • Forgot → SMS OTP (phone) or Supabase email OTP (email), then a new
-//              password: by reset ticket for SMS, by OTP session for email.
+//   • Forgot → OTP to whichever contact the user typed, then a new password via
+//              a single-use reset ticket. Neither channel creates a session.
 
 import { supabase } from '@/lib/supabase/client';
 import { userFromSupabase, type StoredUser } from '../storage/userStorage';
@@ -253,34 +255,29 @@ export async function sendResetOtpUsecase(
   const id = identifier.trim();
   if (!id) return { success: false, error: 'Email or phone is required.' };
 
-  // Email resets keep using Supabase's email OTP — no SMS gateway involved.
-  if (isValidEmail(id)) {
-    const { error } = await supabase().auth.signInWithOtp({
-      email: id,
-      options: { shouldCreateUser: false },
-    });
-    if (error) return { success: false, error: friendlyError(error.message) };
-    return { success: true, contact: id, channel: 'email' };
-  }
-
   const phone = normalizePhone(id);
-  if (isValidPhone(phone)) {
-    const data = await postJson('/api/auth/otp/send', { identifier: phone, purpose: 'reset' });
-    if (!data.success) return { success: false, error: data.error ?? 'Could not send the code.' };
-    return {
-      success: true,
-      contact: phone,
-      channel: 'sms',
-      maskedPhone: typeof data.maskedPhone === 'string' ? data.maskedPhone : undefined,
-    };
+  const isEmail = isValidEmail(id);
+  if (!isEmail && !isValidPhone(phone)) {
+    return { success: false, error: 'Enter a valid email address or phone number.' };
   }
 
-  return { success: false, error: 'Enter a valid email address or phone number.' };
+  // Both channels now go through our own OTP routes. Supabase's mailer is not
+  // involved: without custom SMTP it only delivers to project team members,
+  // which is what surfaced as "Error sending magic link email".
+  const contact = isEmail ? id : phone;
+  const data = await postJson('/api/auth/otp/send', { identifier: contact, purpose: 'reset' });
+  if (!data.success) return { success: false, error: data.error ?? 'Could not send the code.' };
+
+  return {
+    success: true,
+    contact,
+    channel: data.channel === 'sms' || data.channel === 'email' ? data.channel : isEmail ? 'email' : 'sms',
+    maskedPhone: typeof data.maskedPhone === 'string' ? data.maskedPhone : undefined,
+  };
 }
 
 // ─── Verify reset OTP ─────────────────────────────────────────────────────────
-// Email → the OTP itself creates a session, and /reset-password calls
-// updateUser(). SMS → no session; we stash a single-use ticket that
+// Neither channel creates a session. Both stash a single-use ticket that
 // /reset-password exchanges for the password change.
 
 export async function verifyResetOtpUsecase(
@@ -290,17 +287,6 @@ export async function verifyResetOtpUsecase(
 ): Promise<UsecaseResult> {
   if (!/^\d{6}$/.test(token)) return { success: false, error: 'OTP must be 6 digits.' };
 
-  if (channel === 'email') {
-    const { data, error } = await supabase().auth.verifyOtp({
-      email: contact,
-      token,
-      type: 'email',
-    });
-    if (error) return { success: false, error: friendlyError(error.message) };
-    clearResetTicket();
-    return { success: true, user: userFromSupabase(data.user) ?? undefined };
-  }
-
   const data = await postJson('/api/auth/otp/verify', {
     identifier: contact,
     purpose: 'reset',
@@ -308,10 +294,17 @@ export async function verifyResetOtpUsecase(
   });
   if (!data.success) return { success: false, error: data.error ?? 'Verification failed.' };
 
-  storeResetTicket(
-    typeof data.phone === 'string' ? data.phone : contact,
-    String(data.resetTicket ?? '')
-  );
+  // Prefer the contact the server actually issued the ticket against.
+  const verified =
+    channel === 'email'
+      ? typeof data.email === 'string'
+        ? data.email
+        : contact
+      : typeof data.phone === 'string'
+        ? data.phone
+        : contact;
+
+  storeResetTicket(verified, channel, String(data.resetTicket ?? ''));
   return { success: true };
 }
 
@@ -347,14 +340,14 @@ export async function resetPasswordWithTicketUsecase(
   }
 
   const data = await postJson('/api/auth/reset-password', {
-    phone: ticket.phone,
+    ...(ticket.channel === 'email' ? { email: ticket.contact } : { phone: ticket.contact }),
     ticket: ticket.token,
     password: newPassword,
   });
   if (!data.success) return { success: false, error: data.error ?? 'Could not update the password.' };
 
   clearResetTicket();
-  return loginUsecase(ticket.phone, newPassword);
+  return loginUsecase(ticket.contact, newPassword);
 }
 
 // ─── Resend OTP (used by both signup and reset OTP screens) ───────────────────
@@ -364,15 +357,7 @@ export async function resendOtpUsecase(
   channel: OtpChannel,
   intent: OtpIntent = 'reset'
 ): Promise<SendOtpResult> {
-  if (channel === 'email') {
-    const { error } = await supabase().auth.signInWithOtp({
-      email: contact,
-      options: { shouldCreateUser: false },
-    });
-    if (error) return { success: false, error: friendlyError(error.message) };
-    return { success: true };
-  }
-
+  void channel; // the server re-derives the channel from the identifier
   const data = await postJson('/api/auth/otp/send', { identifier: contact, purpose: intent });
   if (!data.success) return { success: false, error: data.error ?? 'Could not resend the code.' };
   return {
@@ -393,11 +378,11 @@ export async function logoutUsecase(): Promise<void> {
 
 const TICKET_KEY = 'lexram.reset.ticket';
 
-interface ResetTicket { phone: string; token: string }
+interface ResetTicket { contact: string; channel: OtpChannel; token: string }
 
-function storeResetTicket(phone: string, token: string): void {
+function storeResetTicket(contact: string, channel: OtpChannel, token: string): void {
   if (typeof window === 'undefined' || !token) return;
-  sessionStorage.setItem(TICKET_KEY, JSON.stringify({ phone, token }));
+  sessionStorage.setItem(TICKET_KEY, JSON.stringify({ contact, channel, token }));
 }
 
 export function readResetTicket(): ResetTicket | null {
@@ -405,8 +390,12 @@ export function readResetTicket(): ResetTicket | null {
   try {
     const raw = sessionStorage.getItem(TICKET_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as ResetTicket;
-    return parsed.phone && parsed.token ? parsed : null;
+    // `phone` is the pre-email shape; keep reading it so a ticket minted just
+    // before a deploy still works.
+    const parsed = JSON.parse(raw) as Partial<ResetTicket> & { phone?: string };
+    const contact = parsed.contact || parsed.phone || '';
+    const channel: OtpChannel = parsed.channel === 'email' ? 'email' : 'sms';
+    return contact && parsed.token ? { contact, channel, token: parsed.token } : null;
   } catch {
     return null;
   }

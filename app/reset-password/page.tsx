@@ -26,8 +26,9 @@ export default function ResetPasswordPage() {
     setError('');
     setLoading(true);
     // Two ways to land here:
-    //   • SMS OTP   → no session, but a single-use ticket in sessionStorage
-    //   • email OTP → signed in already, Supabase does the update
+    //   • a verified OTP (SMS or email) → no session, but a single-use ticket
+    //     in sessionStorage that the server exchanges for the change
+    //   • an already-signed-in user changing their own password
     const result = readResetTicket()
       ? await resetPasswordWithTicketUsecase(newPassword, confirmPassword)
       : await updatePasswordUsecase(newPassword, confirmPassword);

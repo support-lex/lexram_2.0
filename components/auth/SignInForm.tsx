@@ -289,8 +289,8 @@ export default function SignInForm() {
       router.push(redirectPath);
       router.refresh();
     } else {
-      // Email OTP leaves the user signed in; SMS OTP hands /reset-password a
-      // single-use ticket instead. Either way the next stop is the same page.
+      // Neither channel signs the user in: both hand /reset-password a
+      // single-use ticket that authorises exactly one password change.
       router.push('/reset-password');
       router.refresh();
     }

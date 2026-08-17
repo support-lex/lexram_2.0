@@ -14,6 +14,7 @@ import {
   isValidPhone,
   issueAndSendOtp,
   maskPhone,
+  phoneContact,
   phoneDigits,
   toE164,
 } from '@/lib/auth/phone-otp';
@@ -85,7 +86,7 @@ export const POST = jsonRoute('signup', async (req: Request) => {
     }
   }
 
-  const sent = await issueAndSendOtp(digits, 'signup', clientIp(req));
+  const sent = await issueAndSendOtp(phoneContact(digits), 'signup', clientIp(req));
   if (!sent.ok) {
     return NextResponse.json(
       { error: sent.error ?? 'Could not send the verification code.' },

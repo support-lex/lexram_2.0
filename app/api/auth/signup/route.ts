@@ -6,6 +6,7 @@
 // phone; the browser then signs in normally with phone + password.
 
 import { NextResponse } from 'next/server';
+import { jsonRoute } from '@/lib/api/json-route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
   clientIp,
@@ -19,7 +20,7 @@ import {
 
 export const runtime = 'nodejs';
 
-export async function POST(req: Request) {
+export const POST = jsonRoute('signup', async (req: Request) => {
   let body: { phone?: string; password?: string };
   try {
     body = await req.json();
@@ -93,4 +94,4 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ success: true, maskedPhone: maskPhone(digits) });
-}
+});

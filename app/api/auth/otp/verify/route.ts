@@ -7,6 +7,7 @@
 //                      session is created here.
 
 import { NextResponse } from 'next/server';
+import { jsonRoute } from '@/lib/api/json-route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
   consumeOtp,
@@ -18,7 +19,7 @@ import {
 
 export const runtime = 'nodejs';
 
-export async function POST(req: Request) {
+export const POST = jsonRoute('otp/verify', async (req: Request) => {
   let body: { identifier?: string; purpose?: OtpPurpose; code?: string };
   try {
     body = await req.json();
@@ -63,4 +64,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Could not complete verification. Please try again.' }, { status: 500 });
   }
   return NextResponse.json({ success: true, resetTicket: ticket, phone: toE164(user.phone) });
-}
+});

@@ -3,12 +3,13 @@
 // which leaves the user signed in so the client can call updateUser() directly.
 
 import { NextResponse } from 'next/server';
+import { jsonRoute } from '@/lib/api/json-route';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { consumeResetTicket, findUserByContact, phoneDigits } from '@/lib/auth/phone-otp';
 
 export const runtime = 'nodejs';
 
-export async function POST(req: Request) {
+export const POST = jsonRoute('reset-password', async (req: Request) => {
   let body: { phone?: string; ticket?: string; password?: string };
   try {
     body = await req.json();
@@ -49,4 +50,4 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ success: true });
-}
+});

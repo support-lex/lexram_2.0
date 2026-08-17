@@ -8,6 +8,7 @@
 // ever returned masked, so this route can't be used to harvest numbers.
 
 import { NextResponse } from 'next/server';
+import { jsonRoute } from '@/lib/api/json-route';
 import {
   clientIp,
   findUserByContact,
@@ -18,7 +19,7 @@ import {
 
 export const runtime = 'nodejs';
 
-export async function POST(req: Request) {
+export const POST = jsonRoute('otp/send', async (req: Request) => {
   let body: { identifier?: string; purpose?: OtpPurpose };
   try {
     body = await req.json();
@@ -62,4 +63,4 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ success: true, maskedPhone: maskPhone(user.phone) });
-}
+});

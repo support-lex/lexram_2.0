@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Download, Scale, CheckCircle2, Clock, XCircle, Printer } from 'lucide-react';
-import { openInvoicePDF } from '@/lib/invoice-pdf';
+import { X, Download, Scale, CheckCircle2, Clock, XCircle, Printer, Loader2 } from 'lucide-react';
+import { creditsApi } from '@/services/credits';
+import { computeTax, paymentCredits } from '@/lib/billing-config';
 
 export interface Payment {
   id: string;
@@ -11,7 +12,13 @@ export interface Payment {
   user_id?: string;
   amount_inr?: number;
   amount?: number;
+  /**
+   * The database column is `credits_granted`. `credits` exists only on the
+   * create-order response. Read both via paymentCredits() rather than either
+   * directly — reading `credits` off a DB row silently yields 0.
+   */
   credits?: number;
+  credits_granted?: number;
   status?: string;
   currency?: string;
   user_email?: string;
@@ -20,6 +27,32 @@ export interface Payment {
   cashfree_order_id?: string;
   created_at?: string;
   paid_at?: string;
+
+  // ── GST snapshot, written at payment time ──────────────────────────────────
+  // These record what was actually charged and filed. The invoice reads them
+  // rather than recomputing, so a later change to pricing, tax rate or template
+  // cannot silently alter an already-issued invoice. Absent on payments taken
+  // before the snapshot existed — those fall back to the legacy GST-inclusive
+  // calculation in computeTax() (lib/billing-config.ts).
+  /** Sequential, unique per financial year — Rule 46(b). */
+  invoice_number?: string;
+  taxable_value?: number;
+  cgst_amount?: number;
+  sgst_amount?: number;
+  igst_amount?: number;
+  /** Gross charged, i.e. taxable_value + tax. */
+  total_amount?: number;
+  /** State name of the recipient, e.g. "Karnataka". */
+  place_of_supply?: string;
+  /** Two-digit GST state code, e.g. "29". */
+  place_of_supply_code?: string;
+  /** Present only for registered (B2B) recipients. */
+  customer_gstin?: string;
+  customer_state?: string;
+  /** Recipient address, snapshotted at payment time — required by Rule 46. */
+  customer_address?: string;
+  customer_city?: string;
+  customer_pincode?: string;
 }
 
 interface InvoiceViewProps {
@@ -79,19 +112,44 @@ function StatusBadge({ status }: { status?: string }) {
 
 export default function InvoiceView({ payment, userEmail, userName, onClose }: InvoiceViewProps) {
   const amountINR = payment?.amount_inr ?? payment?.amount ?? 0;
-  const credits = payment?.credits ?? 0;
-  // Amount charged is GST-inclusive (that's what Cashfree actually collected),
-  // so the taxable value is backed out of it rather than added on top.
-  const taxableValue = amountINR / 1.18;
-  const cgst = taxableValue * 0.09;
-  const sgst = taxableValue * 0.09;
+  const credits = paymentCredits(payment ?? {});
+  // Shared with the printable invoice. This previously computed its own
+  // GST-inclusive, always-CGST+SGST split, which meant an inter-state customer
+  // would see CGST+SGST on screen and IGST in the downloaded file.
+  const tax = computeTax(payment ?? {});
+  const taxableValue = tax.taxableValue;
+  const cgst = tax.cgst;
+  const sgst = tax.sgst;
 
-  const handleDownload = useCallback(() => {
-    if (!payment) return;
-    openInvoicePDF(payment, userEmail, userName ?? '');
-  }, [payment, userEmail, userName]);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const handlePrint = handleDownload; // same flow — opens clean window that auto-prints
+  /**
+   * Fetches the stored PDF's signed URL and opens it.
+   *
+   * The invoice is rendered and stored server-side on payment success and is
+   * never regenerated once written, so every download hands over the exact
+   * document the customer was issued. This used to build the PDF in the browser
+   * on each click, which meant a template change silently rewrote history.
+   */
+  const handleDownload = useCallback(async () => {
+    if (!payment?.order_id || downloading) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const { url } = await creditsApi.getInvoiceUrl(payment.order_id);
+      if (!url) throw new Error('No download link returned');
+      // Opened rather than assigned to location so the modal stays put; the
+      // signed URL is short-lived and single-use in practice.
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : 'Could not download the invoice');
+    } finally {
+      setDownloading(false);
+    }
+  }, [payment?.order_id, downloading]);
+
+  const handlePrint = handleDownload;
 
   return (
     <>
@@ -135,19 +193,28 @@ export default function InvoiceView({ payment, userEmail, userName, onClose }: I
 
                 {/* Toolbar */}
                 <div className="invoice-no-print sticky top-0 z-10 flex items-center justify-between px-6 py-3.5 bg-white/95 backdrop-blur border-b border-neutral-100">
-                  <p className="text-sm font-medium text-neutral-700">{invoiceNumber(payment)}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-neutral-700">{invoiceNumber(payment)}</p>
+                    {downloadError && (
+                      <p className="text-[11px] text-red-500 mt-0.5">{downloadError}</p>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={handlePrint}
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-colors"
+                      disabled={downloading}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Printer className="w-3.5 h-3.5" /> Print
                     </button>
                     <button
                       onClick={handleDownload}
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-colors"
+                      disabled={downloading}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      <Download className="w-3.5 h-3.5" /> Download PDF
+                      {downloading
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Preparing…</>
+                        : <><Download className="w-3.5 h-3.5" /> Download PDF</>}
                     </button>
                     <button
                       onClick={onClose}
@@ -244,18 +311,30 @@ export default function InvoiceView({ payment, userEmail, userName, onClose }: I
                         <span>Taxable Value</span>
                         <span className="tabular-nums">{fmtINR(taxableValue)}</span>
                       </div>
-                      <div className="flex justify-between text-xs text-neutral-500">
-                        <span>CGST @9%</span>
-                        <span className="tabular-nums">{fmtINR(cgst)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-neutral-500">
-                        <span>SGST @9%</span>
-                        <span className="tabular-nums">{fmtINR(sgst)}</span>
-                      </div>
+                      {/* Inter-state supply is IGST @18%; intra-state splits
+                          into CGST + SGST @9% each. Must match the downloaded
+                          invoice — same computeTax() drives both. */}
+                      {tax.isInterState ? (
+                        <div className="flex justify-between text-xs text-neutral-500">
+                          <span>IGST @18%</span>
+                          <span className="tabular-nums">{fmtINR(tax.igst)}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-xs text-neutral-500">
+                            <span>CGST @9%</span>
+                            <span className="tabular-nums">{fmtINR(cgst)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-neutral-500">
+                            <span>SGST @9%</span>
+                            <span className="tabular-nums">{fmtINR(sgst)}</span>
+                          </div>
+                        </>
+                      )}
                       <div className="h-px bg-neutral-200 my-1" />
                       <div className="flex justify-between text-sm font-bold text-neutral-900">
                         <span>Total</span>
-                        <span className="tabular-nums">{fmtINR(amountINR)}</span>
+                        <span className="tabular-nums">{fmtINR(tax.total)}</span>
                       </div>
                     </div>
                   </div>

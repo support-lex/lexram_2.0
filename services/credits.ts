@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase/client';
+import { getAccessToken } from '@/lib/auth-store';
 
 export interface CreditBalance {
   user_id: string;
@@ -17,14 +17,37 @@ export interface CreditTransaction {
 export interface CreateOrderResponse {
   order_id: string;
   payment_session_id: string;
+  /** Pre-GST amount the user selected. */
   amount: number;
+  /** Gross charged to the gateway = amount + GST. Absent on older backends. */
+  total_amount?: number;
+  gst_amount?: number;
   currency: string;
   credits: number;
 }
 
+/**
+ * Billing details sent with the order. `customer_state_code` is the two-digit
+ * GST state code and is what decides CGST+SGST vs IGST — without it the backend
+ * falls back to the supplier's own state and every sale is billed as
+ * intra-state, which is wrong for customers outside Tamil Nadu.
+ */
+export interface OrderBillingDetails {
+  customer_name?: string;
+  customer_address?: string;
+  customer_city?: string;
+  customer_state_code?: string;
+  customer_pincode?: string;
+  customer_gstin?: string;
+}
+
 async function getAuthHeader(): Promise<Record<string, string>> {
-  const { data } = await supabase().auth.getSession();
-  const token = data.session?.access_token;
+  // Via getAccessToken(), not a raw getSession(). getSession() serialises behind
+  // Supabase's cross-tab Web Lock and can stall rather than reject; this call
+  // had no timeout at all, so a stalled lock would hang every credits request
+  // indefinitely. getAccessToken() races it against a short timeout and falls
+  // back to the last good cached token, which is still valid to authenticate.
+  const token = await getAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -52,10 +75,31 @@ export const creditsApi = {
     return apiFetch('/api/credits/transactions');
   },
 
-  createOrder(amount_inr: number, user_email: string, user_phone: string): Promise<CreateOrderResponse> {
+  /**
+   * Short-lived signed URL for a paid order's stored invoice PDF.
+   *
+   * The PDF is rendered and stored by the backend on payment success and is
+   * never regenerated once written — it is the document the customer received.
+   * If the webhook could not produce it, the backend renders it on this call
+   * from the tax snapshot on the payment row.
+   */
+  getInvoiceUrl(orderId: string): Promise<{ url: string; invoice_number?: string; expires_in?: number }> {
+    return apiFetch(`/api/payments/${encodeURIComponent(orderId)}/invoice`);
+  },
+
+  /**
+   * `amount_inr` is the PRE-GST amount. The backend charges amount + GST and
+   * grants credits on the pre-GST value.
+   */
+  createOrder(
+    amount_inr: number,
+    user_email: string,
+    user_phone: string,
+    billing: OrderBillingDetails = {},
+  ): Promise<CreateOrderResponse> {
     return apiFetch<CreateOrderResponse>('/api/payments/create-order', {
       method: 'POST',
-      body: JSON.stringify({ amount_inr, user_email, user_phone }),
+      body: JSON.stringify({ amount_inr, user_email, user_phone, ...billing }),
     });
   },
 };

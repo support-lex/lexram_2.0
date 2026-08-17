@@ -28,11 +28,15 @@ import {
   X,
   BadgeCheckIcon,
   BellIcon,
+  ReceiptIcon,
   LogOutIcon,
   Sparkles,
   ShieldCheck,
   BarChart3,
+  Zap,
 } from "lucide-react"
+import { useCredits } from "@/hooks/use-credits"
+import { isPaywallEnabled } from "@/lib/billing"
 import { useTour } from "@/components/tour/TourProvider"
 import { TOURS } from "@/lib/tour/tour-config"
 
@@ -130,6 +134,15 @@ export function AppTopBar() {
   const isSuperAdmin = useIsSuperAdmin()
   const hasAdminStats = useAdminAccess()
   const { start: startTour } = useTour()
+  const { balance, ready: creditsReady } = useCredits()
+  // Paywall state is read in an effect rather than during render:
+  // isPaywallEnabled() reads localStorage, which is not available on the server
+  // and would desync the first client render from the server HTML.
+  const [paywallEnabled, setPaywallEnabled] = React.useState(false)
+  React.useEffect(() => { setPaywallEnabled(isPaywallEnabled()) }, [])
+  // Roughly a handful of deep-research queries left, so there is still time to
+  // act rather than being told once it is already too late.
+  const isLowBalance = creditsReady && balance < 20
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const [hoveredIdx, setHoveredIdx] = React.useState<number | null>(null)
   const navRef = React.useRef<HTMLElement>(null)
@@ -281,8 +294,33 @@ export function AppTopBar() {
           })}
         </nav>
 
-        {/* ── Right: settings, help, user chip ─────────────────── */}
+        {/* ── Right: credits, settings, help, user chip ─────────── */}
         <div className="flex items-center gap-1 shrink-0">
+          {/* Balance doubles as the top-up entry point. Previously the only
+              route to it was a card on /dashboard, so from anywhere else you
+              had to go looking. Showing the number makes it worth glancing at,
+              and it turns into a solid CTA once the balance runs low — loud
+              when it matters, quiet when it does not. */}
+          {paywallEnabled && (
+            <Link
+              href="/dashboard/billing"
+              aria-label={creditsReady ? `${balance} credits — top up` : 'Credits — top up'}
+              title="Credits &middot; top up"
+              className={`hidden sm:inline-flex items-center gap-1.5 h-7 pl-2 pr-2.5 mr-1 rounded-full text-[12px] font-semibold transition-all duration-200 ${
+                isLowBalance
+                  ? 'bg-[var(--brand-cta)] text-[var(--brand-cta-text)] hover:bg-[var(--brand-cta-hover)] shadow-sm'
+                  : 'text-[#7a1f2b] bg-[#7a1f2b]/8 hover:bg-[#7a1f2b]/14'
+              }`}
+            >
+              <Zap className="size-3.5" strokeWidth={2} />
+              <span className="tabular-nums">
+                {creditsReady ? balance.toLocaleString('en-IN') : '—'}
+              </span>
+              <span className="hidden md:inline font-medium opacity-80">
+                {isLowBalance ? 'Top up' : 'credits'}
+              </span>
+            </Link>
+          )}
           <Link
             href="/dashboard/settings"
             data-tour="topbar-settings"
@@ -393,8 +431,11 @@ export function AppTopBar() {
 
               {/* Menu items */}
               <DropdownMenuGroup className="p-1.5">
+                {/* /dashboard/settings/profile does not exist — settings is a
+                    single page with tabs, so that route 404'd. The tab is
+                    selected from the hash. */}
                 <DropdownMenuItem
-                  render={<Link href="/dashboard/settings/profile" />}
+                  render={<Link href="/dashboard/settings#profile" />}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] text-gray-700 focus:bg-[#7a1f2b]/8 focus:text-[#7a1f2b] data-[highlighted]:bg-[#7a1f2b]/8 data-[highlighted]:text-[#7a1f2b] transition-colors cursor-pointer"
                 >
                   <span className="grid place-items-center size-8 rounded-lg bg-[#7a1f2b]/8 text-[#7a1f2b]">
@@ -410,6 +451,18 @@ export function AppTopBar() {
                     <BellIcon className="size-4" strokeWidth={1.75} />
                   </span>
                   <span className="font-medium">Notifications</span>
+                </DropdownMenuItem>
+                {/* Billing was only reachable from a card on /dashboard, so from
+                    anywhere else in the app there was no way to find an invoice.
+                    The account menu is where people look for it. */}
+                <DropdownMenuItem
+                  render={<Link href="/dashboard/billing" />}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[14px] text-gray-700 focus:bg-[#7a1f2b]/8 focus:text-[#7a1f2b] data-[highlighted]:bg-[#7a1f2b]/8 data-[highlighted]:text-[#7a1f2b] transition-colors cursor-pointer"
+                >
+                  <span className="grid place-items-center size-8 rounded-lg bg-[#7a1f2b]/8 text-[#7a1f2b]">
+                    <ReceiptIcon className="size-4" strokeWidth={1.75} />
+                  </span>
+                  <span className="font-medium">Billing &amp; Invoices</span>
                 </DropdownMenuItem>
               </DropdownMenuGroup>
 

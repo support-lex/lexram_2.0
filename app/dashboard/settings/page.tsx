@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   User, Building2, Bell, Shield, CreditCard,
-  Settings2, Save, LogOut, Check
+  Settings2, Save, LogOut, Check, Receipt
 } from 'lucide-react';
+import { useCredits } from '@/hooks/use-credits';
 import { toast } from 'sonner';
 import { useCurrentUser, getInitials } from '@/hooks/use-current-user';
 import { useNetworkAvatar, notifyProfileUpdated } from '@/hooks/use-network-avatar';
@@ -20,11 +22,40 @@ const themes = [
   { id: 'emerald', name: 'Emerald', desc: 'Bold green authority', sidebar: '#14291E', bg: '#FAFDF7', accent: '#059669', surface: '#FFFFFF' },
 ];
 
+// Must match the ids passed to setActiveTab() below — an id missing here is
+// silently ignored when it arrives as a hash.
+const VALID_TABS = ['profile', 'firm', 'notifications', 'security', 'billing', 'preferences'];
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [currentTheme, setCurrentTheme] = useState('light');
   const [paywallEnabled, setPaywallEnabled] = useState(true);
   useEffect(() => { setPaywallEnabled(isPaywallEnabled()); }, []);
+
+  const { balance, ready: creditsReady } = useCredits();
+
+  // Select the tab from the URL hash. Links elsewhere in the app already point
+  // at /dashboard/settings#notifications and #profile, but nothing read the
+  // hash, so every one of them silently landed on the default tab.
+  useEffect(() => {
+    const applyHash = () => {
+      const tab = window.location.hash.replace('#', '');
+      if (VALID_TABS.includes(tab)) setActiveTab(tab);
+    };
+    applyHash();
+    window.addEventListener('hashchange', applyHash);
+    return () => window.removeEventListener('hashchange', applyHash);
+  }, []);
+
+  // Keep the hash in step so a chosen tab survives reload and can be linked to.
+  // replaceState rather than assigning location.hash, which would push a history
+  // entry for every tab click and trap the back button inside settings.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.location.hash.replace('#', '') !== activeTab) {
+      window.history.replaceState(null, '', `#${activeTab}`);
+    }
+  }, [activeTab]);
 
   // ── Profile state, hydrated from the signed-in user ────────────────────────
   const currentUser = useCurrentUser();
@@ -109,6 +140,10 @@ export default function SettingsPage() {
   };
 
   return (
+    // Own scroll container: the dashboard layout's <main> is overflow-hidden so
+    // the chat views can manage their own scrolling, which clips any page that
+    // relies on the document scrolling instead.
+    <div className="h-full overflow-y-auto">
     <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       <div>
         <h1 className="font-sans text-2xl font-sans font-bold text-[var(--text-primary)]">Settings</h1>
@@ -397,19 +432,35 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* This previously showed a hardcoded "500 Credits / Free trial
+              credits" regardless of the real balance, and a "Buy More Credits"
+              button linking to #pricing — an anchor that does not exist on this
+              page. Both are now real: the balance comes from useCredits, and
+              invoices live on the billing page rather than being duplicated. */}
           {activeTab === 'billing' && paywallEnabled && (
             <div className="max-w-xl space-y-6">
               <h2 className="font-sans text-xl font-bold text-[var(--text-primary)] border-b border-[var(--border-default)] pb-4">Billing & Credits</h2>
               <div className="bg-[var(--bg-sidebar)] rounded-2xl p-6 text-white">
                 <p className="text-xs font-bold text-[var(--accent)] uppercase tracking-wider mb-2">Current Balance</p>
-                <p className="text-4xl font-sans font-bold">500 Credits</p>
-                <p className="text-sm text-[var(--text-muted)] mt-1">Free trial credits</p>
+                <p className="text-4xl font-sans font-bold">
+                  {creditsReady ? `${balance.toLocaleString('en-IN')} Credits` : '—'}
+                </p>
+                <p className="text-sm text-[var(--text-muted)] mt-1">₹2 per credit · Credits never expire</p>
               </div>
-              <a href="#pricing" className="block w-full text-center bg-[var(--accent)] text-[var(--accent-text)] py-3 rounded-xl font-bold hover:bg-[var(--accent-hover)] transition-colors">Buy More Credits</a>
+              <Link
+                href="/dashboard/billing"
+                className="flex items-center justify-center gap-2 w-full text-center bg-[var(--brand-cta)] text-[var(--brand-cta-text)] py-3 rounded-xl font-bold hover:bg-[var(--brand-cta-hover)] transition-colors"
+              >
+                <Receipt className="w-4 h-4" /> View invoices & top up
+              </Link>
+              <p className="text-xs text-[var(--text-muted)] text-center">
+                Payment history, GST invoices and top-ups are all on the billing page.
+              </p>
             </div>
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

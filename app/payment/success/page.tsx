@@ -5,16 +5,20 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, Loader2, Scale, ArrowRight, Download, Printer } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { openInvoicePDF } from '@/lib/invoice-pdf';
+import { creditsApi } from '@/services/credits';
 import type { Payment } from '@/components/InvoiceView';
+import { SUPPLIER, computeTax, paymentCredits } from '@/lib/billing-config';
 
+// Supplier identity comes from billing-config so the receipt, the invoice and
+// the modal cannot disagree. `city` is kept as a separate line here because
+// this layout prints the address across two lines.
 const COMPANY = {
-  name: 'Ramasubramanian AI Software Pvt. Ltd.',
-  email: 'hello@lexram.ai',
-  phone: '+91 87544 46066',
+  name: SUPPLIER.name,
+  email: SUPPLIER.email,
+  phone: SUPPLIER.phone,
   address: 'B 225, 12th Avenue, Ashok Nagar',
   city: 'Chennai, Tamil Nadu — 600083',
-  website: 'lexram.ai',
+  website: SUPPLIER.website,
 };
 
 function fmtINR(n: number) {
@@ -66,6 +70,8 @@ function SuccessPageContent() {
   const fallbackAmount  = Number(params.get('amount')  ?? 0);
 
   const [payment,   setPayment]   = useState<Payment | null>(null);
+  // Same tax computation as the invoice and the modal — see lib/billing-config.
+  const successTax = computeTax(payment ?? {});
   const [userEmail, setUserEmail] = useState('');
   const [userName,  setUserName]  = useState('');
   const [phase,     setPhase]     = useState<'loading' | 'found' | 'timeout'>('loading');
@@ -120,16 +126,34 @@ function SuccessPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
-  /* ── PDF/print handlers — no ref needed ───────────────────── */
-  const handleDownload = useCallback(() => {
-    if (!payment) return;
-    openInvoicePDF(payment, userEmail, userName);
-  }, [payment, userEmail, userName]);
+  /* ── Invoice download ──────────────────────────────────────
+     Fetches the stored PDF's signed URL rather than building one in the
+     browser. The invoice is rendered and stored server-side on payment success
+     and never regenerated, so this hands over the exact document issued.
+     Right after payment the webhook may not have landed yet, in which case the
+     backend renders on demand from the payment row's tax snapshot. */
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const handlePrint = useCallback(() => {
-    if (!payment) return;
-    openInvoicePDF(payment, userEmail, userName);
-  }, [payment, userEmail, userName]);
+  const handleDownload = useCallback(async () => {
+    const oid = payment?.order_id ?? orderId;
+    if (!oid || downloading) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const { url } = await creditsApi.getInvoiceUrl(oid);
+      if (!url) throw new Error('No download link returned');
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setDownloadError(
+        err instanceof Error ? err.message : 'Invoice is still being prepared. Please try again shortly.',
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }, [payment?.order_id, orderId, downloading]);
+
+  const handlePrint = handleDownload;
 
   return (
     <>
@@ -172,19 +196,28 @@ function SuccessPageContent() {
 
               {/* Action bar */}
               <div className="no-print flex items-center justify-between mb-4">
-                <p className="text-xs text-neutral-400 font-mono">{invoiceNum(payment)}</p>
+                <div className="min-w-0">
+                  <p className="text-xs text-neutral-400 font-mono">{invoiceNum(payment)}</p>
+                  {downloadError && (
+                    <p className="text-[11px] text-red-500 mt-0.5">{downloadError}</p>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handlePrint}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors shadow-sm"
+                    disabled={downloading}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Printer className="w-3.5 h-3.5" /> Print
                   </button>
                   <button
                     onClick={handleDownload}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-colors shadow-sm"
+                    disabled={downloading}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-800 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <Download className="w-3.5 h-3.5" /> Download PDF
+                    {downloading
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Preparing…</>
+                      : <><Download className="w-3.5 h-3.5" /> Download PDF</>}
                   </button>
                 </div>
               </div>
@@ -254,7 +287,7 @@ function SuccessPageContent() {
                         <p className="text-xs text-neutral-400 mt-0.5">Valid for all research &amp; drafting · Never expire</p>
                       </div>
                       <div className="col-span-2 text-center text-sm font-medium text-neutral-700 tabular-nums">
-                        {(payment.credits ?? fallbackCredits).toLocaleString('en-IN')}
+                        {(paymentCredits(payment) || fallbackCredits).toLocaleString('en-IN')}
                       </div>
                       <div className="col-span-2 text-center text-sm text-neutral-400">₹2 / cr</div>
                       <div className="col-span-2 text-right text-sm font-bold text-neutral-900 tabular-nums">
@@ -263,20 +296,38 @@ function SuccessPageContent() {
                     </div>
                   </div>
 
-                  {/* Totals */}
+                  {/* Totals — same computeTax() as the invoice and the modal.
+                      This previously hardcoded "GST (0%)  ₹0", which was wrong
+                      even before the pricing change: the amount charged was
+                      already GST-inclusive, so it told the customer there was
+                      no tax immediately after they had paid it. */}
                   <div className="flex justify-end mb-8">
                     <div className="w-60 space-y-2">
                       <div className="flex justify-between text-xs text-neutral-400">
-                        <span>Subtotal</span>
-                        <span className="tabular-nums">{fmtINR(payment.amount_inr ?? payment.amount ?? fallbackAmount)}</span>
+                        <span>Taxable Value</span>
+                        <span className="tabular-nums">{fmtINR(successTax.taxableValue)}</span>
                       </div>
-                      <div className="flex justify-between text-xs text-neutral-400">
-                        <span>GST (0%)</span><span>₹0</span>
-                      </div>
+                      {successTax.isInterState ? (
+                        <div className="flex justify-between text-xs text-neutral-400">
+                          <span>IGST @18%</span>
+                          <span className="tabular-nums">{fmtINR(successTax.igst)}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-xs text-neutral-400">
+                            <span>CGST @9%</span>
+                            <span className="tabular-nums">{fmtINR(successTax.cgst)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-neutral-400">
+                            <span>SGST @9%</span>
+                            <span className="tabular-nums">{fmtINR(successTax.sgst)}</span>
+                          </div>
+                        </>
+                      )}
                       <div className="h-px bg-neutral-200" />
                       <div className="flex justify-between text-sm font-bold text-neutral-900">
                         <span>Total Paid</span>
-                        <span className="tabular-nums">{fmtINR(payment.amount_inr ?? payment.amount ?? fallbackAmount)}</span>
+                        <span className="tabular-nums">{fmtINR(successTax.total)}</span>
                       </div>
                     </div>
                   </div>

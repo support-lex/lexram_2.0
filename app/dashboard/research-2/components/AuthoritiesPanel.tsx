@@ -421,7 +421,13 @@ export default function AuthoritiesPanel({
 
   const getHost = (url?: string): string => {
     if (!url) return "";
-    try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; }
+    // Tax PDFs are served from our own /api/tax-pdf/... proxy, so the URL is
+    // site-relative. Resolving against the current origin makes those show
+    // our host instead of an empty chip.
+    try {
+      const base = typeof window === "undefined" ? undefined : window.location.origin;
+      return new URL(url, base).hostname.replace(/^www\./, "");
+    } catch { return ""; }
   };
   const getFavicon = (url?: string, size = 64): string => {
     const host = getHost(url);

@@ -1,7 +1,17 @@
 export type CommandMode = "normal" | "counter" | "draft" | "timeline";
 export type ArtifactTab = "workflow" | "authorities" | "editor" | "sources";
 
-export type ChunkSourceType = "sc_judgment" | "hc_judgment" | "statute" | "sc_order" | "state_act";
+// `tax_doc` covers the CBIC indirect-tax corpus — GST, Customs, Central Excise
+// and Service Tax notifications, circulars, orders, rules and the annual
+// Finance Acts. Kept apart from `statute` (the indiacode Central Acts) so a
+// GST notification is not presented as primary legislation.
+export type ChunkSourceType =
+  | "sc_judgment"
+  | "hc_judgment"
+  | "statute"
+  | "sc_order"
+  | "state_act"
+  | "tax_doc";
 
 export type ChunkSource = {
   type: ChunkSourceType;

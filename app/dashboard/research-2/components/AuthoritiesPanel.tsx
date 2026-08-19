@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import {
   ArrowUpRight, Copy, Plus, Landmark, FileText,
   Eye, Download, X, ExternalLink, Scale, BookOpen, Gavel, FileCheck, ScrollText,
+  Receipt,
 } from "lucide-react";
 import { EditorArtifact } from "./EditorArtifact";
 import type { ArtifactTab, ChunkSource, ChunkSourceType, LegalAnswer } from "../types";
@@ -41,6 +42,12 @@ const TYPE_CONFIG: Record<ChunkSourceType, { label: string; dot: string; badge: 
     dot:   "bg-slate-400",
     badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
     icon:  <ScrollText className="w-3 h-3" />,
+  },
+  tax_doc: {
+    label: "Indirect Tax",
+    dot:   "bg-cyan-500",
+    badge: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
+    icon:  <Receipt className="w-3 h-3" />,
   },
 };
 
@@ -402,7 +409,10 @@ export default function AuthoritiesPanel({
     });
   };
 
-  const presentTypes = (["sc_judgment", "hc_judgment", "statute", "sc_order", "state_act"] as ChunkSourceType[])
+  // Derived from TYPE_CONFIG rather than a second hardcoded list: the previous
+  // literal array was cast to ChunkSourceType[], so adding a member to the
+  // union left it without a filter chip and TypeScript raised nothing.
+  const presentTypes = (Object.keys(TYPE_CONFIG) as ChunkSourceType[])
     .filter((t) => streamingSources.some((s) => s.type === t));
 
   const displayedSources = activeFilters.size === 0
